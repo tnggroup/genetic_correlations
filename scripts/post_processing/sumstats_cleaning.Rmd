@@ -1,0 +1,192 @@
+---
+title: "rg results summary tables template"
+author: "Abigail ter Kuile"
+date: "28/08/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      comment=NA,
+                      prompt=FALSE,
+                      cache=FALSE)
+```
+
+Clear global environment
+```{r Clear global environment}
+remove(list = ls())
+```
+
+```{r Packages}
+library(summarytools)
+library(tidyverse)
+```
+
+Retrieve the recent date
+```{r Recent date}
+date = Sys.Date()
+date
+```
+
+Read in sumstats and interpret columns
+```{r read in sumstats}
+
+```
+
+Interpret columns
+```{r }
+
+```
+
+Check the existance of columns
+
+Set correct R data formats
+
+?Remove variants with missing values
+
+?Remove variants based on MAF/FRQ, INFO, OR, p-value, N (Ollies script) filters etc
+
+Deal with duplicate variants
+
+Deal with maf and frequencey columns
+
+Deal with missing effect standard error
+Add standard errors from beta & z or or & z (Ollies script)
+
+Set N from Ncon and Ncas
+
+Add columns on sample size, enough for PRS enough for pathway analysis
+
+Clean or fix variant SNP column
+
+Check and correct for GC
+
+
+
+?Read in reference from plink formats
+```{r read in reference}
+
+```
+
+2) Read in Up to date table with full GWAS information of each trait. Currently in csv format linked with the flask app, or in the google sheet.
+```{r read in full GWAS info all traits}
+
+```
+
+```{r check mhc removed }
+
+```
+
+```{r check traits significantly h2}
+
+```
+
+3) Read in rg data for your trait of interest\
+```{r read in rg results}
+
+```
+
+```{r select rg results from log out put files}
+
+```
+
+2) Joining datasets:
+#Step) join the rg results with the GWAS information file to get full GWAS info for each trait
+Merge 
+```{r join info GWAS sheet with rg results}
+
+```
+
+3) Filtering
+For both summary table for plotting and supplementary table:
+#step) Only extract GWAS traits that are not private. 
+Filter by permissions and exclude all private sumstats
+NOTE: need to simplify the current permissions category 
+```{r filter based on permissions}
+
+```
+
+```{r by trait cateogry}
+
+```
+
+#step) Filter p-values by bonferonni threshold 
+Adapt Helena's script in python that already exists calculating bonferonni significance?
+Create a new data frame with only bonf signif traits for summary table for paper plotting of top traits? or just add a new column with 'yes/no' for bonferonnni significant? Johan's preference: stick to one dataframe and filter in the plotting step
+For supplementary table: how do we want to indicate which traits are bonferonni significant? e.g. bold text? A separate column saying 'significant/ non significant'? Colours??
+```{r create bonferonni column}
+
+```
+
+```{r create FDR column }
+
+```
+
+```{r convert table to matrix for matrix decomposition}
+
+```
+
+note: we already have this script in python
+```{r matrix decomposition for bonferonni threshold}
+
+```
+
+Create new dataframes for supplmentary tables
+
+#create supplementary tables
+Select columns for supplementary tables for paper. Decide on columns. 
+e.g. Watson et al 2019 (AN GWAS) columns: Phenotype, rg, se, P (green = bonferoni significant), Phenotype category, PMID, code, ancestry. 
+but could also include Z value of rg, gcov_int, gcov_int_se, h2_obs, h2_obs_se, h2_int	h2_int_se - or h2 Z and mean chi square which could be useful? Topher has a script that extracted h2 information for each GWAS
+```{r create dataframe for supplementary tables}
+
+```
+
+4) Saving new tables
+#what is the preffered format for saving the new table? google sheets? excel sheet for supplementary materials? Save summary table as rds for plotting?
+Save as excel, google sheets, txt
+```{r save supplementary table}
+
+```
+
+5) Plotting
+Decide on significance threshold for plotting. Note: matrix decomposition threshold as less stringent.
+
+Note: trait labels for plotting. This needs to be added to in the google spreadsheet, and then trait labels column for plotting will be used in stead of 'phenotype'
+
+We also have multiple GWAS for one phenotype e.g. MDD - 
+```{r vector of signficant traits for plotting}
+# i.e. the researcher may only want to show specific GWAS for each phenotype e.g. most powerful, or certain cohorts, selected based on type of phenotyping. A
+```
+
+
+```{r filter based on vector of traits}
+
+```
+
+
+```{r create dataframe for plotting}
+#filtering: 1) matrix decomposition 2) vector of selected traits for plotting
+```
+
+Use AN GWAS plot script (Watson et al 2019)
+```{r plot rg results}
+
+```
+
+Publication table
+```{r dataframe for publication table of significant rg traits}
+
+```
+
+save in excel format
+```{r save publication table}
+
+```
+ 
+What output do we want from this script?
+1) a general filtered summary table with full GWAS information for each trait (permissions, column significant)
+2) an rg plot with top traits
+3) a supplementary table with selected columns for paper (all traits, except traits with private permissions)
+note: at some point we want to filter by heritability. But do we want this at an earlier step so that we are not running rg with traits that aren't significantly heritable?
+4) Publication table - significant ones (instead of a plot)
+
