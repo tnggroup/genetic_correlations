@@ -151,6 +151,7 @@ parseSNPColumnAsRSNumber <- function(text){
     return(lapply(X = matches, FUN = function(x)paste0("rs",x[2])))
   }
   
+  #TODO this was applied to the whole row rather than only the SNP column in Helenas cleaning script - FIX!!
   text<-sub(pattern = "^X",replacement = "13",x = text)
   text<-sub(pattern = "^chr",replacement = "",x = text)
   text<-sub(pattern = "_",replacement = ":",x = text)
