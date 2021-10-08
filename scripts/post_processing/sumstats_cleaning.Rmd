@@ -40,7 +40,7 @@ clOptions<-parse_args(clParser)
 ```
 
 # Script settings
-```{r Recent date}
+```{r Script setting}
 
 filename.rmd<-"sumstats_cleaning.Rmd"
 
@@ -138,7 +138,7 @@ stdGwasColumnNames <- function(columnNames, stopOnMissingEssential=T,
   return(data.frame(std=columnNames,orig=columnNames.orig))
 }
 
-
+#ref, plink chromosome numbering: https://zzz.bwh.harvard.edu/plink/data.shtml
 parseSNPColumnAsRSNumber <- function(text){
   #decide if BGENIE SNP format using top 100,000 SNPs
   #TODO this condition may be improved to not rely on the number of variants being >100,000
@@ -151,13 +151,16 @@ parseSNPColumnAsRSNumber <- function(text){
     return(lapply(X = matches, FUN = function(x)paste0("rs",x[2])))
   }
   
-  #TODO this was applied to the whole row rather than only the SNP column in Helenas cleaning script - FIX!!
-  text<-sub(pattern = "^X",replacement = "13",x = text)
+  text<-sub(pattern = "^XY:",replacement = "25:",x = text)
+  text<-sub(pattern = "^X:",replacement = "23:",x = text)
+  text<-sub(pattern = "^Y:",replacement = "24:",x = text)
+  text<-sub(pattern = "^MT:",replacement = "26:",x = text)
   text<-sub(pattern = "^chr",replacement = "",x = text)
   text<-sub(pattern = "_",replacement = ":",x = text)
   
   return(text)
 }
+
 ```
 
 # Read in sumstats and interpret columns
@@ -212,15 +215,15 @@ cSumstats <- setDT(cSumstats)
 # Column harmonisation
 cSumstats.keys <- c('SNP')
 cSumstats$SNP <- as.character(cSumstats$SNP)
-cSumstats$A1 <- as.character(toupper(cSumstats$A1))
-cSumstats$A2 <- as.character(toupper(cSumstats$A2))
+cSumstats$A1 <- toupper(as.character(cSumstats$A1))
+cSumstats$A2 <- toupper(as.character(cSumstats$A2))
 
 #parse SNP if needed
-cSumstats$SNP<-tolower(parseSNPColumnAsRSNumber(cSumstats$SNP))
+cSumstats$SNP <- tolower(parseSNPColumnAsRSNumber(cSumstats$SNP))
 
 if(any(colnames(cSumstats)=="CHR")) {
-  cSumstats$CHR <- as.character(toupper(cSumstats$CHR))
-  cSumstats.keys <- c(cSumstats.keys,'CHR') 
+  cSumstats$CHR <- toupper(as.character(cSumstats$CHR))
+  cSumstats.keys <- c(cSumstats.keys,'CHR')
 }
 
 if(any(colnames(cSumstats)=="BP")) {
