@@ -413,6 +413,12 @@ Check and correct for GC
 
 ```{r check mhc removed }
 
+#Remove MHC as in HAPMAP
+
+hapmap_snps <- fread("/mnt/lustre/groups/ukbiobank/sumstats/scripts/hapmap_hmc_uniq.txt")
+
+cSumstats_noMHC <- cSumstats[!(cSumstats$SNP %in% hapmap_snps[1]),]
+
 ```
 
 ```{r check traits significantly h2}
