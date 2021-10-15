@@ -370,7 +370,7 @@ Deal with duplicate variants
 if(any(colnames(cSumstats)=="SNP") & any(colnames(cSumstats)=="A1") & any(colnames(cSumstats)=="A2")) {
   cSumstats.n <- nrow(cSumstats)
   cSumstats <- unique(cSumstats,by = c("SNP","A1","A2"))
-  umstats.meta[cCode,c("n_removed_indels")]<-cSumstats.n-nrow(cSumstats)
+  umstats.meta[cCode,c("n_removed_duplicates")]<-cSumstats.n-nrow(cSumstats)
 }
 ```
 
