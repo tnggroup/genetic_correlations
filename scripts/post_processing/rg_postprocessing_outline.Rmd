@@ -19,6 +19,7 @@ remove(list = ls())
 
 ```{r Packages}
 library(summarytools)
+library(googlesheets4)
 library(tidyverse)
 ```
 
@@ -29,29 +30,67 @@ date
 ```
 
 What input do we need for this rmarkdown?
-1) LDSC rg results between a selected trait of interest and all traits in the summary statistics repository (or a shorter list of specific list of traits). All traits have had mhc region removed before rg estimation (and are significantly heritable?). rg results are only calculated in one direction to avoid repetition. 
-```{r read in up to date list of traits}
+LDSC rg results between a selected trait of interest and all traits in the summary statistics repository (or a shorter list of specific list of traits). All traits have had mhc region removed before rg estimation (and are significantly heritable?). rg results are only calculated in one direction to avoid repetition. 
 
+
+1) Read in list of traits to be analysed (in GWAS code format e.g. ADHD05, mhc region removed )
+
+Option 1: up to date list of all GWAS traits for rg analysis
+```{r read in up to date list of traits}
+trait_list_all <- c("insert/file/path/list.txt")
 ```
 
+Option 2: shorter list of specific traits for rg analysis
 ```{r read in sub selected trait list}
-
+trait_list_short <- c("insert/file/path/list.txt")
 ```
 
 2) Read in Up to date table with full GWAS information of each trait. Currently in csv format linked with the flask app, or in the google sheet.
-```{r read in full GWAS info all traits}
 
+# option 1: CSV
+```{r csv read in full GWAS info all traits}
+GWAS_info_sheet <- c("insert/file/path/sheet.csv")
+```
+
+# option 2: google sheet
+
+Login to googlesheets
+```{r Login to google sheets}
+gs4_auth(email = "emailname@kcl.ac.uk")
+```
+
+```{r google read in full GWAS info all traits}
+GWAS_info_sheet <- read_sheet(
+  ss = "https://docs.google.com/spreadsheets/d/1Wmj4Qzumkzks6541vQJqxaUBxjfL4KLQo7_K_oquacI/edit#gid=0", #link to google doc
+  sheet = "SGDP_GWASLIST_EDITTHIS", #sheet name with data in
+  col_names = TRUE, #  use the first row as column names
+  trim_ws = TRUE, # Trims whitespace,
+  guess_max = 600, # Max number of data rows to use for guessing column types +++ATK do we need this? change to +700?
+  na = c("", "NULL", "NA") #Character vector of strings to interpret as missing values. 
+  )
+
+colnames(GWAS_info_sheet)
+
+GWAS_info_sheet
 ```
 
 ```{r check mhc removed }
-
+# add once we have decided what format this is in (remove using SNP list?)
 ```
 
-```{r check traits significantly h2}
+```{r check traits h2 significantly greater than 0}
 
+# e.g. h2_observed+/-1.96*h2_se = upper/lower CI
+# h2_observed - CI_upper 
+#https://www.tidyverse.org/blog/2021/08/infer-1-0-0/
 ```
 
-3) Read in rg data for your trait of interest\
+3) Read in rg data for your trait of interest
+
++++ATK: this depends on if we are using LDSC in python to run rg, or are we using Genomic SEM in R to run rg? 
+
+if LDSC:
+convert already existing bash scripts to R - or just read bash script?
 ```{r read in rg results}
 
 ```
@@ -64,7 +103,13 @@ What input do we need for this rmarkdown?
 #Step) join the rg results with the GWAS information file to get full GWAS info for each trait
 Merge 
 ```{r join info GWAS sheet with rg results}
-
+rgs_gwas_info <- 
+  left_join(
+    x = rgs,
+    y = GWAS_info_sheet,
+    by = c("p1" = "Code")) ##note: p1 is for LDSC-python. Change if we use LDSC-Gsem to whatever we specify for that column (phenotype?)
+    
+colnames(rgs_gwas_info)
 ```
 
 3) Filtering
@@ -73,11 +118,18 @@ For both summary table for plotting and supplementary table:
 Filter by permissions and exclude all private sumstats
 NOTE: need to simplify the current permissions category 
 ```{r filter based on permissions}
-
+rgs_filtered <- rgs_gwas_info %>% 
+  filter(
+    permissions != "PRIVATE" 
+  )
 ```
 
+#optional step if only interested in certain trait categories
 ```{r by trait cateogry}
-
+rgs_filtered_cat <- rgs_filtered %>%
+  filter(
+    category = "insert_category" #add category as relevent
+  )
 ```
 
 #step) Filter p-values by bonferonni threshold 
@@ -85,20 +137,61 @@ Adapt Helena's script in python that already exists calculating bonferonni signi
 Create a new data frame with only bonf signif traits for summary table for paper plotting of top traits? or just add a new column with 'yes/no' for bonferonnni significant? Johan's preference: stick to one dataframe and filter in the plotting step
 For supplementary table: how do we want to indicate which traits are bonferonni significant? e.g. bold text? A separate column saying 'significant/ non significant'? Colours??
 ```{r create bonferonni column}
+rgs_filtered <- rgs_filtered %>%
+  mutate(
+   P.Bonferroni =
+  p.adjust(
+    p = p,
+    method = "bonferroni" # Bonferroni correction method (p-values are multiplied by the number of comparisons)
+    )
+  )
 
+summary(
+  rgs_filtered$P.Bonferroni
+  )
 ```
 
 ```{r create FDR column }
+rgs_filtered <- rgs_filtered %>%
+  mutate(
+   FDR.Q.value =
+  p.adjust(
+    p = p,
+    method = "BH" # Benjamini Hochberg method (the expected proportion of false discoveries amongst the rejected hypotheses)
+    )
+  )
 
+summary(
+  rgs_filtered$FDR.Q.value
+  )
+```
+
+Add column with FDR significant label
+```{r Add column with FDR significant label}
+rgs_filtered <-
+  rgs_filtered %>%
+  mutate(
+    FDR_significant =
+      case_when(
+        FDR.Q.value < 0.05 ~ "significant",
+        FDR.Q.value > 0.05 ~ "not"
+      )
+  )
+
+rgs_filtered %>%
+  summarise(FDR_significant)
 ```
 
 ```{r convert table to matrix for matrix decomposition}
-
+#find Helena's script for this 
 ```
 
 note: we already have this script in python
 ```{r matrix decomposition for bonferonni threshold}
-
+rgs_filtered <- rgs_filtered %>%
+  mutate(
+   P.Bonferroni_matrix =
+     #find Helena's script for this?
 ```
 
 Create new dataframes for supplmentary tables
@@ -107,8 +200,23 @@ Create new dataframes for supplmentary tables
 Select columns for supplementary tables for paper. Decide on columns. 
 e.g. Watson et al 2019 (AN GWAS) columns: Phenotype, rg, se, P (green = bonferoni significant), Phenotype category, PMID, code, ancestry. 
 but could also include Z value of rg, gcov_int, gcov_int_se, h2_obs, h2_obs_se, h2_int	h2_int_se - or h2 Z and mean chi square which could be useful? Topher has a script that extracted h2 information for each GWAS
-```{r create dataframe for supplementary tables}
 
+Select columns for supplementary tables
+```{r create dataframe for supplementary tables}
+rgs_supplmentary_table <- 
+  rgs_supplmentary_table %>%
+    select(
+      Phenotype,
+      rg, 
+      se, 
+      z,
+      p,
+      FDR_significant, ### add other methods too 
+      Phenotype category,
+      PMID, 
+      code, 
+      ancestry
+      
 ```
 
 4) Saving new tables
