@@ -38,12 +38,10 @@ clParser <- add_option(clParser, c("-n", "--sample-size"), type="numeric",
                 help="Number of individuals in the sample.")
 
 clOptions<-parse_args(clParser)
-
 ```
 
 # Script settings
 ```{r Script setting}
-
 filename.rmd<-"sumstats_cleaning.Rmd"
 
 #explicitly set total N
@@ -51,15 +49,12 @@ cN <- clOptions$`sample-size`
 #setting for keeping or removing indels
 keepIndel<-F
 mhc.filter<-37
-
-
 ```
 
 # R script export
+Running this will produce an R-script with the same name as the Rmd-file.
 ```{r Purl export, include=FALSE, purl=FALSE, eval=FALSE}
-#running this will produce an R-script with the same name as the Rmd-file.
 knitr::purl(filename.rmd)
-  
 ```
 
 Retrieve the recent date
@@ -67,28 +62,281 @@ Retrieve the recent date
 date = Sys.Date()
 date
 ```
-# Functions to be used later
-```{r functions}
 
+# Functions to be used later
++++CH: Maybe we want to put this functions in separate R scripts and source them like we do in the other scripts?
+```{r functions}
 stdGwasColumnNames <- function(columnNames, stopOnMissingEssential=T,
-     c.SNP = c("SNP","PREDICTOR","SNPID","MARKERNAME","MARKER_NAME","SNPTESTID","ID_DBSNP49","RSID","ID","RS_NUMBER","MARKER", "RS", "RSNUMBER", "RS_NUMBERS", "SNP.NAME","SNP ID", "SNP_ID","LOCATIONALID","ASSAY_NAME"),
-     c.A1 = c("A1","ALLELE1","ALLELE_1","INC_ALLELE","EA","A1_EFFECT","REF","EFFECT_ALLELE","RISK_ALLELE","EFFECTALLELE","EFFECT_ALL","REFERENCE_ALLELE","REF_ALLELE","REFERENCEALLELE","EA","ALLELE_1","INC_ALLELE","ALLELE1","A","A_1","CODED_ALLELE","TESTED_ALLELE"),
-     c.A2 = c("A2","ALLELE2","ALLELE_2","OTHER_ALLELE","NON_EFFECT_ALLELE","DEC_ALLELE","OA","NEA","ALT","A2_OTHER","NONREF_ALLELE","NEFFECT_ALLELE","NEFFECTALLELE","NONEFFECT_ALLELE","OTHER_ALL","OTHERALLELE","NONEFFECTALLELE","ALLELE0","ALLELE_0","ALT_ALLELE","A_0","NONCODED_ALLELE"),
+     c.SNP = c(
+       "SNP",
+       "PREDICTOR",
+       "SNPID",
+       "MARKERNAME",
+       "MARKER_NAME",
+       "SNPTESTID",
+       "ID_DBSNP49",
+       "RSID",
+       "ID",
+       "RS_NUMBER",
+       "MARKER",
+       "RS",
+       "RSNUMBER",
+       "RS_NUMBERS",
+       "SNP.NAME",
+       "SNP ID",
+       "SNP_ID",
+       "LOCATIONALID",
+       "ASSAY_NAME"
+       ),
+     c.A1 = c(
+       "A1",
+       "ALLELE1",
+       "ALLELE_1",
+       "INC_ALLELE",
+       "EA",
+       "A1_EFFECT",
+       "REF",
+       "EFFECT_ALLELE",
+       "RISK_ALLELE",
+       "EFFECTALLELE",
+       "EFFECT_ALL",
+       "REFERENCE_ALLELE",
+       "REF_ALLELE",
+       "REFERENCEALLELE",
+       "EA",
+       "ALLELE_1",
+       "INC_ALLELE",
+       "ALLELE1",
+       "A",
+       "A_1",
+       "CODED_ALLELE",
+       "TESTED_ALLELE"
+       ),
+     c.A2 = c(
+       "A2",
+       "ALLELE2",
+       "ALLELE_2",
+       "OTHER_ALLELE",
+       "NON_EFFECT_ALLELE",
+       "DEC_ALLELE",
+       "OA",
+       "NEA",
+       "ALT",
+       "A2_OTHER",
+       "NONREF_ALLELE",
+       "NEFFECT_ALLELE",
+       "NEFFECTALLELE",
+       "NONEFFECT_ALLELE",
+       "OTHER_ALL",
+       "OTHERALLELE",
+       "NONEFFECTALLELE",
+       "ALLELE0",
+       "ALLELE_0",
+       "ALT_ALLELE",
+       "A_0",
+       "NONCODED_ALLELE"
+       ),
      #c.EFFECT = c("EFFECT","OR","B","BETA","LOG_ODDS","EFFECTS","SIGNED_SUMSTAT","EST"),
-     c.BETA = c("BETA","B","EFFECT_BETA","EFFECT","EFFECTS","SIGNED_SUMSTAT","EST","GWAS_BETA","EFFECT_A1","EFFECTA1","EFFECT_NW"),
-     c.OR = c("OR","LOG_ODDS","OR","ODDS-RATIO","ODDS_RATIO","ODDSRATIO","OR(MINALLELE)","OR.LOGISTIC","OR_RAN","OR(A1)"),
-     c.SE = c("SE","STDER","STDERR","STD","STANDARD_ERROR","OR_SE","STANDARDERROR", "STDERR_NW","META.SE","SE_DGC","SE.2GC"),
-     c.Z = c("Z","ZSCORE","Z-SCORE","ZSTAT","ZSTATISTIC","GC_ZSCORE","BETAZSCALE"),
-     c.INFO = c("INFO","IMPINFO","IMPQUALITY", "INFO.PLINK", "INFO_UKBB"),
-     c.P = c("P","PVALUE","PVAL","P_VALUE","GC_PVALUE","WALD_P","P.VAL","GWAS_P","P-VALUE","P-VAL","FREQUENTIST_ADD_PVALUE","P.VALUE","P_VAL","SCAN-P","P.LMM","META.PVAL","P_RAN","P.ADD","P_BOLT_LMM"),
-     c.N = c("N","WEIGHT","NCOMPLETESAMPLES","TOTALSAMPLESIZE","TOTALN","TOTAL_N","N_COMPLETE_SAMPLES","N_TOTAL","N_SAMPLES","N_ANALYZED","NSAMPLES","SAMPLESIZE","SAMPLE_SIZE","TOTAL_SAMPLE_SIZE","TOTALSAMPLESIZE"),
-     c.N_CAS = c("N_CAS","NCASE","N_CASE","N_CASES","NCAS","NCA","NCASES","CASES","CASES_N","FRQ_A"),
-     c.N_CON = c("N_CON","NCONTROL","N_CONTROL","N_CONTROLS","NCON","NCO","N_CON","NCONTROLS","CONTROLS","CONTROLS_N","FRQ_U"),
-     c.NEF = c("NEF","NEFF","NEFFECTIVE","NE"),
+     c.BETA = c(
+       "BETA",
+       "B",
+       "EFFECT_BETA",
+       "EFFECT",
+       "EFFECTS",
+       "SIGNED_SUMSTAT",
+       "EST",
+       "GWAS_BETA",
+       "EFFECT_A1",
+       "EFFECTA1",
+       "EFFECT_NW"
+       ),
+     c.OR = c(
+       "OR",
+       "LOG_ODDS",
+       "OR",
+       "ODDS-RATIO",
+       "ODDS_RATIO",
+       "ODDSRATIO",
+       "OR(MINALLELE)",
+       "OR.LOGISTIC",
+       "OR_RAN",
+       "OR(A1)"
+       ),
+     c.SE = c(
+       "SE",
+       "STDER",
+       "STDERR",
+       "STD",
+       "STANDARD_ERROR",
+       "OR_SE",
+       "STANDARDERROR",
+       "STDERR_NW",
+       "META.SE",
+       "SE_DGC",
+       "SE.2GC"
+       ),
+     c.Z = c(
+       "Z",
+       "ZSCORE",
+       "Z-SCORE",
+       "ZSTAT",
+       "ZSTATISTIC",
+       "GC_ZSCORE",
+       "BETAZSCALE"
+       ),
+     c.INFO = c(
+       "INFO",
+       "IMPINFO",
+       "IMPQUALITY",
+       "INFO.PLINK",
+       "INFO_UKBB"
+       ),
+     c.P = c(
+       "P",
+       "PVALUE",
+       "PVAL",
+       "P_VALUE",
+       "GC_PVALUE",
+       "WALD_P",
+       "P.VAL",
+       "GWAS_P",
+       "P-VALUE",
+       "P-VAL",
+       "FREQUENTIST_ADD_PVALUE",
+       "P.VALUE",
+       "P_VAL",
+       "SCAN-P",
+       "P.LMM",
+       "META.PVAL",
+       "P_RAN",
+       "P.ADD",
+       "P_BOLT_LMM"
+       ),
+     c.N = c(
+       "N",
+       "WEIGHT",
+       "NCOMPLETESAMPLES",
+       "TOTALSAMPLESIZE",
+       "TOTALN",
+       "TOTAL_N",
+       "N_COMPLETE_SAMPLES",
+       "N_TOTAL",
+       "N_SAMPLES",
+       "N_ANALYZED",
+       "NSAMPLES",
+       "SAMPLESIZE",
+       "SAMPLE_SIZE",
+       "TOTAL_SAMPLE_SIZE",
+       "TOTALSAMPLESIZE"
+       ),
+     c.N_CAS = c(
+       "N_CAS",
+       "NCASE",
+       "N_CASE",
+       "N_CASES",
+       "NCAS",
+       "NCA",
+       "NCASES",
+       "CASES",
+       "CASES_N",
+       "FRQ_A"
+       ),
+     c.N_CON = c(
+       "N_CON",
+       "NCONTROL",
+       "N_CONTROL",
+       "N_CONTROLS",
+       "NCON",
+       "NCO",
+       "N_CON",
+       "NCONTROLS",
+       "CONTROLS",
+       "CONTROLS_N",
+       "FRQ_U"
+       ),
+     c.NEF = c(
+       "NEF",
+       "NEFF",
+       "NEFFECTIVE",
+       "NE"
+       ),
      #include FRQ_A?
-     c.FRQ = c("FRQ","MAF","AF","CEUAF","FREQ","FREQ1","EAF","FREQ1.HAPMAP","FREQALLELE1HAPMAPCEU", "FREQ.ALLELE1.HAPMAPCEU","EFFECT_ALLELE_FREQ","FREQ.A1","F_A","F_U","FREQ_A","FREQ_U","MA_FREQ","MAF_NW","FREQ_A1","A1FREQ","CODED_ALLELE_FREQUENCY","FREQ_TESTED_ALLELE_IN_HRS","EAF_HRC"),
-     c.CHR = c("CHR","CH","CHROMOSOME","CHROM","CHR_BUILD38","CHR_BUILD37","CHR_BUILD36","CHR_B38","CHR_B37","CHR_B36","CHR_ID","SCAFFOLD","HG19CHR","CHR.HG19","CHR_HG19","HG18CHR","CHR.HG18","CHR_HG18","CHR_BP_HG19B37","HG19CHRC"),
-     c.BP = c("BP","ORIGBP","POS","POSITION","LOCATION","PHYSPOS","GENPOS","CHR_POSITION","POS_B38","POS_BUILD38","POS_B37","POS_BUILD37","BP_HG19B37","POS_B36","POS_BUILD36","POS.HG19","POS.HG18","POS_HG19","POS_HG18","BP_HG19","BP_HG18","BP.GRCH38","BP.GRCH37","POSITION(HG19)","POSITION(HG18)","POS(B38)","POS(B37)")
+     c.FRQ = c(
+       "FRQ",
+       "MAF",
+       "AF",
+       "CEUAF",
+       "FREQ",
+       "FREQ1",
+       "EAF",
+       "FREQ1.HAPMAP",
+       "FREQALLELE1HAPMAPCEU",
+       "FREQ.ALLELE1.HAPMAPCEU",
+       "EFFECT_ALLELE_FREQ",
+       "FREQ.A1",
+       "F_A",
+       "F_U",
+       "FREQ_A",
+       "FREQ_U",
+       "MA_FREQ",
+       "MAF_NW",
+       "FREQ_A1",
+       "A1FREQ",
+       "CODED_ALLELE_FREQUENCY",
+       "FREQ_TESTED_ALLELE_IN_HRS",
+       "EAF_HRC"
+       ),
+     c.CHR = c(
+       "CHR",
+       "CH",
+       "CHROMOSOME",
+       "CHROM",
+       "CHR_BUILD38",
+       "CHR_BUILD37",
+       "CHR_BUILD36",
+       "CHR_B38",
+       "CHR_B37",
+       "CHR_B36",
+       "CHR_ID",
+       "SCAFFOLD",
+       "HG19CHR",
+       "CHR.HG19",
+       "CHR_HG19",
+       "HG18CHR",
+       "CHR.HG18",
+       "CHR_HG18",
+       "CHR_BP_HG19B37",
+       "HG19CHRC"
+       ),
+     c.BP = c(
+       "BP",
+       "ORIGBP",
+       "POS",
+       "POSITION",
+       "LOCATION",
+       "PHYSPOS",
+       "GENPOS",
+       "CHR_POSITION",
+       "POS_B38",
+       "POS_BUILD38",
+       "POS_B37",
+       "POS_BUILD37",
+       "BP_HG19B37",
+       "POS_B36",
+       "POS_BUILD36",
+       "POS.HG19",
+       "POS.HG18",
+       "POS_HG19",
+       "POS_HG18",
+       "BP_HG19",
+       "BP_HG18",
+       "BP.GRCH38",
+       "BP.GRCH37",
+       "POSITION(HG19)",
+       "POSITION(HG18)",
+       "POS(B38)",
+       "POS(B37)"
+       )
                                        ){
   #test
   #columnNames<-cSumstats.names
@@ -182,16 +430,15 @@ parseCHRColumn <- function(text){
 # ****!Setup common stuff for all datasets
 
 THIS IS WHERE YOU SET UP YOUR DATASET SETTINGS! ENTER THE SETTINGS FOR YOUR DATASET AS WAS DONE FOR THE ADHD EXAMPLE GWAS BELOW.
-
++++CH: Maybe we can annotate this a little more?
 ```{r}
-
 filePaths <- clOptions$file
 traitNames <- clOptions$code
 traitCodes <- clOptions$code
 #test or temporary placeholders
-filePaths<-c("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/cleaned/ADHD05.gz")
-traitNames<-c("ADHD 1")
-traitCodes<-c("ADHD05")
+filePaths<-c("../../data_raw/CUD_EUR_full_public_11.14.2020.gz")
+traitNames<-c("Cannabis use disorder (2020)")
+traitCodes<-c("CUDI01")
 sumstats.meta<-data.frame(name=traitNames)
 row.names(sumstats.meta)<-traitCodes
 ```
@@ -199,37 +446,43 @@ row.names(sumstats.meta)<-traitCodes
 # Read in sumstats and interpret columns
 ## Read in sumstats
 
++++JZ: TODO replace commas with field separators as in Helena's script
+
++++CH: to read in the data file, I would use the data.table package because it is much faster than the basic R functions to read in data
+https://cran.r-project.org/web/packages/data.table/vignettes/datatable-intro.html
 ```{r read in sumstats}
-
-#TODO replace commas with field separators as in Helena's script
-
 filePaths <- clOptions$file
 #test
-filePaths<-c("/Users/alishpalmos/Downloads/Revezetal2020_25OHD.gz")
+filePaths<-c("../../data_raw/CUD_EUR_full_public_11.14.2020.gz")
 
 cCode <- traitCodes[1]
 
 cFilePath <- filePaths[1] #we will probably want to have a loop over the provided files
-cSumstats <- read.table(cFilePath,header=T, quote="\"",fill=T,na.string=c(".",NA,"NA",""))
+
+cSumstats <- data.table::fread(
+  file = cFilePath,
+  header=T,
+  quote="\"",
+  fill=T, # If TRUE then in case the rows have unequal length, blank fields are implicitly filled.
+  na.strings=c(".",NA,"NA","")
+  )
 
 #number of rows before touching the data
 nRowsRaw <- nrow(cSumstats)
 sumstats.meta[cCode,c("n_snp_raw")]<-nRowsRaw
 
+sumstats.meta$n_snp_raw
 ```
 
 ## Interpret columns
 
-Check the existance of columns
+Check the existence of columns
 
 Rename columns to standardised names
-
 ```{r interpret columns}
-
 newNames <- stdGwasColumnNames(columnNames = colnames(cSumstats))
 print(newNames)
 colnames(cSumstats) <- newNames$std
-
 ```
 
 # Column and dataframe re-formatting
@@ -315,9 +568,6 @@ if('FRQ' %in% names(cSumstats)){
     colnames(cSumstats)[iDup]<-"XFRQ"
   }
 }
-
-
-
 ```
 
 
@@ -333,7 +583,6 @@ Set N from argument
 Add columns on sample size, enough for PRS enough for pathway analysis
 
 ```{r add missing columns}
-
 # Add total N depending on columns and input
 if(any(colnames(cSumstats)=="N_CAS") && any(colnames(cSumstats)=="N_CON")) {
   ### Calculate total N from number of cases and number of controls if they are present. Overwrite any specific total N.
@@ -344,11 +593,15 @@ if(any(colnames(cSumstats)=="N_CAS") && any(colnames(cSumstats)=="N_CON")) {
   warning("\nNo N column detected!\n")
   sumstats.meta[cCode,c("noN")]<-T
 }
+```
 
+## Meta data
+```{r add meta data}
 #Add metadata about enough for PRS and pathway analysis
 sumstats.meta[cCode,c("enough_PRS")]<-any(colnames(cSumstats)=="SNP") & any(colnames(cSumstats)=="P") & (any(colnames(cSumstats)=="BETA") | any(colnames(cSumstats)=="OR") | any(colnames(cSumstats)=="Z") ) & any(colnames(cSumstats)=="A1") & any(colnames(cSumstats)=="A2")
 sumstats.meta[cCode,c("enough_pathwayanalysis")]<-any(colnames(cSumstats)=="SNP") & any(colnames(cSumstats)=="P")
 
+sumstats.meta
 ```
 
 
@@ -358,8 +611,7 @@ sumstats.meta[cCode,c("enough_pathwayanalysis")]<-any(colnames(cSumstats)=="SNP"
 
 Remove variants with missing values
 
-```{r clean missing data}
-
+```{r clean missing p}
 #clean missing P
 if(any(colnames(cSumstats)=="P")){
   cond <- is.na(cSumstats$P)
@@ -367,6 +619,11 @@ if(any(colnames(cSumstats)=="P")){
   cSumstats<-cSumstats[which(!cond),]
 }
 
+sumstats.meta$n_removed_missing_p
+```
+
+
+```{r clean missing effect}
 #clean missing effect
 if(any(colnames(cSumstats)=="BETA")){
   cond <- is.na(cSumstats$BETA)
@@ -382,7 +639,7 @@ if(any(colnames(cSumstats)=="BETA")){
   cSumstats<-cSumstats[which(!cond),]
 }
 
-
+sumstats.meta$n_removed_missing_effect
 ```
 
 
@@ -397,17 +654,19 @@ if(any(colnames(cSumstats)=="SNP") & any(colnames(cSumstats)=="A1") & any(colnam
   cSumstats <- unique(cSumstats,by = c("SNP","A1","A2"))
   sumstats.meta[cCode,c("n_removed_duplicates")]<-cSumstats.n-nrow(cSumstats)
 }
-```
 
+sumstats.meta$n_removed_duplicates
+```
 
 
 ## Value filters
 
 ?Remove variants based on MAF/FRQ, INFO, OR, p-value, N (Ollies script) filters etc
 
-```{r clean based on values}
+# Clean based on values
 
-# P filter
+## P filter
+```{r P filter}
 if(any(colnames(cSumstats)=="P")){
   rm <- (!is.na(cSumstats$P) & (cSumstats$P>1 | cSumstats$P<0))
   cSumstats <- cSumstats[!rm, ]
@@ -417,7 +676,11 @@ if(any(colnames(cSumstats)=="P")){
   cat("Warning: The dataset does not contain a P column to apply the specified filter on.")
 }
 
-# FRQ filter
+sumstats.meta$n_removed_p
+```
+
+## FRQ filter
+```{r FRQ filter}
 if(any(colnames(cSumstats)=="FRQ")){
   rm <- (!is.na(cSumstats$FRQ) & (cSumstats$FRQ<0.005 | cSumstats$FRQ>0.995))
   cSumstats <- cSumstats[!rm, ]
@@ -427,7 +690,12 @@ if(any(colnames(cSumstats)=="FRQ")){
   cat("Warning: The dataset does not contain a FRQ or MAF column to apply the specified filter on.")
 }
 
-# INFO filter
+sumstats.meta$n_removed_frq
+```
+
+
+## INFO filter
+```{r INFO filter}
 if(any(colnames(cSumstats)=="INFO")){
   rm <- (!is.na(cSumstats$INFO) & cSumstats$INFO<0.6)
   cSumstats <- cSumstats[!rm, ]
@@ -437,7 +705,11 @@ if(any(colnames(cSumstats)=="INFO")){
   cat("Warning: The dataset does not contain an INFO column to apply the specified filter on.")
 }
 
-# OR filter
+sumstats.meta$n_removed_info
+```
+
+## OR filter
+```{r OR filter}
 if(any(colnames(cSumstats)=="OR")){
   rm <- (!is.na(cSumstats$OR) & cSumstats$OR>10000)
   cSumstats <- cSumstats[!rm, ]
@@ -447,7 +719,11 @@ if(any(colnames(cSumstats)=="OR")){
   cat("Warning: The dataset does not contain an INFO column to apply the specified filter on.")
 }
 
-# N filter - from Ollies script
+sumstats.meta$n_removed_or
+```
+
+## N filter - (from Ollies script)
+```{r N filter}
 if(any(colnames(cSumstats)=="N")){
   N_sd<-sd(cSumstats$N)
   N_median<-median(cSumstats$N)
@@ -457,7 +733,11 @@ if(any(colnames(cSumstats)=="N")){
   sumstats.meta[cCode,c("n_removed_n")]<-sum(rm)
 }
 
+sumstats.meta$n_removed_n
+```
+
 # SE filter - from Ollies script
+```{r SE filter}
 if(any(colnames(cSumstats)=="SE")){
   rm <- (!is.na(cSumstats$SE) & cSumstats$SE == 0)
   cSumstats <- cSumstats[!rm, ]
@@ -465,7 +745,11 @@ if(any(colnames(cSumstats)=="SE")){
   sumstats.meta[cCode,c("n_removed_se")]<-sum(rm)
 }
 
+sumstats.meta$n_removed_se
+```
+
 #indels
+```{r indels filter}
 if(keepIndel == T){
   cSumstats$A1 <- as.character(toupper(cSumstats$A1))
   cSumstats$A2 <- as.character(toupper(cSumstats$A2))
@@ -477,11 +761,17 @@ if(keepIndel == T){
   cSumstats<-cSumstats[!rm,]
 }
 
+sumstats.meta$n_removed_indels
+```
 
-##remove MHC region based on position - probably better to do after merge/harmonisation with reference
-#references
-#https://www.ncbi.nlm.nih.gov/grc/human/regions/MHC?asm=GRCh37
-#https://www.ncbi.nlm.nih.gov/grc/human/regions/MHC
+## MHC removal
++++CH: This should happen after the LDSC munging; some people will want to use the MHC variants for their analyses
+
+remove MHC region based on position - probably better to do after merge/harmonisation with reference
+references:
+https://www.ncbi.nlm.nih.gov/grc/human/regions/MHC?asm=GRCh37
+https://www.ncbi.nlm.nih.gov/grc/human/regions/MHC
+```{r MHC removal}
 if(!is.na(mhc.filter)){
   if(any(colnames(cSumstats)=="CHR") & any(colnames(cSumstats)=="BP")){
     if(mhc.filter==37) {
@@ -498,31 +788,25 @@ if(!is.na(mhc.filter)){
     cat("Warning: No chromosome or base-pair position information available - no filtering of the MHC was done!")
   }
 }
-    
-
 ```
 
 
 
-
-
-
-
-
 Deal with maf and frequencey columns
++++CH: Please add this for the next meeting from Helena's script
+Helena: /mnt/lustre/groups/ukbiobank/sumstats/scripts/submit_freq_2.sh
 
 Deal with missing effect standard error
 Add standard errors from beta & z or or & z (Ollies script)
-
-
-
-
-
++++CH: Please, add this for the next meeting
 
 
 Check and correct for GC
++++CH: Add from Ollie's and Helena's scritp:
+Helena: /mnt/lustre/groups/ukbiobank/sumstats/scripts/computeLambdaAndCorrect.r
 
-
++++CH: Here the script should end and a cleaned version of the file should be written into the cleaned folder
++++CH: Additionally, a log file should be created and be saved in the log file folder
 
 ?Read in reference from plink formats
 ```{r read in reference}
