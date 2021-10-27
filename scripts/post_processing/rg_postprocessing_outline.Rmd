@@ -79,10 +79,25 @@ GWAS_info_sheet
 ```
 
 ```{r check traits h2 significantly greater than 0}
+standard_error_ci <-
+  # calculate the confidence interval around the point estimate (rg mean)
+  get_confidence_interval(point_estimate = rg,
+                          # at the 95% confidence level
+                          level = .95,
+                          # using the standard error
+                          type = "se") #this computes lower_ci and upper_ci
 
-# e.g. h2_observed+/-1.96*h2_se = upper/lower CI
-# h2_observed - CI_upper 
-#https://www.tidyverse.org/blog/2021/08/infer-1-0-0/
+#or just calculate it 
+lower_ci <- (rg-1.96*se)
+upper_ci <-(rg+1.96*se)
+
+GWAS_info_sheet %>%
+  filter(
+    lower_ci <= 0 # lower confidence interval of h2 estimate less than or equal to 0
+    ) %>%
+  nrow()
+
+# or use h2 z score cut off of 5 or 2.5? z = rg/se
 ```
 
 3) Read in rg data for your trait of interest
