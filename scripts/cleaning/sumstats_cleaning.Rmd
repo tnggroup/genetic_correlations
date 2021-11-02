@@ -816,17 +816,90 @@ if(any(colnames(cSumstats) == "SE") == 0){
   
   cSumstats$Z<-NULL ###do we want to name Z something else here so we dont over write Z values? e.g. Z_for_SE?
   
-  #+++ATK not too sure how best to add to meta data?
   cat("SE column inserted based on BETA/OR and P")
+  
+  #+++ATK not too sure how best to add to meta data? or if not necessary?
   sumstats.meta[cCode,c("SE_column_based_on_BETA/OR_and_P")]<-T
   }
 ```
 
 
 
-Check and correct for GC
-+++CH: Add from Ollie's and Helena's scritp:
+#Check and correct for Genomic Control
+
++++ATK go over in next meeting what to add from Helenas
+Need to add from Helenas:
 Helena: /mnt/lustre/groups/ukbiobank/sumstats/scripts/computeLambdaAndCorrect.r
+
+Added from Ollie's:
+```{r check and correct for genomic control}
+if(any(colnames(cSumstats) == 'SE') == 1){
+  if(any(colnames(cSumstats) == 'OR') == 1){
+    cSumstats$BETA<-log(cSumstats$OR) ####change to BETA_check?
+    cSumstats$Z<-cSumstats$BETA/cSumstats$SE ####change to Z_check?
+    cSumstats$P_check<-2*pnorm(-abs(cSumstats$Z))
+    cSumstats$Z<-NULL
+    cSumstats$BETA<-NULL
+    
+    if(abs(mean(cSumstats$P[!is.na(cSumstats$P_check)]) - mean(cSumstats$P_check[!is.na(cSumstats$P_check)])) > 0.01){
+       cSumstats$P<-cSumstats$P_check
+       cSumstats$P_check<-NULL
+      
+       cat("Genomic control detected. P-value recomputed using OR and SE.")
+       
+    } else {
+       
+       cat("Genomic control was not detected.")
+       
+       cSumstats$P_check<-NULL
+    }
+  }
+  
+  if(any(colnames(cSumstats) == 'BETA') == 1){
+    cSumstats$Z<-cSumstats$BETA/cSumstats$SE ####change to Z_check?
+    cSumstats$P_check<-2*pnorm(-abs(cSumstats$Z))
+    cSumstats$Z<-NULL
+
+    if(abs(mean(cSumstats$P[!is.na(cSumstats$P_check)]) - mean(cSumstats$P_check[!is.na(cSumstats$P_check)])) > 0.01){
+      cSumstats$P<-cSumstats$P_check
+      cSumstats$P_check<-NULL
+      
+      cat("Genomic control detected. P-value recomputed using BETA and SE.")
+     
+    } else {
+     
+      cat("Genomic control was not detected.")
+    
+      cSumstats$P_check<-NULL
+    }
+    
+  }
+} else {
+  
+  cat("SE column is not present, genomic control cannot be detected.")
+ 
+}
+
+##++++ATK: what do we want to add from Helena's below?
+#arg <- commandArgs(TRUE)
+#output <- arg[2]
+#
+#
+#gres <- read.table(arg[1],header=T,sep="\t")
+#
+#chisq <- qchisq(1-gres$P,1)
+#
+#lambda<-median(chisq)/qchisq(0.5,1)
+#
+#gres$P <- pnorm(-abs((qnorm(gres$P/2)/sqrt(lambda))))*2
+#
+#gres[,"N"]<-floor(gres[,"N"])
+#
+#gz1 <- gzfile(paste(output,".gz",sep=""),"w")
+#write.table(gres,gz1,quote=F,row.names=F,col.names=T,sep="\t")
+#close(gz1)
+```
+
 
 +++CH: Here the script should end and a cleaned version of the file should be written into the cleaned folder
 +++CH: Additionally, a log file should be created and be saved in the log file folder
