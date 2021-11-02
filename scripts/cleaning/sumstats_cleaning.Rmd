@@ -814,12 +814,12 @@ if(any(colnames(cSumstats) == "SE") == 0){
     cSumstats$SE<-abs(log(cSumstats$OR)/cSumstats$Z) #if no BETA column, calculate SE from odds ratio and Z
   }
   
-  cSumstats$Z<-NULL ###do we want to name Z something else here so we dont over write Z values? e.g. Z_for_SE?
+  cSumstats$Z<-NULL ###do we want to name Z something else here so we don't over write Z values? e.g. Z_for_SE?
   
   cat("SE column inserted based on BETA/OR and P")
   
-  #+++ATK not too sure how best to add to meta data? or if not necessary?
-  sumstats.meta[cCode,c("SE_column_based_on_BETA/OR_and_P")]<-T
+  #+++ATK not too sure if we need to add to meta data? or if not necessary?
+
   }
 ```
 
@@ -833,8 +833,8 @@ Helena: /mnt/lustre/groups/ukbiobank/sumstats/scripts/computeLambdaAndCorrect.r
 
 Added from Ollie's:
 ```{r check and correct for genomic control}
-if(any(colnames(cSumstats) == 'SE') == 1){
-  if(any(colnames(cSumstats) == 'OR') == 1){
+if(any(colnames(cSumstats) == "SE") == 1){
+  if(any(colnames(cSumstats) == "OR") == 1){
     cSumstats$BETA<-log(cSumstats$OR) ####change to BETA_check?
     cSumstats$Z<-cSumstats$BETA/cSumstats$SE ####change to Z_check?
     cSumstats$P_check<-2*pnorm(-abs(cSumstats$Z))
@@ -855,7 +855,7 @@ if(any(colnames(cSumstats) == 'SE') == 1){
     }
   }
   
-  if(any(colnames(cSumstats) == 'BETA') == 1){
+  if(any(colnames(cSumstats) == "BETA") == 1){
     cSumstats$Z<-cSumstats$BETA/cSumstats$SE ####change to Z_check?
     cSumstats$P_check<-2*pnorm(-abs(cSumstats$Z))
     cSumstats$Z<-NULL
@@ -880,7 +880,7 @@ if(any(colnames(cSumstats) == 'SE') == 1){
  
 }
 
-##++++ATK: what do we want to add from Helena's below?
+##++++ATK: is there anything we want to add from Helena's below?
 #arg <- commandArgs(TRUE)
 #output <- arg[2]
 #
