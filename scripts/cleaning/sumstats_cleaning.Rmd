@@ -796,9 +796,32 @@ Deal with maf and frequencey columns
 +++CH: Please add this for the next meeting from Helena's script
 Helena: /mnt/lustre/groups/ukbiobank/sumstats/scripts/submit_freq_2.sh
 
-Deal with missing effect standard error
+
+
+
+#Missing effect standard error
 Add standard errors from beta & z or or & z (Ollies script)
-+++CH: Please, add this for the next meeting
++++ATK: Please check in next meeting
+```{r insert SE column if missing}
+
+# if no SE column
+if(any(colnames(cSumstats) == "SE") == 0){ 
+  if(any(colnames(cSumstats) == "BETA") == 1){ #take BETA if BETA column exists
+    cSumstats$Z<-abs(qnorm(cSumstats$P/2)) #calculate Z value using qnorm function
+    cSumstats$SE<-abs(cSumstats$BETA/cSumstats$Z) #calculate SE from BETA and Z
+  } else {
+    cSumstats$Z<-abs(qnorm(cSumstats$P/2)) #calculate Z value
+    cSumstats$SE<-abs(log(cSumstats$OR)/cSumstats$Z) #if no BETA column, calculate SE from odds ratio and Z
+  }
+  
+  cSumstats$Z<-NULL ###do we want to name Z something else here so we dont over write Z values? e.g. Z_for_SE?
+  
+  #+++ATK not too sure how best to add to meta data?
+  cat("SE column inserted based on BETA/OR and P")
+  sumstats.meta[cCode,c("SE_column_based_on_BETA/OR_and_P")]<-T
+  }
+```
+
 
 
 Check and correct for GC
