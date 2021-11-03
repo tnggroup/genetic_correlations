@@ -594,6 +594,10 @@ if(any(colnames(cSumstats)=="N_CAS") && any(colnames(cSumstats)=="N_CON")) {
   sumstats.meta[cCode,c("noN")]<-T
 }
 ```
++++ATK add z column here
+
++++ add BETA column here 
++++ add SE column here
 
 ## Meta data
 ```{r add meta data}
@@ -801,13 +805,13 @@ Helena: /mnt/lustre/groups/ukbiobank/sumstats/scripts/submit_freq_2.sh
 
 #Missing effect standard error
 Add standard errors from beta & z or or & z (Ollies script)
-+++ATK: Please check in next meeting
++++ATK: move above where N column is added and add Z chunk 
 ```{r insert SE column if missing}
 
 # if no SE column
 if(any(colnames(cSumstats) == "SE") == 0){ 
   if(any(colnames(cSumstats) == "BETA") == 1){ #take BETA if BETA column exists
-    cSumstats$Z<-abs(qnorm(cSumstats$P/2)) #calculate Z value using qnorm function
+    cSumstats$Z<-abs(qnorm(cSumstats$P/2)) #calculate Z value using qnorm function - we shouldn't need this step if we are including chunk 
     cSumstats$SE<-abs(cSumstats$BETA/cSumstats$Z) #calculate SE from BETA and Z
   } else {
     cSumstats$Z<-abs(qnorm(cSumstats$P/2)) #calculate Z value
@@ -818,7 +822,7 @@ if(any(colnames(cSumstats) == "SE") == 0){
   
   cat("SE column inserted based on BETA/OR and P")
   
-  #+++ATK not too sure if we need to add to meta data? or if not necessary?
+  #+++ATK not too sure if we need to add to meta data? or if not necessary? - yes. set SE_from_Z as column and set as T
 
   }
 ```
@@ -832,6 +836,8 @@ Need to add from Helenas:
 Helena: /mnt/lustre/groups/ukbiobank/sumstats/scripts/computeLambdaAndCorrect.r
 
 Added from Ollie's:
+
+Need to calculate BETA 
 ```{r check and correct for genomic control}
 if(any(colnames(cSumstats) == "SE") == 1){
   if(any(colnames(cSumstats) == "OR") == 1){
@@ -880,18 +886,22 @@ if(any(colnames(cSumstats) == "SE") == 1){
  
 }
 
-##++++ATK: is there anything we want to add from Helena's below?
+
+```
+
+```{r genomic control Helena's script}
+##++++ATK: is there anything we want to add from Helena's below? http://genometoolbox.blogspot.com/2014/08/how-to-calculate-genomic-inflation.html
 #arg <- commandArgs(TRUE)
 #output <- arg[2]
 #
 #
 #gres <- read.table(arg[1],header=T,sep="\t")
 #
-#chisq <- qchisq(1-gres$P,1)
+#chisq <- qchisq(1-gres$P,1) #check chisq
 #
-#lambda<-median(chisq)/qchisq(0.5,1)
+#lambda<-median(chisq)/qchisq(0.5,1) #check lambda
 #
-#gres$P <- pnorm(-abs((qnorm(gres$P/2)/sqrt(lambda))))*2
+#gres$P <- pnorm(-abs((qnorm(gres$P/2)/sqrt(lambda))))*2 #check p 
 #
 #gres[,"N"]<-floor(gres[,"N"])
 #
