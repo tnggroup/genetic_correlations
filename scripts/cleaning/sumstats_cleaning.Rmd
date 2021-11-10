@@ -656,8 +656,8 @@ if(any(colnames(cSumstats) == "SE") == 0){
 ## Meta data
 ```{r add meta data}
 #Add metadata about enough for PRS and pathway analysis
-sumstats.meta[cCode,c("enough_PRS")]<-any(colnames(cSumstats)=="SNP") & any(colnames(cSumstats)=="P") & (any(colnames(cSumstats)=="BETA") | any(colnames(cSumstats)=="OR") | any(colnames(cSumstats)=="Z") ) & any(colnames(cSumstats)=="A1") & any(colnames(cSumstats)=="A2")
-sumstats.meta[cCode,c("enough_pathwayanalysis")]<-any(colnames(cSumstats)=="SNP") & any(colnames(cSumstats)=="P")
+sumstats.meta[cCode,c("enough_columns_PRS")]<-any(colnames(cSumstats)=="SNP") & any(colnames(cSumstats)=="P") & (any(colnames(cSumstats)=="BETA") | any(colnames(cSumstats)=="OR") | any(colnames(cSumstats)=="Z") ) & any(colnames(cSumstats)=="A1") & any(colnames(cSumstats)=="A2")
+sumstats.meta[cCode,c("enough_columns_pathwayanalysis")]<-any(colnames(cSumstats)=="SNP") & any(colnames(cSumstats)=="P")
 
 sumstats.meta
 ```
@@ -767,6 +767,7 @@ sumstats.meta$n_removed_info
 ```
 
 ## OR filter
++++JZ: TODO - adapt to all kinds of effect types
 ```{r OR filter}
 if(any(colnames(cSumstats)=="OR")){
   rm <- (!is.na(cSumstats$OR) & cSumstats$OR>10000)
@@ -807,6 +808,7 @@ sumstats.meta$n_removed_se
 ```
 
 #indels
++++Ollie: Preferable to not remove these as standard in light cleaning.
 ```{r indels filter}
 if(keepIndel == T){
   cSumstats$A1 <- as.character(toupper(cSumstats$A1))
