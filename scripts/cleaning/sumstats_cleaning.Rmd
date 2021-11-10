@@ -430,15 +430,17 @@ parseCHRColumn <- function(text){
 # ****!Setup common stuff for all datasets
 
 THIS IS WHERE YOU SET UP YOUR DATASET SETTINGS! ENTER THE SETTINGS FOR YOUR DATASET AS WAS DONE FOR THE ADHD EXAMPLE GWAS BELOW.
-+++CH: Maybe we can annotate this a little more?
+
++++JZ: These settings are temporary and if we want to convert the script to a function and a command line utility we will have to adapt them accordingly.
+
 ```{r}
-filePaths <- clOptions$file
-traitNames <- clOptions$code
-traitCodes <- clOptions$code
+filePaths <- clOptions$file #a list of file paths you want to be processed in parallel. in the function this will be a list, but for the command line utility we have to parse the argument, maybe have paths separated by comma or similar?
+traitNames <- clOptions$code # a list of nice trait names which could be fit for a publication table/graph/plot
+traitCodes <- clOptions$code # a list of codes you want to identify your traits by (different from the nice names), used to reference a trait by a string
 #test or temporary placeholders
-filePaths<-c("../../data_raw/CUD_EUR_full_public_11.14.2020.gz")
-traitNames<-c("Cannabis use disorder (2020)")
-traitCodes<-c("CUDI01")
+filePaths<-c("../../data_raw/CUD_EUR_full_public_11.14.2020.gz") #SET YOUR FILE PATH, when testing
+traitNames<-c("Cannabis use disorder (2020)") #SET YOUR NICE TRAIT NAME, when testing
+traitCodes<-c("CUDI01") #SET YOUR TRAIT CODE STRING, when testing
 sumstats.meta<-data.frame(name=traitNames)
 row.names(sumstats.meta)<-traitCodes
 ```
@@ -594,18 +596,23 @@ if(any(colnames(cSumstats)=="N_CAS") && any(colnames(cSumstats)=="N_CON")) {
 }
 ```
 
-+++JZ I moved this here so we can rely on BETA existing if either BETA or OR
++++JZ: I moved this here so we can rely on BETA existing if either BETA or OR. We can't know if the effect is a non-OR unless we check though.
 ```{r add BETA column if missing}
 # if no BETA column
-if(any(colnames(cSumstats) == "BETA") == 0){
+if(any(colnames(cSumstats) == "BETA") == 0 & any(colnames(cSumstats) == "OR")){
     cSumstats$BETA<-log(cSumstats$OR) #calculate BETA from log of OR
+    cat("BETA column inserted based on log OR value")
+    sumstats.meta[cCode,c("Effect")]<-"OR"
+} else if(any(colnames(cSumstats) == "BETA")) {
+    cat("BETA column detected")
+    sumstats.meta[cCode,c("Effect")]<-"BETA"
     }
 
-cat("BETA column inserted based on log OR value")
+
 ```
 
 
-+++JZ Need to be inferred from both the P and the sign of any existing effect. If the effect is not known we cannot know the direction of Z either just from P. Can be calculated from EFFECT and SE but the SE may not be reliable as it can be given on the ln scale or not. There are ways we can check this though and maybe it should be part of the light cleaning as well.
++++JZ: Need to be inferred from both the P and the sign of any existing effect. If the effect is not known we cannot know the direction of Z either just from P. Can be calculated from EFFECT and SE but the SE may not be reliable as it can be given on the ln scale or not. There are ways we can check this and maybe it should be part of the light cleaning as well.
 
 We know that BETA exists if any effect provided previously
 
@@ -615,9 +622,11 @@ We know that BETA exists if any effect provided previously
 if(any(colnames(cSumstats) == "Z") == 0 & any(colnames(cSumstats)=="BETA")){
   cSumstats$Z <- sign(cSumstats$BETA)*sqrt(qchisq(cSumstats$P,1,lower=F)) #calculate Z value using qchisq
   cat("Z column inserted based on P value and sign(BETA)")
+  sumstats.meta[cCode,c("Z")]<-"P,sign(BETA)"
 } else if(any(colnames(cSumstats)=="SE") & any(colnames(cSumstats)=="BETA")){
   cSumstats$Z <- cSumstats$BETA/cSumstats$SE
   cat("Z column inserted based on BETA value and SE")
+  sumstats.meta[cCode,c("Z")]<-"BETA,SE"
 }
   
 
@@ -635,7 +644,7 @@ if(any(colnames(cSumstats) == "SE") == 0){
   }
   
   cat("SE column inserted based on BETA/OR and P")
-  
+  sumstats.meta[cCode,c("SE")]<-"BETA,Z"
   #+++ATK not too sure if we need to add to meta data? or if not necessary? - yes. set SE_from_Z as column and set as T
 
   }
@@ -865,10 +874,12 @@ if(any(colnames(cSumstats) == "SE") == 1){
       cSumstats$P_check<-NULL
       
       cat("Genomic control detected. P-value recomputed using BETA and SE.")
+      sumstats.meta[cCode,c("GC")]<-T
      
     } else {
      
       cat("Genomic control was not detected.")
+      sumstats.meta[cCode,c("GC")]<-F
     
       cSumstats$P_check<-NULL
     }
@@ -906,6 +917,16 @@ Helena: /mnt/lustre/groups/ukbiobank/sumstats/scripts/computeLambdaAndCorrect.r
 #close(gz1)
 ```
 
+# Yet another GC calculation
+Yes, Helena's calculation seems how it it supposed to be done. The block below relies on the Z value being up to date
+```{r Calculate lambda gc}
+#http://genometoolbox.blogspot.com/2014/08/how-to-calculate-genomic-inflation.html
+sumstats.meta[cCode,c("lambdaGC")] <- median(cSumstats$Z^2)/qchisq(0.5,1)
+cat("\nThe genomic inflation factor (lambda GC) was calculated as: ",round(sumstats.meta[cCode,c("lambdaGC")],digits = 2))
+
+```
+
+
 # Save cleaned file and log output
 +++CH: Here the script should end and a cleaned version of the file should be written into the cleaned folder
 +++JZ: When converted to a function we would want to provide this as an argument (with the possibility of a default value).
@@ -915,6 +936,16 @@ cSumstats %>%
     file = paste0("../cleaned/", cCode, ".gz", sep="\t"))
 
 ```
+
+# Update overview spreadsheet
+
++++JZ: TODO
+```{r update overview metadata spreadsheet}
+
+
+
+```
+
 
 +++CH: Additionally, a log file should be created and be saved in the log file folder
 ```{r create log file and save in log file folder}
