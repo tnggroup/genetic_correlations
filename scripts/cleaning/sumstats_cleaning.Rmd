@@ -918,7 +918,7 @@ Helena: /mnt/lustre/groups/ukbiobank/sumstats/scripts/computeLambdaAndCorrect.r
 ```
 
 # Yet another GC calculation
-Yes, Helena's calculation seems how it it supposed to be done. The block below relies on the Z value being up to date
+Yes, Helena's calculation seems how it is supposed to be done. The block below relies on the Z value being up to date.
 ```{r Calculate lambda gc}
 #http://genometoolbox.blogspot.com/2014/08/how-to-calculate-genomic-inflation.html
 sumstats.meta[cCode,c("lambdaGC")] <- median(cSumstats$Z^2)/qchisq(0.5,1)
