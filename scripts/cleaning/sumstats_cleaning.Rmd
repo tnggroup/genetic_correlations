@@ -594,37 +594,7 @@ if(any(colnames(cSumstats)=="N_CAS") && any(colnames(cSumstats)=="N_CON")) {
 }
 ```
 
-#Add missing Z column 
-```{r insert Z column if missing}
-# if no Z column
-if(any(colnames(cSumstats) == "Z") == 0){
-  cSumstats$Z<-abs(qnorm(cSumstats$P/2)) #calculate Z value using qnorm function then divide by 2
-  }
-  
-  cat("Z column inserted based on P value")
-```
-
-
-# Add missing effect standard errors column 
-If missing, add standard errors from beta & z or OR & z 
-```{r insert SE column if missing}
-
-# if no SE column
-if(any(colnames(cSumstats) == "SE") == 0){ 
-  if(any(colnames(cSumstats) == "BETA") == 1){ #take BETA if BETA column exists
-    cSumstats$SE<-abs(cSumstats$BETA/cSumstats$Z) #calculate SE from BETA and Z
-  } else {
-    cSumstats$SE<-abs(log(cSumstats$OR)/cSumstats$Z) #if no BETA column, calculate SE from odds ratio and Z
-  }
-
-  
-  cat("SE column inserted based on BETA/OR and P")
-  
-  #+++ATK not too sure if we need to add to meta data? or if not necessary? - yes. set SE_from_Z as column and set as T
-
-  }
-```
-
++++JZ I moved this here so we can rely on BETA existing if either BETA or OR
 ```{r add BETA column if missing}
 # if no BETA column
 if(any(colnames(cSumstats) == "BETA") == 0){
@@ -633,6 +603,45 @@ if(any(colnames(cSumstats) == "BETA") == 0){
 
 cat("BETA column inserted based on log OR value")
 ```
+
+
++++JZ Need to be inferred from both the P and the sign of any existing effect. If the effect is not known we cannot know the direction of Z either just from P. Can be calculated from EFFECT and SE but the SE may not be reliable as it can be given on the ln scale or not. There are ways we can check this though and maybe it should be part of the light cleaning as well.
+
+We know that BETA exists if any effect provided previously
+
+#Add missing Z column 
+```{r insert Z column if missing}
+# if no Z column
+if(any(colnames(cSumstats) == "Z") == 0 & any(colnames(cSumstats)=="BETA")){
+  cSumstats$Z <- sign(cSumstats$BETA)*sqrt(qchisq(cSumstats$P,1,lower=F)) #calculate Z value using qchisq
+  cat("Z column inserted based on P value and sign(BETA)")
+} else if(any(colnames(cSumstats)=="SE") & any(colnames(cSumstats)=="BETA")){
+  cSumstats$Z <- cSumstats$BETA/cSumstats$SE
+  cat("Z column inserted based on BETA value and SE")
+}
+  
+
+```
+
+
+# Add missing effect standard errors column 
+If missing, add standard errors from beta & z (we always have BETA now if any effect provided previously)
+```{r insert SE column if missing}
+
+# if no SE column
+if(any(colnames(cSumstats) == "SE") == 0){ 
+  if(any(colnames(cSumstats) == "BETA") == 1){ #take BETA if BETA column exists
+    cSumstats$SE<-abs(cSumstats$BETA/cSumstats$Z) #calculate SE from BETA and Z
+  }
+  
+  cat("SE column inserted based on BETA/OR and P")
+  
+  #+++ATK not too sure if we need to add to meta data? or if not necessary? - yes. set SE_from_Z as column and set as T
+
+  }
+```
+
+
 
 
 ## Meta data
@@ -841,31 +850,11 @@ Helena: /mnt/lustre/groups/ukbiobank/sumstats/scripts/submit_freq_2.sh
 
 
 #Check and correct for Genomic Control
++++JZ Only relies on BETA as we know it exists if any effect provided previously
 
 Added from Ollie's script:
 ```{r check and correct for genomic control}
 if(any(colnames(cSumstats) == "SE") == 1){
-  if(any(colnames(cSumstats) == "OR") == 1){
-    cSumstats$BETA<-log(cSumstats$OR) ####change to BETA_check?
-    cSumstats$Z<-cSumstats$BETA/cSumstats$SE ####change to Z_check?
-    cSumstats$P_check<-2*pnorm(-abs(cSumstats$Z))
-    cSumstats$Z<-NULL
-    cSumstats$BETA<-NULL
-    
-    if(abs(mean(cSumstats$P[!is.na(cSumstats$P_check)]) - mean(cSumstats$P_check[!is.na(cSumstats$P_check)])) > 0.01){
-       cSumstats$P<-cSumstats$P_check
-       cSumstats$P_check<-NULL
-      
-       cat("Genomic control detected. P-value recomputed using OR and SE.")
-       
-    } else {
-       
-       cat("Genomic control was not detected.")
-       
-       cSumstats$P_check<-NULL
-    }
-  }
-  
   if(any(colnames(cSumstats) == "BETA") == 1){
     cSumstats$Z<-cSumstats$BETA/cSumstats$SE ####change to Z_check?
     cSumstats$P_check<-2*pnorm(-abs(cSumstats$Z))
@@ -919,6 +908,7 @@ Helena: /mnt/lustre/groups/ukbiobank/sumstats/scripts/computeLambdaAndCorrect.r
 
 # Save cleaned file and log output
 +++CH: Here the script should end and a cleaned version of the file should be written into the cleaned folder
++++JZ: When converted to a function we would want to provide this as an argument (with the possibility of a default value).
 ```{r save cleaned file as .gz file in cleaned folder}
 cSumstats %>%
   gzfile(
