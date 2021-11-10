@@ -581,8 +581,7 @@ Set N from Ncon and Ncas
 Set N from argument
 
 Add columns on sample size, enough for PRS enough for pathway analysis
-
-```{r add missing columns}
+```{r add missing N columns}
 # Add total N depending on columns and input
 if(any(colnames(cSumstats)=="N_CAS") && any(colnames(cSumstats)=="N_CON")) {
   ### Calculate total N from number of cases and number of controls if they are present. Overwrite any specific total N.
@@ -594,6 +593,56 @@ if(any(colnames(cSumstats)=="N_CAS") && any(colnames(cSumstats)=="N_CON")) {
   sumstats.meta[cCode,c("noN")]<-T
 }
 ```
+
++++JZ I moved this here so we can rely on BETA existing if either BETA or OR
+```{r add BETA column if missing}
+# if no BETA column
+if(any(colnames(cSumstats) == "BETA") == 0){
+    cSumstats$BETA<-log(cSumstats$OR) #calculate BETA from log of OR
+    }
+
+cat("BETA column inserted based on log OR value")
+```
+
+
++++JZ Need to be inferred from both the P and the sign of any existing effect. If the effect is not known we cannot know the direction of Z either just from P. Can be calculated from EFFECT and SE but the SE may not be reliable as it can be given on the ln scale or not. There are ways we can check this though and maybe it should be part of the light cleaning as well.
+
+We know that BETA exists if any effect provided previously
+
+#Add missing Z column 
+```{r insert Z column if missing}
+# if no Z column
+if(any(colnames(cSumstats) == "Z") == 0 & any(colnames(cSumstats)=="BETA")){
+  cSumstats$Z <- sign(cSumstats$BETA)*sqrt(qchisq(cSumstats$P,1,lower=F)) #calculate Z value using qchisq
+  cat("Z column inserted based on P value and sign(BETA)")
+} else if(any(colnames(cSumstats)=="SE") & any(colnames(cSumstats)=="BETA")){
+  cSumstats$Z <- cSumstats$BETA/cSumstats$SE
+  cat("Z column inserted based on BETA value and SE")
+}
+  
+
+```
+
+
+# Add missing effect standard errors column 
+If missing, add standard errors from beta & z (we always have BETA now if any effect provided previously)
+```{r insert SE column if missing}
+
+# if no SE column
+if(any(colnames(cSumstats) == "SE") == 0){ 
+  if(any(colnames(cSumstats) == "BETA") == 1){ #take BETA if BETA column exists
+    cSumstats$SE<-abs(cSumstats$BETA/cSumstats$Z) #calculate SE from BETA and Z
+  }
+  
+  cat("SE column inserted based on BETA/OR and P")
+  
+  #+++ATK not too sure if we need to add to meta data? or if not necessary? - yes. set SE_from_Z as column and set as T
+
+  }
+```
+
+
+
 
 ## Meta data
 ```{r add meta data}
@@ -796,17 +845,83 @@ Deal with maf and frequencey columns
 +++CH: Please add this for the next meeting from Helena's script
 Helena: /mnt/lustre/groups/ukbiobank/sumstats/scripts/submit_freq_2.sh
 
-Deal with missing effect standard error
-Add standard errors from beta & z or or & z (Ollies script)
-+++CH: Please, add this for the next meeting
 
 
-Check and correct for GC
-+++CH: Add from Ollie's and Helena's scritp:
+
+
+#Check and correct for Genomic Control
++++JZ Only relies on BETA as we know it exists if any effect provided previously
+
+Added from Ollie's script:
+```{r check and correct for genomic control}
+if(any(colnames(cSumstats) == "SE") == 1){
+  if(any(colnames(cSumstats) == "BETA") == 1){
+    cSumstats$Z<-cSumstats$BETA/cSumstats$SE ####change to Z_check?
+    cSumstats$P_check<-2*pnorm(-abs(cSumstats$Z))
+    cSumstats$Z<-NULL
+
+    if(abs(mean(cSumstats$P[!is.na(cSumstats$P_check)]) - mean(cSumstats$P_check[!is.na(cSumstats$P_check)])) > 0.01){
+      cSumstats$P<-cSumstats$P_check
+      cSumstats$P_check<-NULL
+      
+      cat("Genomic control detected. P-value recomputed using BETA and SE.")
+     
+    } else {
+     
+      cat("Genomic control was not detected.")
+    
+      cSumstats$P_check<-NULL
+    }
+    
+  }
+} else {
+  
+  cat("SE column is not present, genomic control cannot be detected.")
+ 
+}
+
+
+```
+ 
+Need to add from Helenas (below):
 Helena: /mnt/lustre/groups/ukbiobank/sumstats/scripts/computeLambdaAndCorrect.r
+```{r genomic control Helena's script}
+##++++ATK: is there anything we want to add from Helena's below? http://genometoolbox.blogspot.com/2014/08/how-to-calculate-genomic-inflation.html
+#arg <- commandArgs(TRUE)
+#output <- arg[2]
+#
+#
+#gres <- read.table(arg[1],header=T,sep="\t")
+#
+#chisq <- qchisq(1-gres$P,1) #check chisq
+#
+#lambda<-median(chisq)/qchisq(0.5,1) #check lambda
+#
+#gres$P <- pnorm(-abs((qnorm(gres$P/2)/sqrt(lambda))))*2 #check p 
+#
+#gres[,"N"]<-floor(gres[,"N"])
+#
+#gz1 <- gzfile(paste(output,".gz",sep=""),"w")
+#write.table(gres,gz1,quote=F,row.names=F,col.names=T,sep="\t")
+#close(gz1)
+```
 
+# Save cleaned file and log output
 +++CH: Here the script should end and a cleaned version of the file should be written into the cleaned folder
++++JZ: When converted to a function we would want to provide this as an argument (with the possibility of a default value).
+```{r save cleaned file as .gz file in cleaned folder}
+cSumstats %>%
+  gzfile(
+    file = paste0("../cleaned/", cCode, ".gz", sep="\t"))
+
+```
+
 +++CH: Additionally, a log file should be created and be saved in the log file folder
+```{r create log file and save in log file folder}
+
+```
+
+
 
 ?Read in reference from plink formats
 ```{r read in reference}
@@ -1862,121 +1977,5 @@ ldsc.mod <- function(traits, sample.prev, population.prev, ld, wld,
 ```
 
 
-```{r check mhc removed }
 
-
-```
-
-```{r check traits significantly h2}
-
-```
-
-3) Read in rg data for your trait of interest\
-```{r read in rg results}
-
-```
-
-```{r select rg results from log out put files}
-
-```
-
-2) Joining datasets:
-#Step) join the rg results with the GWAS information file to get full GWAS info for each trait
-Merge 
-```{r join info GWAS sheet with rg results}
-
-```
-
-3) Filtering
-For both summary table for plotting and supplementary table:
-#step) Only extract GWAS traits that are not private. 
-Filter by permissions and exclude all private sumstats
-NOTE: need to simplify the current permissions category 
-```{r filter based on permissions}
-
-```
-
-```{r by trait cateogry}
-
-```
-
-#step) Filter p-values by bonferonni threshold 
-Adapt Helena's script in python that already exists calculating bonferonni significance?
-Create a new data frame with only bonf signif traits for summary table for paper plotting of top traits? or just add a new column with 'yes/no' for bonferonnni significant? Johan's preference: stick to one dataframe and filter in the plotting step
-For supplementary table: how do we want to indicate which traits are bonferonni significant? e.g. bold text? A separate column saying 'significant/ non significant'? Colours??
-```{r create bonferonni column}
-
-```
-
-```{r create FDR column }
-
-```
-
-```{r convert table to matrix for matrix decomposition}
-
-```
-
-note: we already have this script in python
-```{r matrix decomposition for bonferonni threshold}
-
-```
-
-Create new dataframes for supplmentary tables
-
-#create supplementary tables
-Select columns for supplementary tables for paper. Decide on columns. 
-e.g. Watson et al 2019 (AN GWAS) columns: Phenotype, rg, se, P (green = bonferoni significant), Phenotype category, PMID, code, ancestry. 
-but could also include Z value of rg, gcov_int, gcov_int_se, h2_obs, h2_obs_se, h2_int	h2_int_se - or h2 Z and mean chi square which could be useful? Topher has a script that extracted h2 information for each GWAS
-```{r create dataframe for supplementary tables}
-
-```
-
-4) Saving new tables
-#what is the preffered format for saving the new table? google sheets? excel sheet for supplementary materials? Save summary table as rds for plotting?
-Save as excel, google sheets, txt
-```{r save supplementary table}
-
-```
-
-5) Plotting
-Decide on significance threshold for plotting. Note: matrix decomposition threshold as less stringent.
-
-Note: trait labels for plotting. This needs to be added to in the google spreadsheet, and then trait labels column for plotting will be used in stead of 'phenotype'
-
-We also have multiple GWAS for one phenotype e.g. MDD - 
-```{r vector of signficant traits for plotting}
-# i.e. the researcher may only want to show specific GWAS for each phenotype e.g. most powerful, or certain cohorts, selected based on type of phenotyping. A
-```
-
-
-```{r filter based on vector of traits}
-
-```
-
-
-```{r create dataframe for plotting}
-#filtering: 1) matrix decomposition 2) vector of selected traits for plotting
-```
-
-Use AN GWAS plot script (Watson et al 2019)
-```{r plot rg results}
-
-```
-
-Publication table
-```{r dataframe for publication table of significant rg traits}
-
-```
-
-save in excel format
-```{r save publication table}
-
-```
- 
-What output do we want from this script?
-1) a general filtered summary table with full GWAS information for each trait (permissions, column significant)
-2) an rg plot with top traits
-3) a supplementary table with selected columns for paper (all traits, except traits with private permissions)
-note: at some point we want to filter by heritability. But do we want this at an earlier step so that we are not running rg with traits that aren't significantly heritable?
-4) Publication table - significant ones (instead of a plot)
 
