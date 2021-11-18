@@ -5,6 +5,7 @@ date: "28/08/2021"
 output: html_document
 ---
 
+# Rmd set up
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,
                       comment=NA,
@@ -17,56 +18,178 @@ Clear global environment
 remove(list = ls())
 ```
 
-# Package setup
+Package setup
 ```{r Packages}
 library(optparse)
 library(data.table)
 library(summarytools)
+library(googlesheets4)
 library(tidyverse)
 ```
 
-
+## Command line set up
 ```{r command line setup}
 clParser <- OptionParser()
-clParser <- add_option(clParser, c("-t", "--task"), type="character", default="clean",
-                help="The explicit task to run:\nclean: Clean GWAS sumstat [default %default]")
-clParser <- add_option(clParser, c("-f", "--file"), type="character",
-                help="The file to process")
-clParser <- add_option(clParser, c("-c", "--code"), type="character",
-                help="The code to use for the dataset from the specified file.")
-clParser <- add_option(clParser, c("-n", "--sample-size"), type="numeric",
-                help="Number of individuals in the sample.")
 
-clOptions<-parse_args(clParser)
-```
+clParser <- add_option(
+  object = clParser,
+  opt_str = c("-t", "--task"),
+  type= "character",
+  default="clean",
+  help = "The explicit task to run:\nclean: Clean GWAS sumstat [default %default]"
+  )
 
-# Script settings
-```{r Script setting}
-filename.rmd<-"sumstats_cleaning.Rmd"
+clParser <- add_option(
+  object = clParser,
+  opt_str = c("-f", "--file"),
+  type = "character",
+  help="The file to process"
+  )
 
-#explicitly set total N
-cN <- clOptions$`sample-size`
-#setting for keeping or removing indels
-keepIndel<-F
-mhc.filter<-37
-```
+clParser <- add_option(
+  object = clParser,
+  opt_str = c("-c", "--code"),
+  type = "character",
+  help = "The code to use for the dataset from the specified file."
+  )
 
-# R script export
-Running this will produce an R-script with the same name as the Rmd-file.
-```{r Purl export, include=FALSE, purl=FALSE, eval=FALSE}
-knitr::purl(filename.rmd)
+clParser <- add_option(
+  object = clParser,
+  opt_str = c("-n", "--sample-size"),
+  type = "numeric",
+  help = "Number of individuals in the sample."
+  )
+
+clOptions <- parse_args(clParser)
 ```
 
 Retrieve the recent date
+We use this to save files with a time stemp.
 ```{r Recent date}
 date = Sys.Date()
 date
 ```
 
-# Functions to be used later
+Specify file name
+This file name is needed to export the whole file as an R file
+```{r Specify file name}
+filename.rmd <- "sumstats_cleaning.Rmd"
+```
+
+## Source credentials files
+This file includes the file path to the King's College London Microsoft Teams channel to store the raw data files of the GWAS summary statistics (intermediate solution before we move the final version to the rosalind cluster). However, we probably will save all summary statistics raw files on SharePoint/Teams to save space on rosalind.
+sumstats_path
+
+The file also contains the login details for your google work account: google_account_details
+
+```{r Credentials file}
+source(file = "../credentials/credentials.R")
+```
+
+
+# GWAS summary statistics overview sheet
+
+Login to googlesheets
+```{r Login to google sheets}
+gs4_auth(email = google_account_details)
+```
+
+
+Import google spreadsheet that contains the information of the GWAS
+```{r Google spreadsheet of GWAS dictionary}
+gwas_sheet <- read_sheet(
+  ss = "https://docs.google.com/spreadsheets/d/1Wmj4Qzumkzks6541vQJqxaUBxjfL4KLQo7_K_oquacI/edit#gid=0",
+  sheet = "SGDP_GWASLIST_EDITTHIS",
+  col_names = TRUE,
+  trim_ws = TRUE, # Trims whitespace,
+  guess_max = 600,
+  na = c("", "NULL", "NA")
+  )
+
+colnames(gwas_sheet)
+
+gwas_sheet
+```
+
+## Script settings
+
+### Paths
+A list of file paths you want to be processed in parallel. In the function this will be a list, but for the command line utility we have to parse the argument, maybe have paths separated by comma or similar?
+_Set your file path_, when testing
+```{r Paths}
+filePaths <- c(
+  paste0(sumstats_path, "/data_raw/CUD_EUR_full_public_11.14.2020.gz")
+  ) 
+# filePaths <- clOptions$file
+```
+
+### Trait names
+A list of nice trait names which could be fit for a publication table/graph/plot
+_Set your nice trait name_, when testing
+```{r Trait names}
+traitNames <- c("Cannabis use disorder (2020)") 
+#traitNames <- clOptions$names
+```
+
+### Code
+A list of codes you want to identify your traits by (different from the nice names), used to reference a trait by a string
+These codes consist of 4 letters; for examples investigate the GWAS spreadsheet. Try to identify similar traits.
+ #Set your trait code string_, when testing
+```{r Code}
+traitCodes <- c("CUDI01")
+#traitCodes <- clOptions$code
+```
+
+### Creating the sumstats.meta object
+```{r Creating the sumstats.meta object}
+sumstats.meta <- data.frame(
+  name = traitNames
+  )
+
+row.names(sumstats.meta) <- traitCodes
+```
+
+### Sample size
+Explicitly set total N (e.g., a vector of sample sizes)
+```{r Sample size}
+cN <- clOptions$`sample-size`
+```
+
+### Indels
+Setting for keeping or removing indels
+```{r Sample size}
+keepIndel <- FALSE # or change to TRUE
+```
+
+### MHC filter
+Activate/deactivate MHC filter
+```{r Sample size}
+mhc.filter <- 37
+```
+
+### R script export
+Running this will produce an R script with the same name as the Rmd file.
++++CH: Do we really need this in this script or should this be a separate file?
+```{r Purl export, include=FALSE, purl=FALSE, eval=FALSE}
+knitr::purl(filename.rmd)
+```
+
 +++CH: Maybe we want to put this functions in separate R scripts and source them like we do in the other scripts?
-```{r functions}
-stdGwasColumnNames <- function(columnNames, stopOnMissingEssential=T,
+
+### Standardised colum names
+This chunk creates one function called "standardise_GWAS_column_names". The function interprets the columns of the original raw GWAS summary statistics and replaces them with standard column names. The standard column names are the first item in the vector:
+SNP	CHR	ORIGBP	A1	A2	FREQ	FREQ_CASES	P	INFO	OR/BETA/Z	SE	N	Ncas	Ncon
+We have chosen ORIGBP as output name, because the summary statistics are based on different genome builds which means SNPs will be located at different BPs
+To avoid follow-up software using the BP column (cave: different genome builds), we named it ORIGBP.
+The function stops if the essential columns SNP, A1, A2, P, BETA or OR or Z 
+
+_Future_
++++CH: FREQ_CASES is missing when reading in, NEF is missing when reading in
++++CH: Ollie has code that detects the genome build of sumstats; we could add the chunk for lifting over. (not top priority).
++++CH: Johan, can you try to find the most recent version of Helena's script on the virtual machine?
++++CH: The stopping and the warning needs to be double checked. I think at the moment it only stops for SNP, A1 or A2 and nothing else.
+```{r Standardise GWAS column names}
+standardise_GWAS_column_names <- function(column_names, stop_on_missing_essential_column = T,
      c.SNP = c(
        "SNP",
        "PREDICTOR",
@@ -136,7 +259,16 @@ stdGwasColumnNames <- function(columnNames, stopOnMissingEssential=T,
        "A_0",
        "NONCODED_ALLELE"
        ),
-     #c.EFFECT = c("EFFECT","OR","B","BETA","LOG_ODDS","EFFECTS","SIGNED_SUMSTAT","EST"),
+     #c.EFFECT = c(
+     #"EFFECT",
+     #"OR",
+     #"B",
+     #"BETA",
+     #"LOG_ODDS",
+     #"EFFECTS",
+     #"SIGNED_SUMSTAT",
+     #"EST"
+     #),
      c.BETA = c(
        "BETA",
        "B",
@@ -230,6 +362,7 @@ stdGwasColumnNames <- function(columnNames, stopOnMissingEssential=T,
        "TOTALSAMPLESIZE"
        ),
      c.N_CAS = c(
+       "Ncas",
        "N_CAS",
        "NCASE",
        "N_CASE",
@@ -239,9 +372,10 @@ stdGwasColumnNames <- function(columnNames, stopOnMissingEssential=T,
        "NCASES",
        "CASES",
        "CASES_N",
-       "FRQ_A"
+       "FRQ_A" # +++CH: Is this correct here?
        ),
      c.N_CON = c(
+       "Ncon",
        "N_CON",
        "NCONTROL",
        "N_CONTROL",
@@ -252,7 +386,7 @@ stdGwasColumnNames <- function(columnNames, stopOnMissingEssential=T,
        "NCONTROLS",
        "CONTROLS",
        "CONTROLS_N",
-       "FRQ_U"
+       "FRQ_U" # +++CH: Is this correct here?
        ),
      c.NEF = c(
        "NEF",
@@ -260,13 +394,13 @@ stdGwasColumnNames <- function(columnNames, stopOnMissingEssential=T,
        "NEFFECTIVE",
        "NE"
        ),
-     #include FRQ_A?
+     #include FRQ_A? # +++CH: Who is this question by?
      c.FRQ = c(
+       "FREQ",
        "FRQ",
        "MAF",
        "AF",
        "CEUAF",
-       "FREQ",
        "FREQ1",
        "EAF",
        "FREQ1.HAPMAP",
@@ -309,8 +443,8 @@ stdGwasColumnNames <- function(columnNames, stopOnMissingEssential=T,
        "HG19CHRC"
        ),
      c.BP = c(
-       "BP",
        "ORIGBP",
+       "BP",
        "POS",
        "POSITION",
        "LOCATION",
@@ -338,60 +472,75 @@ stdGwasColumnNames <- function(columnNames, stopOnMissingEssential=T,
        "POS(B37)"
        )
                                        ){
-  #test
-  #columnNames<-cSumstats.names
+
+  #column_names<-cSumstats.names #+++CH: Why is this hashed out?
   
-  columnNames.upper<-toupper(columnNames)
-  #names(columnNames)<-columnNames
-  columnNames.orig<-columnNames
+  column_names.upper <- toupper(column_names)
+  #names(column_names)<-column_names #+++CH: Why is this hashed out?
+  column_names.orig <- column_names
   
-  columnNames[columnNames.upper %in% c.SNP] <- c.SNP[1]
-  columnNames[columnNames.upper %in% c.A1] <- c.A1[1]
-  columnNames[columnNames.upper %in% c.A2] <- c.A2[1]
-  #columnNames[columnNames.upper %in% c.EFFECT] <- c.EFFECT[1]
-  #if(any(columnNames==c.EFFECT[1])) columnNames[columnNames.upper %in% c.Z] <- c.Z[1] else columnNames[columnNames.upper %in% c.Z] <- c.EFFECT[1]
-  columnNames[columnNames.upper %in% c.BETA] <- c.BETA[1]
-  columnNames[columnNames.upper %in% c.OR] <- c.OR[1] 
-  columnNames[columnNames.upper %in% c.Z] <- c.Z[1] 
-  columnNames[columnNames.upper %in% c.SE] <- c.SE[1]
-  columnNames[columnNames.upper %in% c.INFO] <- c.INFO[1]
-  columnNames[columnNames.upper %in% c.P] <- c.P[1]
-  columnNames[columnNames.upper %in% c.N] <- c.N[1]
-  columnNames[columnNames.upper %in% c.N_CAS] <- c.N_CAS[1]
-  columnNames[columnNames.upper %in% c.N_CON] <- c.N_CON[1]
-  columnNames[columnNames.upper %in% c.NEF] <- c.NEF[1]
-  columnNames[columnNames.upper %in% c.FRQ] <- c.FRQ[1]
-  columnNames[columnNames.upper %in% c.CHR] <- c.CHR[1]
-  columnNames[columnNames.upper %in% c.BP] <- c.BP[1]
+  #+++CH: What does this bit do?
+  column_names[column_names.upper %in% c.SNP] <- c.SNP[1]
+  column_names[column_names.upper %in% c.A1] <- c.A1[1]
+  column_names[column_names.upper %in% c.A2] <- c.A2[1]
+  #column_names[column_names.upper %in% c.EFFECT] <- c.EFFECT[1] #+++CH: Why is this hashed out?
+  #if(any(column_names==c.EFFECT[1])) column_names[column_names.upper %in% c.Z] <- c.Z[1] else column_names[column_names.upper %in% c.Z] <- c.EFFECT[1] #+++CH: Why is this hashed out?
+  column_names[column_names.upper %in% c.BETA] <- c.BETA[1]
+  column_names[column_names.upper %in% c.OR] <- c.OR[1] 
+  column_names[column_names.upper %in% c.Z] <- c.Z[1] 
+  column_names[column_names.upper %in% c.SE] <- c.SE[1]
+  column_names[column_names.upper %in% c.INFO] <- c.INFO[1]
+  column_names[column_names.upper %in% c.P] <- c.P[1]
+  column_names[column_names.upper %in% c.N] <- c.N[1]
+  column_names[column_names.upper %in% c.N_CAS] <- c.N_CAS[1]
+  column_names[column_names.upper %in% c.N_CON] <- c.N_CON[1]
+  column_names[column_names.upper %in% c.NEF] <- c.NEF[1]
+  column_names[column_names.upper %in% c.FRQ] <- c.FRQ[1]
+  column_names[column_names.upper %in% c.CHR] <- c.CHR[1]
+  column_names[column_names.upper %in% c.BP] <- c.BP[1]
   
-  if(stopOnMissingEssential){
-    # Stop if any of these columns are not found
-    if(!any(columnNames=="SNP")) stop("\nCould not find the 'SNP' column.\n")
-    if(!any(columnNames=="A1")) stop("\nCould not find the 'A1' column.\n")
-    if(!any(columnNames=="A2")) stop("\nCould not find the 'A2' column.\n")
+  if(stop_on_missing_essential_column){
+# Stop if any of these columns are not found
+    if(!any(column_names=="SNP")) stop("\nCould not find the 'SNP' column.\n")
+    if(!any(column_names=="A1")) stop("\nCould not find the 'A1' column.\n")
+    if(!any(column_names=="A2")) stop("\nCould not find the 'A2' column.\n")
+    if(!any(column_names=="BETA") & !any(column_names=="OR") & !any(column_names=="Z")) stop("Could not find any effect column.\n")  
   }
   
-  if(!any(columnNames=="P")) warning("\nCould not find the P-value column. Standard is 'P'.\n")
-  if(!any(columnNames=="BETA") & !any(columnNames=="OR" & !any(columnNames=="Z"))) warning("Could not find any effect column.\n")
-  if(!any(columnNames=="SNP")) warning("\nCould not find the 'SNP' column.\n")
-  if(!any(columnNames=="A1")) warning("\nCould not find the 'A1' column.\n")
-  if(!any(columnNames=="A2")) warning("\nCould not find the 'A2' column.\n")
-  if(!any(columnNames=="FRQ")) warning("\nCould not find the 'FRQ' column.\n")
+  if(!any(column_names=="P")) warning("\nCould not find the P-value column. Standard is 'P'.\n")
+  if(!any(column_names=="FRQ")) warning("\nCould not find the 'FRQ' column.\n")
   
-  # Warn if multiple of these columns are found
-  if(sum(columnNames=="SNP")>1) warning("\nMultiple 'SNP' columns found!\n")
-  if(sum(columnNames=="P")>1) warning("\nMultiple 'P' columns found!\n")
-  if(sum(columnNames=="A1")>1) warning("\nMultiple 'A1' columns found!\n")
-  if(sum(columnNames=="A2")>1) warning("\nMultiple 'A2' columns found!\n")
-  if(sum(columnNames=="BETA")>1) warning("\nMultiple 'BETA' columns found!\n")
-  if(sum(columnNames=="OR")>1) warning("\nMultiple 'OR' columns found!\n")
-  if(sum(columnNames=="Z")>1) warning("\nMultiple 'Z' columns found!\n")
-  if(sum(columnNames=="FRQ")>1) warning("\nMultiple 'FRQ' columns found!\n")
+# Warn if multiple of these columns are found #+++CH: Do we want to add more checks for duplicates?
+  if(sum(column_names=="SNP")>1) warning("\nMultiple 'SNP' columns found!\n")
+  if(sum(column_names=="P")>1) warning("\nMultiple 'P' columns found!\n")
+  if(sum(column_names=="A1")>1) warning("\nMultiple 'A1' columns found!\n")
+  if(sum(column_names=="A2")>1) warning("\nMultiple 'A2' columns found!\n")
+  if(sum(column_names=="BETA")>1) warning("\nMultiple 'BETA' columns found!\n")
+  if(sum(column_names=="OR")>1) warning("\nMultiple 'OR' columns found!\n")
+  if(sum(column_names=="Z")>1) warning("\nMultiple 'Z' columns found!\n")
+  if(sum(column_names=="SE")>1) warning("\nMultiple 'SE' columns found!\n")
+  if(sum(column_names=="FRQ")>1) warning("\nMultiple 'FRQ' columns found!\n")
+  if(sum(column_names=="INFO")>1) warning("\nMultiple 'INFO' columns found!\n")
   
-  return(data.frame(std=columnNames,orig=columnNames.orig))
+  return(
+    data.frame(
+      std = column_names,
+      orig = column_names.orig
+      )
+    )
 }
+```
 
-#ref, plink chromosome numbering: https://zzz.bwh.harvard.edu/plink/data.shtml
+# Chromosome numbering
+We are changing naming of chromosomes to PLINK standard.
+As a reference, we are using the PLINK naming:
+plink chromosome numbering: https://zzz.bwh.harvard.edu/plink/data.shtml
+
+_Future_
++++CH: These functions need a sentence explaining what they are doing. Who is going to do this?
++++CH: What is this comment about the number of SNPs? Can we move this outside of the chunk including explanation?
++++JKZ: It only checks the top 100,000 SNPs in a file. We don't know what happens if it detects less than 100,000
+```{r Chromosome numbering}
 parseSNPColumnAsRSNumber <- function(text){
   #decide if BGENIE SNP format using top 100,000 SNPs
   #TODO this condition may be improved to not rely on the number of variants being >100,000
@@ -422,51 +571,33 @@ parseCHRColumn <- function(text){
   text<-sub(pattern = "^chr",replacement = "",x = text)
   return(text)
 }
-
 ```
 
 
 
-# ****!Setup common stuff for all datasets
-
-THIS IS WHERE YOU SET UP YOUR DATASET SETTINGS! ENTER THE SETTINGS FOR YOUR DATASET AS WAS DONE FOR THE ADHD EXAMPLE GWAS BELOW.
-
-+++JZ: These settings are temporary and if we want to convert the script to a function and a command line utility we will have to adapt them accordingly.
-
-```{r}
-filePaths <- clOptions$file #a list of file paths you want to be processed in parallel. in the function this will be a list, but for the command line utility we have to parse the argument, maybe have paths separated by comma or similar?
-traitNames <- clOptions$code # a list of nice trait names which could be fit for a publication table/graph/plot
-traitCodes <- clOptions$code # a list of codes you want to identify your traits by (different from the nice names), used to reference a trait by a string
-#test or temporary placeholders
-filePaths<-c("../../data_raw/CUD_EUR_full_public_11.14.2020.gz") #SET YOUR FILE PATH, when testing
-traitNames<-c("Cannabis use disorder (2020)") #SET YOUR NICE TRAIT NAME, when testing
-traitCodes<-c("CUDI01") #SET YOUR TRAIT CODE STRING, when testing
-sumstats.meta<-data.frame(name=traitNames)
-row.names(sumstats.meta)<-traitCodes
-```
-
-# Read in sumstats and interpret columns
-## Read in sumstats
-
-+++JZ: TODO replace commas with field separators as in Helena's script
-
-+++CH: to read in the data file, I would use the data.table package because it is much faster than the basic R functions to read in data
+## Read in sumstats and interpret columns
+We use the data.table package, because it is much faster than the basic R functions to read in data.
 https://cran.r-project.org/web/packages/data.table/vignettes/datatable-intro.html
-```{r read in sumstats}
-filePaths <- clOptions$file
-#test
-filePaths<-c("../../data_raw/CUD_EUR_full_public_11.14.2020.gz")
 
+_Future_
++++JZ: TODO replace commas with field separators as in Helena's script
++++CH: Has this happened?
+```{r read in sumstats}
 cCode <- traitCodes[1]
 
 cFilePath <- filePaths[1] #we will probably want to have a loop over the provided files
 
 cSumstats <- data.table::fread(
   file = cFilePath,
-  header=T,
-  quote="\"",
-  fill=T, # If TRUE then in case the rows have unequal length, blank fields are implicitly filled.
-  na.strings=c(".",NA,"NA","")
+  header = T,
+  quote = "\"",
+  fill = T, # If TRUE then in case the rows have unequal length, blank fields are implicitly filled.
+  na.strings = c(
+    ".",
+    NA,
+    "NA",
+    ""
+    )
   )
 
 #number of rows before touching the data
@@ -477,12 +608,11 @@ sumstats.meta$n_snp_raw
 ```
 
 ## Interpret columns
-
-Check the existence of columns
-
-Rename columns to standardised names
+Check the existence of columns. Rename columns to standardised names.
 ```{r interpret columns}
-newNames <- stdGwasColumnNames(columnNames = colnames(cSumstats))
+newNames <- standardise_GWAS_column_names(
+  column_names = colnames(cSumstats)
+  )
 print(newNames)
 colnames(cSumstats) <- newNames$std
 ```
@@ -493,26 +623,24 @@ colnames(cSumstats) <- newNames$std
 Set correct R data formats
 
 Transform to data table
+```{r Transform to data table}
+cSumstats <- setDT(cSumstats)
+```
 
 Clean or fix variant SNP column
-
-Interpret BGENIE SNP format
-
-Interpret daner like format
-
-Rename duplicate columns
-
-```{r re-format columns}
-#convert to data frame
-cSumstats <- setDT(cSumstats)
-
-# Column harmonisation
+```{r Fix SNP column}
 cSumstats.keys <- c('SNP')
 cSumstats$SNP <- as.character(cSumstats$SNP)
+```
+
+Format A1 and A2 to upper case
+```{r Format A1 and A2 to upper case}
 cSumstats$A1 <- toupper(as.character(cSumstats$A1))
 cSumstats$A2 <- toupper(as.character(cSumstats$A2))
+```
 
-#parse SNP if needed
+Parse SNP (if needed)
+```{r Parse SNP}
 cSumstats$SNP <- tolower(parseSNPColumnAsRSNumber(cSumstats$SNP))
 
 if(any(colnames(cSumstats)=="CHR")) {
@@ -524,13 +652,20 @@ if(any(colnames(cSumstats)=="BP")) {
   cSumstats$BP <- as.integer(cSumstats$BP)
   cSumstats.keys <- c(cSumstats.keys,'BP')
 }
+```
 
-#set data table index on selected keys
+Set data table index on selected keys
++++CH: Johan, what does this do, please explain
+```{r Set data table index on selected keys}
 setkeyv(cSumstats,cols = cSumstats.keys)
+```
 
 
-#check if daner like columns present
-# ref: https://docs.google.com/document/d/1TWIhr8-qpCXB13WCXcU1_HDio8lC_MeWoAg2jlggrtU/edit
+Interpret BGENIE SNP format
+
+Check if daner like columns present
+ref: https://docs.google.com/document/d/1TWIhr8-qpCXB13WCXcU1_HDio8lC_MeWoAg2jlggrtU/edit
+```{r Interpret daner like format}
 if(!any(colnames(cSumstats)=="FRQ") & !any(colnames(cSumstats)=="N_CAS") & !any(colnames(cSumstats)=="N_CON")){
   danerNcas<-colnames(cSumstats)[startsWith(colnames(cSumstats),prefix = "FRQ_A_")][1]
   danerNcon<-colnames(cSumstats)[startsWith(colnames(cSumstats),prefix = "FRQ_U_")][1]
@@ -544,8 +679,12 @@ if(!any(colnames(cSumstats)=="FRQ") & !any(colnames(cSumstats)=="N_CAS") & !any(
   }
   
 }
+```
 
-#deal with duplicate columns - use the first occurrence
+
+Rename duplicate columns
+Deal with duplicate columns - use the first occurrence
+```{r Rename duplicate columns}
 ##SNP
 iDup<-grep(pattern = "^SNP$",colnames(cSumstats))
 if(length(iDup)>1){
@@ -573,18 +712,21 @@ if('FRQ' %in% names(cSumstats)){
 ```
 
 
-DO WE WANT TO CONVERT CHR TO NUMERIC VALUES? ^
++++JZ: DO WE WANT TO CONVERT CHR TO NUMERIC VALUES?
+```{r Convert to numeric columns}
+
+```
 
 
-## Add missing columns
+# Add missing columns
 
-Set N from Ncon and Ncas
-
-Set N from argument
+## Add total N depending on columns and input
+1) Calcualte N from Ncon and Ncas, if not present
+2) Set N from external argument (set at the beginning)
 
 Add columns on sample size, enough for PRS enough for pathway analysis
+
 ```{r add missing N columns}
-# Add total N depending on columns and input
 if(any(colnames(cSumstats)=="N_CAS") && any(colnames(cSumstats)=="N_CON")) {
   ### Calculate total N from number of cases and number of controls if they are present. Overwrite any specific total N.
   cSumstats$N <- cSumstats$N_CAS + cSumstats$N_CON
@@ -596,7 +738,9 @@ if(any(colnames(cSumstats)=="N_CAS") && any(colnames(cSumstats)=="N_CON")) {
 }
 ```
 
-+++JZ: I moved this here so we can rely on BETA existing if either BETA or OR. We can't know if the effect is a non-OR unless we check though.
+## Add BETA column if missing
+JZ moved this here so we can rely on BETA existing if either BETA or OR are present in the raw data file. We can't know if the effect is a non-OR unless we check though.
++++CH: Johan, what do you mean by "We can't know if the effect is a non-OR unless we check though."?
 ```{r add BETA column if missing}
 # if no BETA column
 if(any(colnames(cSumstats) == "BETA") == 0 & any(colnames(cSumstats) == "OR")){
@@ -607,16 +751,14 @@ if(any(colnames(cSumstats) == "BETA") == 0 & any(colnames(cSumstats) == "OR")){
     cat("BETA column detected")
     sumstats.meta[cCode,c("Effect")]<-"BETA"
     }
-
-
 ```
 
 
+
+## Add missing Z column
+We know that BETA exists if any effect provided previously
 +++JZ: Need to be inferred from both the P and the sign of any existing effect. If the effect is not known we cannot know the direction of Z either just from P. Can be calculated from EFFECT and SE but the SE may not be reliable as it can be given on the ln scale or not. There are ways we can check this and maybe it should be part of the light cleaning as well.
 
-We know that BETA exists if any effect provided previously
-
-#Add missing Z column 
 ```{r insert Z column if missing}
 # if no Z column
 if(any(colnames(cSumstats) == "Z") == 0 & any(colnames(cSumstats)=="BETA")){
@@ -628,36 +770,38 @@ if(any(colnames(cSumstats) == "Z") == 0 & any(colnames(cSumstats)=="BETA")){
   cat("Z column inserted based on BETA value and SE")
   sumstats.meta[cCode,c("Z")]<-"BETA,SE"
 }
-  
-
 ```
 
 
-# Add missing effect standard errors column 
+## Add missing effect standard errors column 
 If missing, add standard errors from beta & z (we always have BETA now if any effect provided previously)
 ```{r insert SE column if missing}
-
 # if no SE column
 if(any(colnames(cSumstats) == "SE") == 0){ 
   if(any(colnames(cSumstats) == "BETA") == 1){ #take BETA if BETA column exists
     cSumstats$SE<-abs(cSumstats$BETA/cSumstats$Z) #calculate SE from BETA and Z
   }
-  
   cat("SE column inserted based on BETA/OR and P")
   sumstats.meta[cCode,c("SE")]<-"BETA,Z"
-  #+++ATK not too sure if we need to add to meta data? or if not necessary? - yes. set SE_from_Z as column and set as T
-
   }
 ```
 
 
-
-
 ## Meta data
+Add metadata about enough for PRS and pathway analysis
 ```{r add meta data}
-#Add metadata about enough for PRS and pathway analysis
-sumstats.meta[cCode,c("enough_columns_PRS")]<-any(colnames(cSumstats)=="SNP") & any(colnames(cSumstats)=="P") & (any(colnames(cSumstats)=="BETA") | any(colnames(cSumstats)=="OR") | any(colnames(cSumstats)=="Z") ) & any(colnames(cSumstats)=="A1") & any(colnames(cSumstats)=="A2")
-sumstats.meta[cCode,c("enough_columns_pathwayanalysis")]<-any(colnames(cSumstats)=="SNP") & any(colnames(cSumstats)=="P")
+sumstats.meta[cCode,c("enough_columns_PRS")] <- 
+  any(colnames(cSumstats)=="SNP") &
+  any(colnames(cSumstats)=="P") &
+  (any(colnames(cSumstats)=="BETA") |
+     any(colnames(cSumstats)=="OR") |
+     any(colnames(cSumstats)=="Z") ) &
+  any(colnames(cSumstats)=="A1") &
+  any(colnames(cSumstats)=="A2")
+
+sumstats.meta[cCode,c("enough_columns_pathway_analysis")] <- 
+  any(colnames(cSumstats)=="SNP") &
+  any(colnames(cSumstats)=="P")
 
 sumstats.meta
 ```
@@ -668,9 +812,8 @@ sumstats.meta
 ##Missing data
 
 Remove variants with missing values
-
+Clean missing Px
 ```{r clean missing p}
-#clean missing P
 if(any(colnames(cSumstats)=="P")){
   cond <- is.na(cSumstats$P)
   sumstats.meta[cCode,c("n_removed_missing_p")]<-sum(cond)
@@ -680,9 +823,8 @@ if(any(colnames(cSumstats)=="P")){
 sumstats.meta$n_removed_missing_p
 ```
 
-
+Clean missing effect
 ```{r clean missing effect}
-#clean missing effect
 if(any(colnames(cSumstats)=="BETA")){
   cond <- is.na(cSumstats$BETA)
   sumstats.meta[cCode,c("n_removed_missing_effect")]<-sum(cond)
@@ -704,7 +846,6 @@ sumstats.meta$n_removed_missing_effect
 ## Duplicate data
 
 Deal with duplicate variants
-
 ```{r clean duplicate data}
 # Remove duplicated variants across SNP, A1 and A2
 if(any(colnames(cSumstats)=="SNP") & any(colnames(cSumstats)=="A1") & any(colnames(cSumstats)=="A2")) {
