@@ -20,9 +20,11 @@ remove(list = ls())
 
 Package setup
 ```{r Packages}
+#devtools::install_github("johanzvrskovec/shru")
 library(optparse)
 library(data.table)
 library(summarytools)
+library(shru)
 library(googlesheets4)
 library(tidyverse)
 ```
@@ -166,6 +168,13 @@ Activate/deactivate MHC filter
 ```{r Sample size}
 mhc.filter <- 37
 ```
+
+### Supemunge?
+Activate/deactivate supermunge
+```{r Supermunge setting}
+doSupermunge <- T
+```
+
 
 ### R script export
 Running this will produce an R script with the same name as the Rmd file.
@@ -1069,44 +1078,6 @@ cat("\nThe genomic inflation factor (lambda GC) was calculated as: ",round(sumst
 
 ```
 
-
-# Save cleaned file and log output
-+++CH: Here the script should end and a cleaned version of the file should be written into the cleaned folder
-+++JZ: When converted to a function we would want to provide this as an argument (with the possibility of a default value).
-```{r save cleaned file as .gz file in cleaned folder}
-cSumstats %>%
-  gzfile(
-    file = paste0("../cleaned/", cCode, ".gz", sep="\t"))
-
-```
-
-# Update overview spreadsheet
-
-+++JZ: TODO
-```{r update overview metadata spreadsheet}
-
-
-
-```
-
-
-+++CH: Additionally, a log file should be created and be saved in the log file folder
-```{r create log file and save in log file folder}
-
-```
-
-
-
-?Read in reference from plink formats
-```{r read in reference}
-
-```
-
-2) Read in Up to date table with full GWAS information of each trait. Currently in csv format linked with the flask app, or in the google sheet.
-```{r read in full GWAS info all traits}
-
-```
-
 #Deal with maf and frequencey columns
 NOTE: This would only work if in the harmonization step earlier, the MAF_REF column was insterted into the cSumstats dataframe
 
@@ -1183,16 +1154,30 @@ if(any(cSumstats$FRQ>1) || any(cSumstats$FRQ<0)) {
 ```
 
 
-Deal with missing effect standard error
-Add standard errors from beta & z or or & z (Ollies script)
+# Save cleaned file and log output
++++CH: Here the script should end and a cleaned version of the file should be written into the cleaned folder
++++JZ: When converted to a function we would want to provide this as an argument (with the possibility of a default value).
+```{r save cleaned file as .gz file in cleaned folder}
+cSumstats %>%
+  gzfile(
+    file = paste0("../cleaned/", cCode, ".gz", sep="\t"))
+
+```
+
+# Update overview spreadsheet
+
++++JZ: TODO
+```{r update overview metadata spreadsheet}
 
 
 
+```
 
 
++++CH: Additionally, a log file should be created and be saved in the log file folder
+```{r create log file and save in log file folder}
 
-
-Check and correct for GC
+```
 
 
 
@@ -1205,6 +1190,24 @@ Check and correct for GC
 ```{r read in full GWAS info all traits}
 
 ```
+
+
+?Read in reference from plink formats
+```{r read in reference}
+
+```
+
+2) Read in Up to date table with full GWAS information of each trait. Currently in csv format linked with the flask app, or in the google sheet.
+```{r read in full GWAS info all traits}
+
+```
+
+
+Deal with missing effect standard error
+Add standard errors from beta & z or or & z (Ollies script)
+
+
+Check and correct for GC
 
 #Munge sumstats
 ```{r}
@@ -1237,6 +1240,25 @@ python ${ldscdir}/munge_sumstats.py --out ${output_path}/${file} --merge-alleles
 
 ```
 
+
+#Supermunge
+```{r Supermunge}
+if(doSupermunge){
+  supermungeTraitCode<-paste0(traitCodes[1],"_supermunge")
+  supermunge(
+    list_df = list(cSumstats),
+    refFilePath = "/scratch/groups/ukbiobank/Edinburgh_Data/Software/ldscore/w_hm3.snplist",
+    traitNames = paste0(traitCodes[1],"_supermunge"),
+    pathDirOutput = "/scratch/groups/ukbiobank/sumstats/munged/",
+    N = cN,
+    keepIndel = keepIndel
+      )
+  
+  Sys.setenv(supermunge_trait_code=supermungeTraitCode)
+}
+```
+
+
 #LD score
 ```{bash}
 #!/bin/bash
@@ -1254,7 +1276,29 @@ output_path="/scratch/groups/ukbiobank/sumstats/munged/"
 ldscdir="/scratch/groups/ukbiobank/KCL_Data/Software/ldsc/"
 
 #run ldsc 
-python ${ldscdir}/ldsc.py --h2 ${output_path}/${file}.sumstats.gz --ref-ld-chr ${ldscdir}/eur_w_ld_chr/ --w-ld-chr ${ldscdir}/eur_w_ld_chr/ --out ${output_path}/${file}_herit
+python ${ldscdir}/ldsc.py --h2 ${output_path}/${file}.gz --ref-ld-chr ${ldscdir}/eur_w_ld_chr/ --w-ld-chr ${ldscdir}/eur_w_ld_chr/ --out ${output_path}/${file}_herit
+
+```
+
+#LD score 2
+```{bash}
+#!/bin/bash
+#SBATCH -n 8
+#SBATCH --mem-per-cpu=9G
+#SBATCH -t 72:00:00
+if [[ -v supermunge_trait_code ]]; then
+###
+module add devtools/anaconda/2019.3-python2.7.16
+
+#parameters
+input_path="/scratch/groups/ukbiobank/sumstats/cleaned/"
+output_path="/scratch/groups/ukbiobank/sumstats/munged/"
+ldscdir="/scratch/groups/ukbiobank/KCL_Data/Software/ldsc/"
+
+#run ldsc 
+python ${ldscdir}/ldsc.py --h2 ${output_path}/${supermunge_trait_code}.gz --ref-ld-chr ${ldscdir}/eur_w_ld_chr/ --w-ld-chr ${ldscdir}/eur_w_ld_chr/ --out ${output_path}/${supermunge_trait_code}_herit
+
+fi
 
 ```
 
