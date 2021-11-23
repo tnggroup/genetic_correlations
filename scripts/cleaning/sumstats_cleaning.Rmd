@@ -143,6 +143,7 @@ traitCodes <- c("CUDI01")
 ```
 
 ### Creating the sumstats.meta object
+Sumatats.meta is an output containing an overview with information of the cleaning steps that is generated throughout the cleaning pipeline for each GWAS trait.
 ```{r Creating the sumstats.meta object}
 sumstats.meta <- data.frame(
   name = traitNames
@@ -611,13 +612,15 @@ cSumstats <- data.table::fread(
 
 #number of rows before touching the data
 nRowsRaw <- nrow(cSumstats)
-sumstats.meta[cCode,c("n_snp_raw")]<-nRowsRaw
+sumstats.meta[cCode,c("n_snp_raw")]<-nRowsRaw #add number of SNPs raw to sumstats.meta (meta data file)
 
 sumstats.meta$n_snp_raw
 ```
 
+
+
 ## Interpret columns
-Check the existence of columns. Rename columns to standardised names.
+Checks the existence of columns based on list of column names in chunk above (Standardise GWAS column names). Renames columns to standardised names.
 ```{r interpret columns}
 newNames <- standardise_GWAS_column_names(
   column_names = colnames(cSumstats)
@@ -796,10 +799,10 @@ if(any(colnames(cSumstats) == "SE") == 0){
 ```
 
 
-## Meta data
-Add metadata about enough for PRS and pathway analysis
-```{r add meta data}
-sumstats.meta[cCode,c("enough_columns_PRS")] <- 
+## Meta data about sufficient columns for analyses
+Add information to metadata if there are enough columns for PRS and pathway analysis
+```{r add meta data for PRS & pathway analysis}
+sumstats.meta[cCode,c("enough_columns_PRS")] <- #sufficient columns for PRS analysis
   any(colnames(cSumstats)=="SNP") &
   any(colnames(cSumstats)=="P") &
   (any(colnames(cSumstats)=="BETA") |
@@ -808,7 +811,7 @@ sumstats.meta[cCode,c("enough_columns_PRS")] <-
   any(colnames(cSumstats)=="A1") &
   any(colnames(cSumstats)=="A2")
 
-sumstats.meta[cCode,c("enough_columns_pathway_analysis")] <- 
+sumstats.meta[cCode,c("enough_columns_pathway_analysis")] <- #sufficient columns  for pathway analysis
   any(colnames(cSumstats)=="SNP") &
   any(colnames(cSumstats)=="P")
 
@@ -820,8 +823,8 @@ sumstats.meta
 
 ##Missing data
 
-Remove variants with missing values
-Clean missing Px
+Remove variants with missing P values and missing effect columns
+Clean if missing P column
 ```{r clean missing p}
 if(any(colnames(cSumstats)=="P")){
   cond <- is.na(cSumstats$P)
@@ -832,18 +835,18 @@ if(any(colnames(cSumstats)=="P")){
 sumstats.meta$n_removed_missing_p
 ```
 
-Clean missing effect
+Clean if missing effect columns 
 ```{r clean missing effect}
-if(any(colnames(cSumstats)=="BETA")){
-  cond <- is.na(cSumstats$BETA)
+if(any(colnames(cSumstats)=="BETA")){ 
+  cond <- is.na(cSumstats$BETA) #if NA for BETA value remove variant
   sumstats.meta[cCode,c("n_removed_missing_effect")]<-sum(cond)
   cSumstats<-cSumstats[which(!cond),]
 } else if(any(colnames(cSumstats)=="OR")) {
-  cond <- is.na(cSumstats$OR)
+  cond <- is.na(cSumstats$OR) #if NA for OR value remove variant
   sumstats.meta[cCode,c("n_removed_missing_effect")]<-sum(cond)
   cSumstats<-cSumstats[which(!cond),]
 } else if(any(colnames(cSumstats)=="Z")) {
-  cond <- is.na(cSumstats$Z)
+  cond <- is.na(cSumstats$Z) #if NA for Z value remove variant
   sumstats.meta[cCode,c("n_removed_missing_effect")]<-sum(cond)
   cSumstats<-cSumstats[which(!cond),]
 }
@@ -876,9 +879,9 @@ sumstats.meta$n_removed_duplicates
 ## P filter
 ```{r P filter}
 if(any(colnames(cSumstats)=="P")){
-  rm <- (!is.na(cSumstats$P) & (cSumstats$P>1 | cSumstats$P<0))
+  rm <- (!is.na(cSumstats$P) & (cSumstats$P>1 | cSumstats$P<0)) #if outside of bounds P < 0 or P > 1
   cSumstats <- cSumstats[!rm, ]
-  cat("Removing ", sum(rm), " SNPs with P < 0 or P > 1; ", nrow(cSumstats), " remain")
+  cat("Removing ", sum(rm), " SNPs with P < 0 or P > 1; ", nrow(cSumstats), " remain") 
   sumstats.meta[cCode,c("n_removed_p")]<-sum(rm)
 } else {
   cat("Warning: The dataset does not contain a P column to apply the specified filter on.")
@@ -890,7 +893,7 @@ sumstats.meta$n_removed_p
 ## FRQ filter
 ```{r FRQ filter}
 if(any(colnames(cSumstats)=="FRQ")){
-  rm <- (!is.na(cSumstats$FRQ) & (cSumstats$FRQ<0.005 | cSumstats$FRQ>0.995))
+  rm <- (!is.na(cSumstats$FRQ) & (cSumstats$FRQ<0.005 | cSumstats$FRQ>0.995)) #if outside of bounds 
   cSumstats <- cSumstats[!rm, ]
   cat("Removing ", sum(rm), " SNPs with FRQ <", frq.filter, "; ", nrow(cSumstats), " remain")
   sumstats.meta[cCode,c("n_removed_frq")]<-sum(rm)
@@ -932,6 +935,7 @@ sumstats.meta$n_removed_or
 ```
 
 ## N filter - (from Ollies script)
++++ATK: do we want to remove SNPs that have a large N as set here? Or just SNPs with small N? 
 ```{r N filter}
 if(any(colnames(cSumstats)=="N")){
   N_sd<-sd(cSumstats$N)
@@ -946,9 +950,10 @@ sumstats.meta$n_removed_n
 ```
 
 # SE filter - from Ollies script
+Note: if SE is 0 then this is flagged because it can cause issues in downstream analyses
 ```{r SE filter}
 if(any(colnames(cSumstats)=="SE")){
-  rm <- (!is.na(cSumstats$SE) & cSumstats$SE == 0)
+  rm <- (!is.na(cSumstats$SE) & cSumstats$SE == 0) #if SE is 0 or NA - remove
   cSumstats <- cSumstats[!rm, ]
   cat("Removing ", sum(rm), " SNPs with SE = 0; ", nrow(cSumstats), " remain")
   sumstats.meta[cCode,c("n_removed_se")]<-sum(rm)
@@ -958,12 +963,14 @@ sumstats.meta$n_removed_se
 ```
 
 #indels
+
 +++Ollie: Preferable to not remove these as standard in light cleaning.
+
 ```{r indels filter}
-if(keepIndel == T){
+if(keepIndel == T){ #if set at True, keeps indels
   cSumstats$A1 <- as.character(toupper(cSumstats$A1))
   cSumstats$A2 <- as.character(toupper(cSumstats$A2))
-} else if(keepIndel == F){
+} else if(keepIndel == F){ #if set at False, removes indels
   cSumstats$A1 <- as.character(toupper(cSumstats$A1), c("A", "C", "G", "T"))
   cSumstats$A2 <- as.character(toupper(cSumstats$A2), c("A", "C", "G", "T"))
   rm <- (is.na(cSumstats$A1) | is.na(cSumstats$A2))
@@ -974,43 +981,9 @@ if(keepIndel == T){
 sumstats.meta$n_removed_indels
 ```
 
-## MHC removal
-+++CH: This should happen after the LDSC munging; some people will want to use the MHC variants for their analyses
-
-remove MHC region based on position - probably better to do after merge/harmonisation with reference
-references:
-https://www.ncbi.nlm.nih.gov/grc/human/regions/MHC?asm=GRCh37
-https://www.ncbi.nlm.nih.gov/grc/human/regions/MHC
-```{r MHC removal}
-if(!is.na(mhc.filter)){
-  if(any(colnames(cSumstats)=="CHR") & any(colnames(cSumstats)=="BP")){
-    if(mhc.filter==37) {
-        rm <- (!is.na(cSumstats$CHR) & !is.na(cSumstats$BP) & cSumstats$CHR=="6" & cSumstats$BP>=28477797 & cSumstats$BP<=33448354)
-        cSumstats <- cSumstats[!rm, ]
-    } else if (mhc.filter==38) {
-        rm <- (!is.na(cSumstats$CHR) & !is.na(cSumstats$BP) & cSumstats$CHR=="6" & cSumstats$BP>=28510120 & cSumstats$BP<=33480577)
-        cSumstats <- cSumstats[!rm, ]
-        cat("Removing ", sum(rm), " SNPs in the GRCh",mhc.filter," MHC; ", nrow(cSumstats), " remain")
-    } else {
-        cat("Warning: Invalid assembly version provided - no filtering of the MHC was done!")
-      }
-  } else {
-    cat("Warning: No chromosome or base-pair position information available - no filtering of the MHC was done!")
-  }
-}
-```
-
-
-
-Deal with maf and frequencey columns
-+++CH: Please add this for the next meeting from Helena's script
-Helena: /mnt/lustre/groups/ukbiobank/sumstats/scripts/submit_freq_2.sh
-
-
-
-
 
 #Check and correct for Genomic Control
+
 +++JZ Only relies on BETA as we know it exists if any effect provided previously
 
 Added from Ollie's script:
@@ -1069,20 +1042,28 @@ Helena: /mnt/lustre/groups/ukbiobank/sumstats/scripts/computeLambdaAndCorrect.r
 #close(gz1)
 ```
 
-# Yet another GC calculation
-Yes, Helena's calculation seems how it is supposed to be done. The block below relies on the Z value being up to date.
-```{r Calculate lambda gc}
+# GC calculation: Lambda
+The block below relies on the Z value being up to date.
+```{r Calculate lambda GC}
 #http://genometoolbox.blogspot.com/2014/08/how-to-calculate-genomic-inflation.html
+
 sumstats.meta[cCode,c("lambdaGC")] <- median(cSumstats$Z^2)/qchisq(0.5,1)
+
 cat("\nThe genomic inflation factor (lambda GC) was calculated as: ",round(sumstats.meta[cCode,c("lambdaGC")],digits = 2))
 
 ```
 
+#
+
 #Deal with maf and frequencey columns
-NOTE: This would only work if in the harmonization step earlier, the MAF_REF column was insterted into the cSumstats dataframe
+  
 
-```{r}
+NOTE: This would only work if in the harmonization step earlier, the MAF_REF column was insterted into the cSumstats dataframe (so need to add harmonisation step before this step)
 
++++Alish: this is slightly different to what we were previously doing in Helena's script. Discuss in meeting?
+
+#Compares to reference and inverts MAFs if they are incorrect based on average allele frequency.
+```{r allele Frequency columns and MAF inversion}
 # Check FRQ column is valid
 
 if(any(cSumstats$FRQ>1) || any(cSumstats$FRQ<0)) {
@@ -1116,8 +1097,11 @@ if(any(cSumstats$FRQ>1) || any(cSumstats$FRQ<0)) {
         
       }
   }
+```
 
-### Compute MAF
+#if allele frequency column is missing, infer from reference panel 
+```{r Compute MAF columns based on reference MAF}
+### Compute MAF 
 
   if(cond.invertedMAF<-cSumstats$FRQ > .5){
     
@@ -1136,7 +1120,7 @@ if(any(cSumstats$FRQ>1) || any(cSumstats$FRQ<0)) {
     
     #Set FRQ from ref if not present
     
-    cSumstats$FRQ <- cSumstats$MAF_REF
+    cSumstats$FRQ <- cSumstats$MAF_REF #creates new column with allele frequency inffered from reference
     
     cSumstats.warnings <- c(cSumstats.warnings,"Inferring FRQ from reference!")
     
@@ -1144,7 +1128,7 @@ if(any(cSumstats$FRQ>1) || any(cSumstats$FRQ<0)) {
     
   else {
       
-    #### Add empty FRQ here for consistency
+    #### Add empty FRQ here for consistency (sets to NAs)
     
       cSumstats$FRQ<-NA_real_
       
@@ -1155,7 +1139,7 @@ if(any(cSumstats$FRQ>1) || any(cSumstats$FRQ<0)) {
 
 
 # Save cleaned file and log output
-+++CH: Here the script should end and a cleaned version of the file should be written into the cleaned folder
+
 +++JZ: When converted to a function we would want to provide this as an argument (with the possibility of a default value).
 ```{r save cleaned file as .gz file in cleaned folder}
 cSumstats %>%
@@ -1179,35 +1163,37 @@ cSumstats %>%
 
 ```
 
-
-
 ?Read in reference from plink formats
 ```{r read in reference}
 
 ```
 
-2) Read in Up to date table with full GWAS information of each trait. Currently in csv format linked with the flask app, or in the google sheet.
-```{r read in full GWAS info all traits}
 
+## MHC removal (separate from cleaning script)
+This should happen after the LDSC munging; some people will want to use the MHC variants for their analyses
+
+remove MHC region based on position - probably better to do after merge/harmonisation with reference
+references:
+https://www.ncbi.nlm.nih.gov/grc/human/regions/MHC?asm=GRCh37
+https://www.ncbi.nlm.nih.gov/grc/human/regions/MHC
+```{r MHC removal}
+if(!is.na(mhc.filter)){
+  if(any(colnames(cSumstats)=="CHR") & any(colnames(cSumstats)=="BP")){
+    if(mhc.filter==37) {
+        rm <- (!is.na(cSumstats$CHR) & !is.na(cSumstats$BP) & cSumstats$CHR=="6" & cSumstats$BP>=28477797 & cSumstats$BP<=33448354)
+        cSumstats <- cSumstats[!rm, ]
+    } else if (mhc.filter==38) {
+        rm <- (!is.na(cSumstats$CHR) & !is.na(cSumstats$BP) & cSumstats$CHR=="6" & cSumstats$BP>=28510120 & cSumstats$BP<=33480577)
+        cSumstats <- cSumstats[!rm, ]
+        cat("Removing ", sum(rm), " SNPs in the GRCh",mhc.filter," MHC; ", nrow(cSumstats), " remain")
+    } else {
+        cat("Warning: Invalid assembly version provided - no filtering of the MHC was done!")
+      }
+  } else {
+    cat("Warning: No chromosome or base-pair position information available - no filtering of the MHC was done!")
+  }
+}
 ```
-
-
-?Read in reference from plink formats
-```{r read in reference}
-
-```
-
-2) Read in Up to date table with full GWAS information of each trait. Currently in csv format linked with the flask app, or in the google sheet.
-```{r read in full GWAS info all traits}
-
-```
-
-
-Deal with missing effect standard error
-Add standard errors from beta & z or or & z (Ollies script)
-
-
-Check and correct for GC
 
 #Munge sumstats
 ```{r}
