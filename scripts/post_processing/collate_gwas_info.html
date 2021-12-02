@@ -407,8 +407,10 @@ library(easyPubMed)</code></pre>
 </div>
 <div id="load-up-to-date-sql-database-csv" class="section level1">
 <h1>Load up-to-date SQL database csv</h1>
-<pre class="r"><code># I don't know where the location of this csv is, so this is an example
-csv_new&lt;-fread('/users/k1806347/brc_scratch/Data/GWAS_sumstats/Rosalind_repository/download_csv_test.csv')</code></pre>
+<pre class="r"><code>csv_new&lt;-fread('/scratch/users/k1806347/Software/genetic_correlations/data_gwas_sumstats_repository_2021/database_export_gwas_reference_category_phenotype.tsv',fill=T)
+
+# For testing, create mini version
+csv_new&lt;-csv_new[1:10,]</code></pre>
 <hr />
 </div>
 <div id="create-or-update-gwas-inforamtion-file" class="section level1">
@@ -437,7 +439,7 @@ if(!is.na(opt$gwas_info)){
   new_gwas&lt;-csv_new
   cat(dim(new_gwas)[1],'new entries detected.\n')
 }</code></pre>
-<pre><code>49 new entries detected.</code></pre>
+<pre><code>10 new entries detected.</code></pre>
 <hr />
 </div>
 <div id="download-pubmed-information" class="section level1">
@@ -452,54 +454,15 @@ for(i in which(!is.na(new_gwas$pmid))){
   new_gwas$article_abstract[i] &lt;- paste0(custom_grep(dat, &quot;AbstractText&quot;, &quot;char&quot;), collapse=' ')
   cat(paste0(round(i/sum(!is.na(new_gwas$pmid)),2)*100,&quot;% complete\n&quot;))
 }</code></pre>
-<pre><code>2% complete
-4% complete
-6% complete
-8% complete
-10% complete
-12% complete
-14% complete
-16% complete
-18% complete
+<pre><code>10% complete
 20% complete
-22% complete
-24% complete
-27% complete
-29% complete
-31% complete
-33% complete
-35% complete
-37% complete
-39% complete
-41% complete
-43% complete
-45% complete
-47% complete
-49% complete
-51% complete
-53% complete
-55% complete
-57% complete
-59% complete
-61% complete
-63% complete
-65% complete
-67% complete
-69% complete
-71% complete
-73% complete
-76% complete
-78% complete
+30% complete
+40% complete
+50% complete
+60% complete
+70% complete
 80% complete
-82% complete
-84% complete
-86% complete
-88% complete
 90% complete
-92% complete
-94% complete
-96% complete
-98% complete
 100% complete</code></pre>
 <hr />
 </div>
@@ -537,6 +500,55 @@ for(i in 1:dim(new_gwas)[1]){
     }
   }
 }</code></pre>
+<hr />
+</div>
+<div id="compare-with-information-in-gwas-catalogue" class="section level1">
+<h1>Compare with information in GWAS catalogue</h1>
+<pre class="r"><code>library(gwasrapidd)
+studies &lt;- get_studies(pubmed_id = as.character(new_gwas$pmid[!is.na(new_gwas$pmid)]))
+
+# This package provides a lot of useful information and is quick to run. If we are not interested in abstracts, we could skip using PubMed entirely.
+# One issue is instances where more than one GWAS was released per PMID
+# The information could be manually filtered to check for errors
+# The only reliable solution programmatically is to only check sample size for PMID with one set of sumstats.
+# The same is true in our repository, as there are often multiple GWAS per pubmed ID.
+
+tmp&lt;-merge(studies@publications, studies@studies, by='study_id')
+tmp&lt;-tmp[,c('study_id','pubmed_id','title','reported_trait','initial_sample_size'),]
+dup&lt;-unique(tmp$pubmed_id[duplicated(tmp$pubmed_id)])
+tmp&lt;-tmp[!(tmp$pubmed_id %in% dup),]
+
+n_tmp&lt;-studies@ancestries[studies@ancestries$study_id %in% tmp$study_id,]
+n_tmp&lt;-n_tmp[n_tmp$type == 'initial',]
+
+n_tmp_sum&lt;-NULL
+for(i in unique(n_tmp$study_id)){
+  n_tmp_sum&lt;-rbind(n_tmp_sum,data.frame(study_id=i,
+                                        n=sum(n_tmp$number_of_individuals[n_tmp$study_id == i])))
+}
+
+tmp&lt;-merge(tmp, n_tmp_sum, by='study_id')
+
+new_gwas_nodup&lt;-new_gwas[!(new_gwas$pmid %in% new_gwas$pmid[duplicated(new_gwas$pmid)])]
+new_gwas_nodup&lt;-merge(new_gwas_nodup, tmp, by.x='pmid', by.y='pubmed_id', all.x=T)
+
+# Some studies still don't always match well as there may only be one version of sumstats available in each repository, but different versions. e.g. cross-disorder GWAS
+
+new_gwas_nodup[,c('pmid','code','name','n_total','n','reported_trait')]</code></pre>
+<pre><code>       pmid   code                                         name n_total     n
+1: 20732625 ADHD01                                         ADHD    5422  5415
+2: 23453885 ADHD03                  Cross-disorder: ADHD subset    5422 61220
+3: 25607358 ACCU01 Subcortical brain regions: Nucleus Accumbens   13171 13171
+4: 27663945 ADHD02                                ADHD symptoms   17666 17666
+5: 27918534 ADIP01            Pericardial adipose tissue volume   18332    NA
+6: 28358823 ACHI01                         Achilles heel injury  108127    NA
+                                                                                                                                  reported_trait
+1:                                                                                                      Attention deficit hyperactivity disorder
+2: Autism spectrum disorder, attention deficit-hyperactivity disorder, bipolar disorder, major depressive disorder, and schizophrenia (combined)
+3:                                                                                                              Subcortical brain region volumes
+4:                                                                                        Attention deficit hyperactivity disorder symptom score
+5:                                                                                                                                          &lt;NA&gt;
+6:                                                                                                                                          &lt;NA&gt;</code></pre>
 <hr />
 </div>
 <div id="write-out-updated-gwas-information-file" class="section level1">

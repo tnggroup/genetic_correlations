@@ -65,8 +65,10 @@ library(easyPubMed)
 # Load up-to-date SQL database csv
 
 ```{r}
-# I don't know where the location of this csv is, so this is an example
-csv_new<-fread('/users/k1806347/brc_scratch/Data/GWAS_sumstats/Rosalind_repository/download_csv_test.csv')
+csv_new<-fread('/scratch/users/k1806347/Software/genetic_correlations/data_gwas_sumstats_repository_2021/database_export_gwas_reference_category_phenotype.tsv',fill=T)
+
+# For testing, create mini version
+csv_new<-csv_new[1:10,]
 
 ```
 
@@ -160,6 +162,46 @@ for(i in 1:dim(new_gwas)[1]){
     }
   }
 }
+
+```
+
+***
+
+# Compare with information in GWAS catalogue
+
+```{r}
+
+library(gwasrapidd)
+studies <- get_studies(pubmed_id = as.character(new_gwas$pmid[!is.na(new_gwas$pmid)]))
+
+# This package provides a lot of useful information and is quick to run. If we are not interested in abstracts, we could skip using PubMed entirely.
+# One issue is instances where more than one GWAS was released per PMID
+# The information could be manually filtered to check for errors
+# The only reliable solution programmatically is to only check sample size for PMID with one set of sumstats.
+# The same is true in our repository, as there are often multiple GWAS per pubmed ID.
+
+tmp<-merge(studies@publications, studies@studies, by='study_id')
+tmp<-tmp[,c('study_id','pubmed_id','title','reported_trait','initial_sample_size'),]
+dup<-unique(tmp$pubmed_id[duplicated(tmp$pubmed_id)])
+tmp<-tmp[!(tmp$pubmed_id %in% dup),]
+
+n_tmp<-studies@ancestries[studies@ancestries$study_id %in% tmp$study_id,]
+n_tmp<-n_tmp[n_tmp$type == 'initial',]
+
+n_tmp_sum<-NULL
+for(i in unique(n_tmp$study_id)){
+  n_tmp_sum<-rbind(n_tmp_sum,data.frame(study_id=i,
+                                        n=sum(n_tmp$number_of_individuals[n_tmp$study_id == i])))
+}
+
+tmp<-merge(tmp, n_tmp_sum, by='study_id')
+
+new_gwas_nodup<-new_gwas[!(new_gwas$pmid %in% new_gwas$pmid[duplicated(new_gwas$pmid)])]
+new_gwas_nodup<-merge(new_gwas_nodup, tmp, by.x='pmid', by.y='pubmed_id', all.x=T)
+
+# Some studies still don't always match well as there may only be one version of sumstats available in each repository, but different versions. e.g. cross-disorder GWAS
+
+new_gwas_nodup[,c('pmid','code','name','n_total','n','reported_trait')]
 
 ```
 
