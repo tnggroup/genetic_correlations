@@ -1,0 +1,164 @@
+---
+title: "Harmonising GWAS with reference data"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+***
+
+This script harmonises GWAS summary statistics with reference data.
+
+If CHR and BP position is available:
+
+- Identify genome build
+- Update/insert RSID
+- Update BP (GRCh37)
+
+If only RSID is available:
+- Insert CHR
+- Insert BP (GRCh37)
+
+Then the following:
+- Insert REF.FREQ
+- Remove variants with discordant MAF
+
+Possible further checks:
+- DENTIST
+- LDpred2 QC
+
+***
+
+# Set up RMD options and environment
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE,
+                      comment=NA,
+                      prompt=FALSE,
+                      cache=FALSE)
+```
+
+Clear global environment
+```{r}
+remove(list = ls())
+```
+
+***
+
+# Set parameters
+
+```{r}
+
+opt<-list()
+opt$sumstats<-''
+opt$output<-''
+opt$ref_plink_chr<-''
+opt$ref_freq_chr<-''
+
+```
+
+***
+
+# Read in GWAS sumstats
+
+```{r}
+library(data.table)
+sumstats<-fread(opt$sumstats)
+```
+
+***
+
+# Read in reference data
+
+```{r}
+# Read in reference bim files and update column names
+ref_bim<-NULL
+for(i in 1:22){
+  ref_bim<-rbind(ref_bim, fread(paste0(opt$ref_plink_chr,i,'.bim')))
+}
+
+names(ref_bim)<-c('CHR','SNP','POS','BP','A1','A2')
+ref_bim$POS<-NULL
+
+# Read in reference freq files
+ref_freq<-NULL
+for(i in 1:22){
+  ref_freq<-rbind(ref_freq, fread(paste0(opt$ref_freq_chr,i,'.frq')))
+}
+
+```
+
+***
+
+# Identify variants in GWAS
+
+```{r}
+# Check if CHR and BP are present
+if(c('CHR','BP') %in% names(sumstats) == c(T,T)){
+  # Determine genome build
+  
+  # Insert IUPAC codes in ref (GRCh38)
+  ref[['GRCh38']]$IUPAC[ref[['GRCh38']]$A1 == 'A' & ref[['GRCh38']]$A2 =='T' | ref[['GRCh38']]$A1 == 'T' & ref[['GRCh38']]$A2 =='A']<-'W'
+  ref[['GRCh38']]$IUPAC[ref[['GRCh38']]$A1 == 'C' & ref[['GRCh38']]$A2 =='G' | ref[['GRCh38']]$A1 == 'G' & ref[['GRCh38']]$A2 =='C']<-'S'
+  ref[['GRCh38']]$IUPAC[ref[['GRCh38']]$A1 == 'A' & ref[['GRCh38']]$A2 =='G' | ref[['GRCh38']]$A1 == 'G' & ref[['GRCh38']]$A2 =='A']<-'R'
+  ref[['GRCh38']]$IUPAC[ref[['GRCh38']]$A1 == 'C' & ref[['GRCh38']]$A2 =='T' | ref[['GRCh38']]$A1 == 'T' & ref[['GRCh38']]$A2 =='C']<-'Y'
+  ref[['GRCh38']]$IUPAC[ref[['GRCh38']]$A1 == 'G' & ref[['GRCh38']]$A2 =='T' | ref[['GRCh38']]$A1 == 'T' & ref[['GRCh38']]$A2 =='G']<-'K'
+  ref[['GRCh38']]$IUPAC[ref[['GRCh38']]$A1 == 'A' & ref[['GRCh38']]$A2 =='C' | ref[['GRCh38']]$A1 == 'C' & ref[['GRCh38']]$A2 =='A']<-'M'
+  
+  # Insert IUPAC codes in ref (ref[['GRCh37']])
+  ref[['GRCh37']]$IUPAC[ref[['GRCh37']]$A1 == 'A' & ref[['GRCh37']]$A2 =='T' | ref[['GRCh37']]$A1 == 'T' & ref[['GRCh37']]$A2 =='A']<-'W'
+  ref[['GRCh37']]$IUPAC[ref[['GRCh37']]$A1 == 'C' & ref[['GRCh37']]$A2 =='G' | ref[['GRCh37']]$A1 == 'G' & ref[['GRCh37']]$A2 =='C']<-'S'
+  ref[['GRCh37']]$IUPAC[ref[['GRCh37']]$A1 == 'A' & ref[['GRCh37']]$A2 =='G' | ref[['GRCh37']]$A1 == 'G' & ref[['GRCh37']]$A2 =='A']<-'R'
+  ref[['GRCh37']]$IUPAC[ref[['GRCh37']]$A1 == 'C' & ref[['GRCh37']]$A2 =='T' | ref[['GRCh37']]$A1 == 'T' & ref[['GRCh37']]$A2 =='C']<-'Y'
+  ref[['GRCh37']]$IUPAC[ref[['GRCh37']]$A1 == 'G' & ref[['GRCh37']]$A2 =='T' | ref[['GRCh37']]$A1 == 'T' & ref[['GRCh37']]$A2 =='G']<-'K'
+  ref[['GRCh37']]$IUPAC[ref[['GRCh37']]$A1 == 'A' & ref[['GRCh37']]$A2 =='C' | ref[['GRCh37']]$A1 == 'C' & ref[['GRCh37']]$A2 =='A']<-'M'
+  
+  # Insert IUPAC codes in target
+  target_snp$IUPAC[target_snp$A1 == 'A' & target_snp$A2 =='T' | target_snp$A1 == 'T' & target_snp$A2 =='A']<-'W'
+  target_snp$IUPAC[target_snp$A1 == 'C' & target_snp$A2 =='G' | target_snp$A1 == 'G' & target_snp$A2 =='C']<-'S'
+  target_snp$IUPAC[target_snp$A1 == 'A' & target_snp$A2 =='G' | target_snp$A1 == 'G' & target_snp$A2 =='A']<-'R'
+  target_snp$IUPAC[target_snp$A1 == 'C' & target_snp$A2 =='T' | target_snp$A1 == 'T' & target_snp$A2 =='C']<-'Y'
+  target_snp$IUPAC[target_snp$A1 == 'G' & target_snp$A2 =='T' | target_snp$A1 == 'T' & target_snp$A2 =='G']<-'K'
+  target_snp$IUPAC[target_snp$A1 == 'A' & target_snp$A2 =='C' | target_snp$A1 == 'C' & target_snp$A2 =='A']<-'M'
+  
+  # Check condordance of BP across builds
+  matched<-list()
+  matched[['GRCh37']]<-merge(target_snp, ref[['GRCh37']], by=c('CHR','BP','IUPAC'))
+  matched[['GRCh38']]<-merge(target_snp, ref[['GRCh38']], by=c('CHR','BP','IUPAC'))
+  
+  sink(file = paste(opt$out,'.geno_to_plink.log',sep=''), append = T)
+  cat('GRCh37 match: ',round(nrow(matched[['GRCh37']])/nrow(ref[['GRCh37']])*100, 2),'%\n',sep='')
+  cat('GRCh38 match: ',round(nrow(matched[['GRCh38']])/nrow(ref[['GRCh38']])*100,2),'%\n',sep='')
+  sink()
+  
+  if((nrow(matched[['GRCh37']])/nrow(ref[['GRCh37']])) > 0.7 & (nrow(matched[['GRCh37']])/nrow(ref[['GRCh37']])) > (nrow(matched[['GRCh38']])/nrow(ref[['GRCh38']]))){
+    target_build<-'GRCh37'
+  }
+  
+  if((nrow(matched[['GRCh38']])/nrow(ref[['GRCh38']])) > 0.7 & (nrow(matched[['GRCh38']])/nrow(ref[['GRCh38']])) > (nrow(matched[['GRCh37']])/nrow(ref[['GRCh37']]))){
+    target_build<-'GRCh38'
+  }
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
