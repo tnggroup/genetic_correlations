@@ -596,7 +596,8 @@ _Future_
 cCode <- traitCodes[1]
 
 cFilePath <- filePaths[1] #we will probably want to have a loop over the provided files
-
+# For Ollie testng:
+# cFilePath<-'/users/k1806347/brc_scratch/Data/GWAS_sumstats/Rosalind_repository/CUD_EUR_full_public_11.14.2020.gz'
 cSumstats <- data.table::fread(
   file = cFilePath,
   header = T,
@@ -617,8 +618,6 @@ sumstats.meta[cCode,c("n_snp_raw")]<-nRowsRaw #add number of SNPs raw to sumstat
 sumstats.meta$n_snp_raw
 ```
 
-
-
 ## Interpret columns
 Checks the existence of columns based on list of column names in chunk above (Standardise GWAS column names). Renames columns to standardised names.
 ```{r interpret columns}
@@ -626,7 +625,7 @@ newNames <- standardise_GWAS_column_names(
   column_names = colnames(cSumstats)
   )
 print(newNames)
-colnames(cSumstats) <- newNames$std
+colnames(cSumstats) <- as.character(newNames$std)
 ```
 
 # Column and dataframe re-formatting
@@ -668,6 +667,7 @@ if(any(colnames(cSumstats)=="BP")) {
 
 Set data table index on selected keys
 +++CH: Johan, what does this do, please explain
++++OP: Seems to sort the data table and index by SNP id to allow faster manipulations downstream. Not certain though!
 ```{r Set data table index on selected keys}
 setkeyv(cSumstats,cols = cSumstats.keys)
 ```
@@ -725,6 +725,7 @@ if('FRQ' %in% names(cSumstats)){
 
 
 +++JZ: DO WE WANT TO CONVERT CHR TO NUMERIC VALUES?
++++OP: No strong opinion on this. Are there standard numeric values for non-autosomes and what does commonly used software use? If not then I would suggest leaving as a character vector.
 ```{r Convert to numeric columns}
 
 ```
@@ -762,7 +763,7 @@ if(any(colnames(cSumstats) == "BETA") == 0 & any(colnames(cSumstats) == "OR")){
 } else if(any(colnames(cSumstats) == "BETA")) {
     cat("BETA column detected")
     sumstats.meta[cCode,c("Effect")]<-"BETA"
-    }
+}
 ```
 
 
@@ -795,7 +796,7 @@ if(any(colnames(cSumstats) == "SE") == 0){
   }
   cat("SE column inserted based on BETA/OR and P")
   sumstats.meta[cCode,c("SE")]<-"BETA,Z"
-  }
+}
 ```
 
 
@@ -967,12 +968,9 @@ sumstats.meta$n_removed_se
 +++Ollie: Preferable to not remove these as standard in light cleaning.
 
 ```{r indels filter}
-if(keepIndel == T){ #if set at True, keeps indels
-  cSumstats$A1 <- as.character(toupper(cSumstats$A1))
-  cSumstats$A2 <- as.character(toupper(cSumstats$A2))
-} else if(keepIndel == F){ #if set at False, removes indels
-  cSumstats$A1 <- as.character(toupper(cSumstats$A1), c("A", "C", "G", "T"))
-  cSumstats$A2 <- as.character(toupper(cSumstats$A2), c("A", "C", "G", "T"))
+if(keepIndel == F){ #if set at False, removes indels
+  cSumstats$A1 <- as.character(cSumstats$A1, c("A", "C", "G", "T"))
+  cSumstats$A2 <- as.character(cSumstats$A2, c("A", "C", "G", "T"))
   rm <- (is.na(cSumstats$A1) | is.na(cSumstats$A2))
   sumstats.meta[cCode,c("n_removed_indels")]<-sum(cond)
   cSumstats<-cSumstats[!rm,]
@@ -985,6 +983,7 @@ sumstats.meta$n_removed_indels
 #Check and correct for Genomic Control
 
 +++JZ Only relies on BETA as we know it exists if any effect provided previously
++++OP: This also relies on the SEs not being adjusted for genomic control, which does happen sometimes. Using the LDSC intercept might be a better approach for detection, although there is no easy way to reverse.
 
 Added from Ollie's script:
 ```{r check and correct for genomic control}
@@ -1021,6 +1020,7 @@ if(any(colnames(cSumstats) == "SE") == 1){
  
 Need to add from Helenas (below):
 Helena: /mnt/lustre/groups/ukbiobank/sumstats/scripts/computeLambdaAndCorrect.r
++++ OP: I have noticed gzfile sometimes truncates the output. the fwrite function now automatically gzips files if the file name ends with a 'gz'
 ```{r genomic control Helena's script}
 ##++++ATK: is there anything we want to add from Helena's below? http://genometoolbox.blogspot.com/2014/08/how-to-calculate-genomic-inflation.html
 #arg <- commandArgs(TRUE)
@@ -1053,19 +1053,329 @@ cat("\nThe genomic inflation factor (lambda GC) was calculated as: ",round(sumst
 
 ```
 
-#
+#Harmonise with the reference
+
+To insert and/or check reference MAFs, the user must assign appropriate super population for GWAS. If missing or mixed, no reference MAF should be inserted.
+
+This step will also insert RSIDs where possible.
+
+No variants will be removed from the GWAS during this haronisation step to retain information for downstream analyses that do not require the variants to be in the reference.
+
+INDELS are reported in such a varied way across GWAS, that we will only harmonise SNPs.
+
+We will also only insert MAF for non-ambiguous SNPs.
+
+```{r}
+# Insert IUPAC codes into target
+cSumstats$IUPAC[cSumstats$A1 == 'A' & cSumstats$A2 =='T' | cSumstats$A1 == 'T' & cSumstats$A2 =='A']<-'W'
+cSumstats$IUPAC[cSumstats$A1 == 'C' & cSumstats$A2 =='G' | cSumstats$A1 == 'G' & cSumstats$A2 =='C']<-'S'
+cSumstats$IUPAC[cSumstats$A1 == 'A' & cSumstats$A2 =='G' | cSumstats$A1 == 'G' & cSumstats$A2 =='A']<-'R'
+cSumstats$IUPAC[cSumstats$A1 == 'C' & cSumstats$A2 =='T' | cSumstats$A1 == 'T' & cSumstats$A2 =='C']<-'Y'
+cSumstats$IUPAC[cSumstats$A1 == 'G' & cSumstats$A2 =='T' | cSumstats$A1 == 'T' & cSumstats$A2 =='G']<-'K'
+cSumstats$IUPAC[cSumstats$A1 == 'A' & cSumstats$A2 =='C' | cSumstats$A1 == 'C' & cSumstats$A2 =='A']<-'M'
+
+# Define super population
+super_pop<-'EUR' # Should be specified by user
+
+###########
+# Merge with the reference
+###########
+# Initially target should be merged with the reference based on CHR, BP and IUPAC. RSIDs will be inserted for all SNPs, and reference MAF will be inserted for all non-ambiguous SNPs if the super population is specified.
+# If CHR and BP are unavailable, but RSID is present, target will be merged with the reference by RSID and IUPAC. CHR and BP will be inserted for all SNPs, and reference MAF will be inserted for all non-ambiguous SNPs if the super population is specified.
+
+# Check whether RSIDs are available for majority of SNPs in GWAS
+chr_bp_avail<-sum(c('CHR','ORIGBP') %in% names(cSumstats)) == 2 
+rsid_avail<-(sum(grepl('rs', cSumstats$SNP)) > 0.9*length(cSumstats$SNP))
+
+if(chr_bp_avail){
+  ###
+  # Determine build
+  ###
+  # Read in chromosome 22 of reference data
+  i<-22
+  ref<-list()
+
+  ref[['GRCh37']]<-fread(paste0('/scratch/groups/biomarkers-brc-mh/Reference_data/1KG_Phase3/PLINK/all_phase3.chr',i,'.bim'))
+  ref[['GRCh37']]$V3<-NULL
+  names(ref[['GRCh37']])<-c('chr','snp','pos','a1','a2')
+  
+  # Update BP from build GRCh37 (hg19) to GRCh38
+  # Create snp_modifyBuild_offline
+  make_executable <- function(exe) {
+    Sys.chmod(exe, mode = (file.info(exe)$mode | "111"))
+  }
+  
+  snp_modifyBuild_offline<-function (info_snp, liftOver, chain, from = "hg18", to = "hg19"){
+    if (!all(c("chr", "pos") %in% names(info_snp)))
+      stop2("Please use proper names for variables in 'info_snp'. Expected %s.",
+            "'chr' and 'pos'")
+    liftOver <- normalizePath(liftOver)
+    make_executable(liftOver)
+    BED <- tempfile(fileext = ".BED")
+    info_BED <- with(info_snp, data.frame(paste0("chr", chr),
+                                          pos0 = pos - 1L, pos, id = seq_len(nrow(info_snp))))
+    bigreadr::fwrite2(info_BED, BED, col.names = FALSE, sep = " ")
+    lifted<-'/users/k1806347/tmp/tmp.lifted'
+    unmapped<-'/users/k1806347/tmp/tmp.unmapped'
+    system(paste(liftOver, BED, chain, lifted, unmapped))
+    new_pos <- bigreadr::fread2(lifted)
+    bad <- grep("^#", readLines(unmapped), value = TRUE, invert = TRUE)
+    print(paste0(length(bad)," variants have not been mapped."))
+    info_snp$pos <- NA
+    info_snp$pos[new_pos$V4] <- new_pos$V3
+    info_snp
+  }
+
+  # Liftover BP to GRCh38
+  ref[['GRCh38']]<-snp_modifyBuild_offline(ref[['GRCh37']], liftOver='/users/k1806347/brc_scratch/Software/MyGit/GenoPred/GenoPredPipe/resources/software/liftover/liftover', chain='/users/k1806347/brc_scratch/Software/MyGit/GenoPred/GenoPredPipe/resources/data/liftover/hg18ToHg19.over.chain.gz', from = "hg18", to = "hg19")
+
+  names(ref[['GRCh37']])<-c('CHR','SNP','BP','A1','A2')
+  names(ref[['GRCh38']])<-c('CHR','SNP','BP','A1','A2')
+
+  # Insert IUPAC codes in ref (GRCh38)
+  ref[['GRCh38']]$IUPAC[ref[['GRCh38']]$A1 == 'A' & ref[['GRCh38']]$A2 =='T' | ref[['GRCh38']]$A1 == 'T' & ref[['GRCh38']]$A2 =='A']<-'W'
+  ref[['GRCh38']]$IUPAC[ref[['GRCh38']]$A1 == 'C' & ref[['GRCh38']]$A2 =='G' | ref[['GRCh38']]$A1 == 'G' & ref[['GRCh38']]$A2 =='C']<-'S'
+  ref[['GRCh38']]$IUPAC[ref[['GRCh38']]$A1 == 'A' & ref[['GRCh38']]$A2 =='G' | ref[['GRCh38']]$A1 == 'G' & ref[['GRCh38']]$A2 =='A']<-'R'
+  ref[['GRCh38']]$IUPAC[ref[['GRCh38']]$A1 == 'C' & ref[['GRCh38']]$A2 =='T' | ref[['GRCh38']]$A1 == 'T' & ref[['GRCh38']]$A2 =='C']<-'Y'
+  ref[['GRCh38']]$IUPAC[ref[['GRCh38']]$A1 == 'G' & ref[['GRCh38']]$A2 =='T' | ref[['GRCh38']]$A1 == 'T' & ref[['GRCh38']]$A2 =='G']<-'K'
+  ref[['GRCh38']]$IUPAC[ref[['GRCh38']]$A1 == 'A' & ref[['GRCh38']]$A2 =='C' | ref[['GRCh38']]$A1 == 'C' & ref[['GRCh38']]$A2 =='A']<-'M'
+  
+  # Insert IUPAC codes in ref (ref[['GRCh37']])
+  ref[['GRCh37']]$IUPAC[ref[['GRCh37']]$A1 == 'A' & ref[['GRCh37']]$A2 =='T' | ref[['GRCh37']]$A1 == 'T' & ref[['GRCh37']]$A2 =='A']<-'W'
+  ref[['GRCh37']]$IUPAC[ref[['GRCh37']]$A1 == 'C' & ref[['GRCh37']]$A2 =='G' | ref[['GRCh37']]$A1 == 'G' & ref[['GRCh37']]$A2 =='C']<-'S'
+  ref[['GRCh37']]$IUPAC[ref[['GRCh37']]$A1 == 'A' & ref[['GRCh37']]$A2 =='G' | ref[['GRCh37']]$A1 == 'G' & ref[['GRCh37']]$A2 =='A']<-'R'
+  ref[['GRCh37']]$IUPAC[ref[['GRCh37']]$A1 == 'C' & ref[['GRCh37']]$A2 =='T' | ref[['GRCh37']]$A1 == 'T' & ref[['GRCh37']]$A2 =='C']<-'Y'
+  ref[['GRCh37']]$IUPAC[ref[['GRCh37']]$A1 == 'G' & ref[['GRCh37']]$A2 =='T' | ref[['GRCh37']]$A1 == 'T' & ref[['GRCh37']]$A2 =='G']<-'K'
+  ref[['GRCh37']]$IUPAC[ref[['GRCh37']]$A1 == 'A' & ref[['GRCh37']]$A2 =='C' | ref[['GRCh37']]$A1 == 'C' & ref[['GRCh37']]$A2 =='A']<-'M'
+  
+  # Check target-ref condordance of BP across builds
+  ref[['GRCh37']]$CHR<-as.character(ref[['GRCh37']]$CHR)
+  ref[['GRCh38']]$CHR<-as.character(ref[['GRCh38']]$CHR)
+  matched<-list()
+  matched[['GRCh37']]<-merge(cSumstats, ref[['GRCh37']], by.x=c('CHR','ORIGBP','IUPAC'), by.y=c('CHR','BP','IUPAC'))
+  matched[['GRCh38']]<-merge(cSumstats, ref[['GRCh38']], by.x=c('CHR','ORIGBP','IUPAC'), by.y=c('CHR','BP','IUPAC'))
+  
+  cat('GRCh37 match: ',round(nrow(matched[['GRCh37']])/sum(cSumstats$CHR == i)*100, 2),'%\n',sep='')
+  cat('GRCh38 match: ',round(nrow(matched[['GRCh38']])/sum(cSumstats$CHR == i)*100, 2),'%\n',sep='')
+
+  target_build<-NA
+  if((nrow(matched[['GRCh37']])/sum(cSumstats$CHR == i)) > 0.7 & (nrow(matched[['GRCh37']])/sum(cSumstats$CHR == i)) > (nrow(matched[['GRCh38']])/sum(cSumstats$CHR == i))){
+    target_build<-'GRCh37'
+  }
+  
+  if((nrow(matched[['GRCh38']])/sum(cSumstats$CHR == i)) > 0.7 & (nrow(matched[['GRCh38']])/sum(cSumstats$CHR == i)) > (nrow(matched[['GRCh37']])/sum(cSumstats$CHR == i))){
+    target_build<-'GRCh38'
+  }
+  
+  if(!is.na(target_build)){
+    # Build detected, so can continue reference harmonisation
+    # Run per chromosome to reduce memory requirements
+    chrs<-unique(cSumstats$CHR)
+
+    cSumstats_matched<-NULL
+    cSumstats_unmatched<-NULL
+    for(i in chrs){
+      print(i)
+      
+      # Read reference data
+      tmp<-fread(paste0('/scratch/groups/biomarkers-brc-mh/Reference_data/1KG_Phase3/PLINK/all_phase3.chr',i,'.bim'))
+      tmp<-tmp[nchar(tmp$V5) == 1 & nchar(tmp$V6) == 1,]
+      names(tmp)<-c('CHR','SNP','POS','BP','A1','A2')
+      tmp$POS<-NULL
+      tmp$CHR<-NULL
+      
+      # Insert IUPAC codes into ref
+      tmp$IUPAC[tmp$A1 == 'A' & tmp$A2 =='T' | tmp$A1 == 'T' & tmp$A2 =='A']<-'W'
+      tmp$IUPAC[tmp$A1 == 'C' & tmp$A2 =='G' | tmp$A1 == 'G' & tmp$A2 =='C']<-'S'
+      tmp$IUPAC[tmp$A1 == 'A' & tmp$A2 =='G' | tmp$A1 == 'G' & tmp$A2 =='A']<-'R'
+      tmp$IUPAC[tmp$A1 == 'C' & tmp$A2 =='T' | tmp$A1 == 'T' & tmp$A2 =='C']<-'Y'
+      tmp$IUPAC[tmp$A1 == 'G' & tmp$A2 =='T' | tmp$A1 == 'T' & tmp$A2 =='G']<-'K'
+      tmp$IUPAC[tmp$A1 == 'A' & tmp$A2 =='C' | tmp$A1 == 'C' & tmp$A2 =='A']<-'M'
+      
+      # Read in reference frequency data
+      freq<-fread(paste0('/scratch/groups/biomarkers-brc-mh/Reference_data/1KG_Phase3/PLINK/MAF/',super_pop,'/all_phase3.',super_pop,'.chr',i,'.frq'))
+      
+      # The freq files have come from the reference files, so we can assume they are on the same strand
+      freq_match<-merge(tmp, freq[,c('SNP','A1','A2','MAF'), with=F], by=c('SNP','A1','A2'))
+      freq_swap<-merge(tmp, freq[,c('SNP','A1','A2','MAF'), with=F], by.x=c('SNP','A1','A2'), by.y=c('SNP','A2','A1'))
+      freq_swap$MAF<-1-freq_swap$MAF
+      tmp<-rbind(freq_match, freq_swap)
+      
+      names(tmp)[names(tmp) == 'SNP']<-'REF.SNP'
+      names(tmp)[names(tmp) == 'MAF']<-'REF.FRQ'
+      names(tmp)[names(tmp) == 'BP']<-'REF.BP'
+
+      # Merge target and reference by BP
+      cSumstats_chr<-cSumstats[cSumstats$CHR == i,]
+      ref_target<-merge(cSumstats_chr, tmp, by.x=c('ORIGBP'), by.y=c('REF.BP'))
+      
+      # Identify SNPs that have matched alleles
+      matched<-ref_target[ref_target$IUPAC.x == ref_target$IUPAC.y,]
+  
+      # Remove REF.FRQ for ambiguous SNPs
+      matched$REF.FRQ[matched$IUPAC.x %in% c('w','S')]<-NA
+      
+      # For ambiguous SNPs, set ref A1 and A2 as target A1 and A2
+      matched$A1.y[matched$IUPAC.x %in% c('w','S')]<-matched$A1.x[matched$IUPAC.x %in% c('w','S')]
+      matched$A2.y[matched$IUPAC.x %in% c('w','S')]<-matched$A2.x[matched$IUPAC.x %in% c('w','S')]
+      
+      # Identify SNPs that are opposite strands
+      flipped<-ref_target[(ref_target$IUPAC.x == 'R' & ref_target$IUPAC.y == 'Y') | 
+                          (ref_target$IUPAC.x == 'Y' & ref_target$IUPAC.y == 'R') | 
+                          (ref_target$IUPAC.x == 'K' & ref_target$IUPAC.y == 'M') |
+                          (ref_target$IUPAC.x == 'M' & ref_target$IUPAC.y == 'K'),]
+      
+      # For strand flipped variants, change to match reference
+      if('FRQ' %in% names(cSumstats)){
+        flipped$FRQ<-1-flipped$FRQ
+      }
+      if('BETA' %in% names(cSumstats)){
+        flipped$BETA<--flipped$BETA
+      }
+      if('OR' %in% names(cSumstats)){
+        flipped$OR<-exp(-log(flipped$OR))
+      }
+      
+      # Retain reference CHR, BP, A1, and A2 information
+      matched_flipped<-rbind(matched, flipped)
+      matched_flipped$A1<-matched_flipped$A1.y
+      matched_flipped$A1.y<-NULL
+      matched_flipped$A1.x<-NULL
+      matched_flipped$A2<-matched_flipped$A2.y
+      matched_flipped$A2.y<-NULL
+      matched_flipped$A2.x<-NULL
+      matched_flipped$IUPAC<-matched_flipped$IUPAC.y
+      matched_flipped$IUPAC.y<-NULL
+      matched_flipped$REF.CHR<-matched_flipped$CHR
+      matched_flipped$REF.BP<-matched_flipped$ORIGBP
+
+      # Idntify SNPs that are unmatched
+      unmatched_chr<-cSumstats_chr[!(paste0(cSumstats_chr$ORIGBP,':',cSumstats_chr$IUPAC) %in% paste0(matched_flipped$ORIGBP,':',matched_flipped$IUPAC.x)),]
+      matched_flipped$IUPAC.x<-NULL
+
+      cSumstats_matched<-rbind(cSumstats_matched, matched_flipped)
+      cSumstats_unmatched<-rbind(cSumstats_unmatched, unmatched_chr)
+    }
+    
+    # Reinsert variants in GWAS that could not be matched to the reference
+    # These unmatched variants include those with CHR:BP:IUPAC not in the reference, and INDELS.
+    cSumstats_unmatched$REF.CHR<-NA
+    cSumstats_unmatched$REF.BP<-NA
+    cSumstats_unmatched$REF.SNP<-NA
+    cSumstats_unmatched$REF.FRQ<-NA
+
+    cSumstats_harm<-rbind(cSumstats_matched, cSumstats_unmatched)
+  }
+} else {
+  if(rsid_avail = T){
+    # Run per chromosome to reduce memory requirements
+    chrs<-c(1:22,'X','Y','MT')
+  
+    cSumstats_matched<-NULL
+    for(i in chrs){
+      print(i)
+      
+      # Read reference data
+      tmp<-fread(paste0('/scratch/groups/biomarkers-brc-mh/Reference_data/1KG_Phase3/PLINK/all_phase3.chr',i,'.bim'))
+      tmp<-tmp[nchar(tmp$V5) == 1 & nchar(tmp$V6) == 1,]
+      names(tmp)<-c('CHR','SNP','POS','BP','A1','A2')
+      tmp$POS<-NULL
+      
+      # Insert IUPAC codes into ref
+      tmp$IUPAC[tmp$A1 == 'A' & tmp$A2 =='T' | tmp$A1 == 'T' & tmp$A2 =='A']<-'W'
+      tmp$IUPAC[tmp$A1 == 'C' & tmp$A2 =='G' | tmp$A1 == 'G' & tmp$A2 =='C']<-'S'
+      tmp$IUPAC[tmp$A1 == 'A' & tmp$A2 =='G' | tmp$A1 == 'G' & tmp$A2 =='A']<-'R'
+      tmp$IUPAC[tmp$A1 == 'C' & tmp$A2 =='T' | tmp$A1 == 'T' & tmp$A2 =='C']<-'Y'
+      tmp$IUPAC[tmp$A1 == 'G' & tmp$A2 =='T' | tmp$A1 == 'T' & tmp$A2 =='G']<-'K'
+      tmp$IUPAC[tmp$A1 == 'A' & tmp$A2 =='C' | tmp$A1 == 'C' & tmp$A2 =='A']<-'M'
+      
+      # Read in reference frequency data
+      freq<-fread(paste0('/scratch/groups/biomarkers-brc-mh/Reference_data/1KG_Phase3/PLINK/MAF/',super_pop,'/all_phase3.EUR.chr',i,'.frq'))
+      
+      # The freq files have come from the reference files, so we can assume they are on the same strand
+      freq_match<-merge(tmp, freq[,c('SNP','A1','A2','MAF'), with=F], by=c('SNP','A1','A2'))
+      freq_swap<-merge(tmp, freq[,c('SNP','A1','A2','MAF'), with=F], by.x=c('SNP','A1','A2'), by.y=c('SNP','A2','A1'))
+      freq_swap$MAF<-1-freq_swap$MAF
+      tmp<-rbind(freq_match, freq_swap)
+      
+      names(tmp)[names(tmp) == 'MAF']<-'REF.FRQ'
+      names(tmp)[names(tmp) == 'BP']<-'REF.BP'
+      names(tmp)[names(tmp) == 'CHR']<-'REF.CHR'
+      
+      # Merge target and reference by SNP ID
+      ref_target<-merge(cSumstats, tmp, by='SNP')
+      
+      # Identify SNPs that have matched alleles
+      matched<-ref_target[ref_target$IUPAC.x == ref_target$IUPAC.y,]
+  
+      # Remove REF.FRQ for ambiguous SNPs
+      matched$REF.FRQ[matched$IUPAC.x %in% c('w','S')]<-NA
+      
+      # For ambiguous SNPs, set ref A1 and A2 as target A1 and A2
+      matched$A1.y[matched$IUPAC.x %in% c('w','S')]<-matched$A1.x[matched$IUPAC.x %in% c('w','S')]
+      matched$A2.y[matched$IUPAC.x %in% c('w','S')]<-matched$A2.x[matched$IUPAC.x %in% c('w','S')]
+  
+      # Identify SNPs that are opposite strands
+      flipped<-ref_target[(ref_target$IUPAC.x == 'R' & ref_target$IUPAC.y == 'Y') | 
+                          (ref_target$IUPAC.x == 'Y' & ref_target$IUPAC.y == 'R') | 
+                          (ref_target$IUPAC.x == 'K' & ref_target$IUPAC.y == 'M') |
+                          (ref_target$IUPAC.x == 'M' & ref_target$IUPAC.y == 'K'),]
+      
+      # For strand flipped variants, change to match reference
+      if('FRQ' %in% names(cSumstats)){
+        flipped$FRQ<-1-flipped$FRQ
+      }
+      if('BETA' %in% names(cSumstats)){
+        flipped$BETA<--flipped$BETA
+      }
+      if('OR' %in% names(cSumstats)){
+        flipped$OR<-exp(-log(flipped$OR))
+      }
+      
+      # Retain reference CHR, BP, A1, and A2 information
+      matched_flipped<-rbind(matched, flipped)
+      matched_flipped$A1<-matched_flipped$A1.y
+      matched_flipped$A1.y<-NULL
+      matched_flipped$A1.x<-NULL
+      matched_flipped$A2<-matched_flipped$A2.y
+      matched_flipped$A2.y<-NULL
+      matched_flipped$A2.x<-NULL
+      matched_flipped$IUPAC<-matched_flipped$IUPAC.y
+      matched_flipped$IUPAC.y<-NULL
+      matched_flipped$IUPAC.x<-NULL
+      matched_flipped$REF.SNP<-matched_flipped$SNP
+  
+      cSumstats_matched_chr<-rbind(matched_flipped)
+      cSumstats_matched<-rbind(cSumstats_matched, cSumstats_matched_chr)
+    }
+    
+    # Idntify SNPs that are unmatched
+    unmatched<-cSumstats[!(cSumstats$SNP %in% cSumstats_matched$SNP),]
+    
+    # Reinsert variants in GWAS that could not be matched to the reference
+    # These unmatched variants include those with RSIDs not in the reference, any ambiguous SNPs, and INDELS.
+    unmatched$REF.SNP<-NA
+    unmatched$REF.FRQ<-NA
+    unmatched$REF.CHR<-NA
+    unmatched$REF.BP<-NA
+  
+    cSumstats_harm<-rbind(cSumstats_matched, unmatched)
+
+  }
+}
+
+```
 
 #Deal with maf and frequencey columns
-  
 
 NOTE: This would only work if in the harmonization step earlier, the MAF_REF column was insterted into the cSumstats dataframe (so need to add harmonisation step before this step)
 
 +++Alish: this is slightly different to what we were previously doing in Helena's script. Discuss in meeting?
++++OP: I notice this FRQ check isn't functional yet. Are alleles flipped?
 
 #Compares to reference and inverts MAFs if they are incorrect based on average allele frequency.
 ```{r allele Frequency columns and MAF inversion}
 # Check FRQ column is valid
-
 if(any(cSumstats$FRQ>1) || any(cSumstats$FRQ<0)) {
       
       stop(paste0('\nThere are FRQ values larger than 1 (',sum(cSumstats$FRQ>1),') or less than 0 (',sum(cSumstats$FRQ<0),') which is outside of the possible FRQ range.')
@@ -1100,6 +1410,7 @@ if(any(cSumstats$FRQ>1) || any(cSumstats$FRQ<0)) {
 ```
 
 #if allele frequency column is missing, infer from reference panel 
+
 ```{r Compute MAF columns based on reference MAF}
 ### Compute MAF 
 
