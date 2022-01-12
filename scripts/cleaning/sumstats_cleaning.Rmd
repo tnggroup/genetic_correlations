@@ -193,352 +193,8 @@ We have chosen ORIGBP as output name, because the summary statistics are based o
 To avoid follow-up software using the BP column (cave: different genome builds), we named it ORIGBP.
 The function stops if the essential columns SNP, A1, A2, P, BETA or OR or Z 
 
-_Future_
-+++CH: FREQ_CASES is missing when reading in, NEF is missing when reading in
-+++CH: Ollie has code that detects the genome build of sumstats; we could add the chunk for lifting over. (not top priority).
-+++CH: Johan, can you try to find the most recent version of Helena's script on the virtual machine?
-+++CH: The stopping and the warning needs to be double checked. I think at the moment it only stops for SNP, A1 or A2 and nothing else.
 ```{r Standardise GWAS column names}
-standardise_GWAS_column_names <- function(column_names, stop_on_missing_essential_column = T,
-     c.SNP = c(
-       "SNP",
-       "PREDICTOR",
-       "SNPID",
-       "MARKERNAME",
-       "MARKER_NAME",
-       "SNPTESTID",
-       "ID_DBSNP49",
-       "RSID",
-       "ID",
-       "RS_NUMBER",
-       "MARKER",
-       "RS",
-       "RSNUMBER",
-       "RS_NUMBERS",
-       "SNP.NAME",
-       "SNP ID",
-       "SNP_ID",
-       "LOCATIONALID",
-       "ASSAY_NAME"
-       ),
-     c.A1 = c(
-       "A1",
-       "ALLELE1",
-       "ALLELE_1",
-       "INC_ALLELE",
-       "EA",
-       "A1_EFFECT",
-       "REF",
-       "EFFECT_ALLELE",
-       "RISK_ALLELE",
-       "EFFECTALLELE",
-       "EFFECT_ALL",
-       "REFERENCE_ALLELE",
-       "REF_ALLELE",
-       "REFERENCEALLELE",
-       "EA",
-       "ALLELE_1",
-       "INC_ALLELE",
-       "ALLELE1",
-       "A",
-       "A_1",
-       "CODED_ALLELE",
-       "TESTED_ALLELE"
-       ),
-     c.A2 = c(
-       "A2",
-       "ALLELE2",
-       "ALLELE_2",
-       "OTHER_ALLELE",
-       "NON_EFFECT_ALLELE",
-       "DEC_ALLELE",
-       "OA",
-       "NEA",
-       "ALT",
-       "A2_OTHER",
-       "NONREF_ALLELE",
-       "NEFFECT_ALLELE",
-       "NEFFECTALLELE",
-       "NONEFFECT_ALLELE",
-       "OTHER_ALL",
-       "OTHERALLELE",
-       "NONEFFECTALLELE",
-       "ALLELE0",
-       "ALLELE_0",
-       "ALT_ALLELE",
-       "A_0",
-       "NONCODED_ALLELE"
-       ),
-     #c.EFFECT = c(
-     #"EFFECT",
-     #"OR",
-     #"B",
-     #"BETA",
-     #"LOG_ODDS",
-     #"EFFECTS",
-     #"SIGNED_SUMSTAT",
-     #"EST"
-     #),
-     c.BETA = c(
-       "BETA",
-       "B",
-       "EFFECT_BETA",
-       "EFFECT",
-       "EFFECTS",
-       "SIGNED_SUMSTAT",
-       "EST",
-       "GWAS_BETA",
-       "EFFECT_A1",
-       "EFFECTA1",
-       "EFFECT_NW"
-       ),
-     c.OR = c(
-       "OR",
-       "LOG_ODDS",
-       "OR",
-       "ODDS-RATIO",
-       "ODDS_RATIO",
-       "ODDSRATIO",
-       "OR(MINALLELE)",
-       "OR.LOGISTIC",
-       "OR_RAN",
-       "OR(A1)"
-       ),
-     c.SE = c(
-       "SE",
-       "STDER",
-       "STDERR",
-       "STD",
-       "STANDARD_ERROR",
-       "OR_SE",
-       "STANDARDERROR",
-       "STDERR_NW",
-       "META.SE",
-       "SE_DGC",
-       "SE.2GC"
-       ),
-     c.Z = c(
-       "Z",
-       "ZSCORE",
-       "Z-SCORE",
-       "ZSTAT",
-       "ZSTATISTIC",
-       "GC_ZSCORE",
-       "BETAZSCALE"
-       ),
-     c.INFO = c(
-       "INFO",
-       "IMPINFO",
-       "IMPQUALITY",
-       "INFO.PLINK",
-       "INFO_UKBB"
-       ),
-     c.P = c(
-       "P",
-       "PVALUE",
-       "PVAL",
-       "P_VALUE",
-       "GC_PVALUE",
-       "WALD_P",
-       "P.VAL",
-       "GWAS_P",
-       "P-VALUE",
-       "P-VAL",
-       "FREQUENTIST_ADD_PVALUE",
-       "P.VALUE",
-       "P_VAL",
-       "SCAN-P",
-       "P.LMM",
-       "META.PVAL",
-       "P_RAN",
-       "P.ADD",
-       "P_BOLT_LMM"
-       ),
-     c.N = c(
-       "N",
-       "WEIGHT",
-       "NCOMPLETESAMPLES",
-       "TOTALSAMPLESIZE",
-       "TOTALN",
-       "TOTAL_N",
-       "N_COMPLETE_SAMPLES",
-       "N_TOTAL",
-       "N_SAMPLES",
-       "N_ANALYZED",
-       "NSAMPLES",
-       "SAMPLESIZE",
-       "SAMPLE_SIZE",
-       "TOTAL_SAMPLE_SIZE",
-       "TOTALSAMPLESIZE"
-       ),
-     c.N_CAS = c(
-       "Ncas",
-       "N_CAS",
-       "NCASE",
-       "N_CASE",
-       "N_CASES",
-       "NCAS",
-       "NCA",
-       "NCASES",
-       "CASES",
-       "CASES_N",
-       "FRQ_A" # +++CH: Is this correct here?
-       ),
-     c.N_CON = c(
-       "Ncon",
-       "N_CON",
-       "NCONTROL",
-       "N_CONTROL",
-       "N_CONTROLS",
-       "NCON",
-       "NCO",
-       "N_CON",
-       "NCONTROLS",
-       "CONTROLS",
-       "CONTROLS_N",
-       "FRQ_U" # +++CH: Is this correct here?
-       ),
-     c.NEF = c(
-       "NEF",
-       "NEFF",
-       "NEFFECTIVE",
-       "NE"
-       ),
-     #include FRQ_A? # +++CH: Who is this question by?
-     c.FRQ = c(
-       "FREQ",
-       "FRQ",
-       "MAF",
-       "AF",
-       "CEUAF",
-       "FREQ1",
-       "EAF",
-       "FREQ1.HAPMAP",
-       "FREQALLELE1HAPMAPCEU",
-       "FREQ.ALLELE1.HAPMAPCEU",
-       "EFFECT_ALLELE_FREQ",
-       "FREQ.A1",
-       "F_A",
-       "F_U",
-       "FREQ_A",
-       "FREQ_U",
-       "MA_FREQ",
-       "MAF_NW",
-       "FREQ_A1",
-       "A1FREQ",
-       "CODED_ALLELE_FREQUENCY",
-       "FREQ_TESTED_ALLELE_IN_HRS",
-       "EAF_HRC"
-       ),
-     c.CHR = c(
-       "CHR",
-       "CH",
-       "CHROMOSOME",
-       "CHROM",
-       "CHR_BUILD38",
-       "CHR_BUILD37",
-       "CHR_BUILD36",
-       "CHR_B38",
-       "CHR_B37",
-       "CHR_B36",
-       "CHR_ID",
-       "SCAFFOLD",
-       "HG19CHR",
-       "CHR.HG19",
-       "CHR_HG19",
-       "HG18CHR",
-       "CHR.HG18",
-       "CHR_HG18",
-       "CHR_BP_HG19B37",
-       "HG19CHRC"
-       ),
-     c.BP = c(
-       "ORIGBP",
-       "BP",
-       "POS",
-       "POSITION",
-       "LOCATION",
-       "PHYSPOS",
-       "GENPOS",
-       "CHR_POSITION",
-       "POS_B38",
-       "POS_BUILD38",
-       "POS_B37",
-       "POS_BUILD37",
-       "BP_HG19B37",
-       "POS_B36",
-       "POS_BUILD36",
-       "POS.HG19",
-       "POS.HG18",
-       "POS_HG19",
-       "POS_HG18",
-       "BP_HG19",
-       "BP_HG18",
-       "BP.GRCH38",
-       "BP.GRCH37",
-       "POSITION(HG19)",
-       "POSITION(HG18)",
-       "POS(B38)",
-       "POS(B37)"
-       )
-                                       ){
-
-  #column_names<-cSumstats.names #+++CH: Why is this hashed out?
-  
-  column_names.upper <- toupper(column_names)
-  #names(column_names)<-column_names #+++CH: Why is this hashed out?
-  column_names.orig <- column_names
-  
-  #+++CH: What does this bit do?
-  column_names[column_names.upper %in% c.SNP] <- c.SNP[1]
-  column_names[column_names.upper %in% c.A1] <- c.A1[1]
-  column_names[column_names.upper %in% c.A2] <- c.A2[1]
-  #column_names[column_names.upper %in% c.EFFECT] <- c.EFFECT[1] #+++CH: Why is this hashed out?
-  #if(any(column_names==c.EFFECT[1])) column_names[column_names.upper %in% c.Z] <- c.Z[1] else column_names[column_names.upper %in% c.Z] <- c.EFFECT[1] #+++CH: Why is this hashed out?
-  column_names[column_names.upper %in% c.BETA] <- c.BETA[1]
-  column_names[column_names.upper %in% c.OR] <- c.OR[1] 
-  column_names[column_names.upper %in% c.Z] <- c.Z[1] 
-  column_names[column_names.upper %in% c.SE] <- c.SE[1]
-  column_names[column_names.upper %in% c.INFO] <- c.INFO[1]
-  column_names[column_names.upper %in% c.P] <- c.P[1]
-  column_names[column_names.upper %in% c.N] <- c.N[1]
-  column_names[column_names.upper %in% c.N_CAS] <- c.N_CAS[1]
-  column_names[column_names.upper %in% c.N_CON] <- c.N_CON[1]
-  column_names[column_names.upper %in% c.NEF] <- c.NEF[1]
-  column_names[column_names.upper %in% c.FRQ] <- c.FRQ[1]
-  column_names[column_names.upper %in% c.CHR] <- c.CHR[1]
-  column_names[column_names.upper %in% c.BP] <- c.BP[1]
-  
-  if(stop_on_missing_essential_column){
-# Stop if any of these columns are not found
-    if(!any(column_names=="SNP")) stop("\nCould not find the 'SNP' column.\n")
-    if(!any(column_names=="A1")) stop("\nCould not find the 'A1' column.\n")
-    if(!any(column_names=="A2")) stop("\nCould not find the 'A2' column.\n")
-    if(!any(column_names=="BETA") & !any(column_names=="OR") & !any(column_names=="Z")) stop("Could not find any effect column.\n")  
-  }
-  
-  if(!any(column_names=="P")) warning("\nCould not find the P-value column. Standard is 'P'.\n")
-  if(!any(column_names=="FRQ")) warning("\nCould not find the 'FRQ' column.\n")
-  
-# Warn if multiple of these columns are found #+++CH: Do we want to add more checks for duplicates?
-  if(sum(column_names=="SNP")>1) warning("\nMultiple 'SNP' columns found!\n")
-  if(sum(column_names=="P")>1) warning("\nMultiple 'P' columns found!\n")
-  if(sum(column_names=="A1")>1) warning("\nMultiple 'A1' columns found!\n")
-  if(sum(column_names=="A2")>1) warning("\nMultiple 'A2' columns found!\n")
-  if(sum(column_names=="BETA")>1) warning("\nMultiple 'BETA' columns found!\n")
-  if(sum(column_names=="OR")>1) warning("\nMultiple 'OR' columns found!\n")
-  if(sum(column_names=="Z")>1) warning("\nMultiple 'Z' columns found!\n")
-  if(sum(column_names=="SE")>1) warning("\nMultiple 'SE' columns found!\n")
-  if(sum(column_names=="FRQ")>1) warning("\nMultiple 'FRQ' columns found!\n")
-  if(sum(column_names=="INFO")>1) warning("\nMultiple 'INFO' columns found!\n")
-  
-  return(
-    data.frame(
-      std = column_names,
-      orig = column_names.orig
-      )
-    )
-}
+source(file = "../functions/standardise_GWAS_column_names.R")
 ```
 
 # Chromosome numbering
@@ -546,41 +202,10 @@ We are changing naming of chromosomes to PLINK standard.
 As a reference, we are using the PLINK naming:
 plink chromosome numbering: https://zzz.bwh.harvard.edu/plink/data.shtml
 
-_Future_
-+++CH: These functions need a sentence explaining what they are doing. Who is going to do this?
-+++CH: What is this comment about the number of SNPs? Can we move this outside of the chunk including explanation?
-+++JKZ: It only checks the top 100,000 SNPs in a file. We don't know what happens if it detects less than 100,000
+This chunk creates the functions "parse_SNP_column_as_rs_number" and "parse_CHR_column" which parses the SNP and CHR columns respectively. It means that it can read different formats of data in those and convert it to rs-id and chromosome number which we expect to be in the SNP and CHR columns.
 ```{r Chromosome numbering}
-parseSNPColumnAsRSNumber <- function(text){
-  #decide if BGENIE SNP format using top 100,000 SNPs
-  #TODO this condition may be improved to not rely on the number of variants being >100,000
-  #test
-  #text<-files[[i]]$SNP
-  if(sum(grepl(pattern = "^\\d+:\\w+_\\w+_\\w+", x= head(x = text, n=100000)))>90000){
-    #extract and format rs-no
-    indexesLengths<-regexec(pattern = "^\\d+:(\\w+)_\\w+_\\w+", text=text)
-    matches<-regmatches(text,indexesLengths)
-    return(lapply(X = matches, FUN = function(x)paste0("rs",x[2])))
-  }
-  
-  text<-sub(pattern = "^XY:",replacement = "25:",x = text)
-  text<-sub(pattern = "^X:",replacement = "23:",x = text)
-  text<-sub(pattern = "^Y:",replacement = "24:",x = text)
-  text<-sub(pattern = "^MT:",replacement = "26:",x = text)
-  text<-sub(pattern = "^chr",replacement = "",x = text)
-  text<-sub(pattern = "_",replacement = ":",x = text)
-  
-  return(text)
-}
+source(file = "../functions/parse_SNP_column_as_rs_number.R")
 
-parseCHRColumn <- function(text){
-  text<-sub(pattern = "^XY",replacement = "25",x = text)
-  text<-sub(pattern = "^X",replacement = "23",x = text)
-  text<-sub(pattern = "^Y",replacement = "24",x = text)
-  text<-sub(pattern = "^MT",replacement = "26",x = text)
-  text<-sub(pattern = "^chr",replacement = "",x = text)
-  return(text)
-}
 ```
 
 
@@ -653,7 +278,7 @@ cSumstats$A2 <- toupper(as.character(cSumstats$A2))
 
 Parse SNP (if needed)
 ```{r Parse SNP}
-cSumstats$SNP <- tolower(parseSNPColumnAsRSNumber(cSumstats$SNP))
+cSumstats$SNP <- tolower(parse_SNP_column_as_rs_number(cSumstats$SNP))
 
 if(any(colnames(cSumstats)=="CHR")) {
   cSumstats$CHR <- toupper(as.character(cSumstats$CHR))
@@ -668,6 +293,7 @@ if(any(colnames(cSumstats)=="BP")) {
 
 Set data table index on selected keys
 +++CH: Johan, what does this do, please explain
++++JZ: It orders and indexes the data based on the key columns specified in the cols argument. Any data.table matching using the key columns will be performed more quickly when it has been run previously. It may have to be re-run if you change the data.table too much.
 ```{r Set data table index on selected keys}
 setkeyv(cSumstats,cols = cSumstats.keys)
 ```
@@ -697,30 +323,7 @@ if(!any(colnames(cSumstats)=="FRQ") & !any(colnames(cSumstats)=="N_CAS") & !any(
 Rename duplicate columns
 Deal with duplicate columns - use the first occurrence
 ```{r Rename duplicate columns}
-##SNP
-iDup<-grep(pattern = "^SNP$",colnames(cSumstats))
-if(length(iDup)>1){
-  iDup<-iDup[2:length(iDup)]
-  colnames(cSumstats)[iDup]<-"XSNP"
-}
-
-##BP
-if('BP' %in% names(cSumstats)){
-  iDup<-grep(pattern = "^BP$",colnames(cSumstats))
-  if(length(iDup)>1){
-    iDup<-iDup[2:length(iDup)]
-    colnames(cSumstats)[iDup]<-"XBP"
-  }
-}
-
-##FRQ
-if('FRQ' %in% names(cSumstats)){
-  iDup<-grep(pattern = "^FRQ$",colnames(cSumstats))
-  if(length(iDup)>1){
-    iDup<-iDup[2:length(iDup)]
-    colnames(cSumstats)[iDup]<-"XFRQ"
-  }
-}
+#+++JZ: Moved this part to the column name standardisation script to de-clutter the main script
 ```
 
 
@@ -733,7 +336,7 @@ if('FRQ' %in% names(cSumstats)){
 # Add missing columns
 
 ## Add total N depending on columns and input
-1) Calcualte N from Ncon and Ncas, if not present
+1) Calculate N from Ncon and Ncas, if not present
 2) Set N from external argument (set at the beginning)
 
 Add columns on sample size, enough for PRS enough for pathway analysis
@@ -753,6 +356,8 @@ if(any(colnames(cSumstats)=="N_CAS") && any(colnames(cSumstats)=="N_CON")) {
 ## Add BETA column if missing
 JZ moved this here so we can rely on BETA existing if either BETA or OR are present in the raw data file. We can't know if the effect is a non-OR unless we check though.
 +++CH: Johan, what do you mean by "We can't know if the effect is a non-OR unless we check though."?
++++JZ: You can check if the effect is an odds ratio if the (rounded) median is 1. Other comparisons you can do is comparing the Z-values and P if SE is present while using combinations of log(EFFECT/SE) or e^(EFFECT/SE)
+if(round(median(cSumstats$EFFECT,na.rm=T)) == 1) #from Genomic SEM code
 ```{r add BETA column if missing}
 # if no BETA column
 if(any(colnames(cSumstats) == "BETA") == 0 & any(colnames(cSumstats) == "OR")){
