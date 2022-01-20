@@ -1,0 +1,344 @@
+---
+title: "Reference Preparation"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+***
+
+This script documents how the reference data for the Rosalind GWAS repository was created. The reference data is derived from the 1000 Genomes Phase 3 data.
+
+***
+
+# Initial download and formating of reference
+
+The data used in the GWAS pipepline is based on data that had been previously downloaded and formatted on Rosalind. To provide full provenance of the refernence data in the pipeline, below is the code used to download and format the reference data initially.
+
+```{text , echo=T, eval=F}
+###########################################
+# Creating repository for reference genetic data
+###########################################
+# For questions contact Oliver Pain (oliver.pain@kcl.ac.uk)
+# This repository was created using the below code:
+
+#####################################
+# 1000 Genomes Phase 3
+#####################################
+
+mkdir /scratch/groups/biomarkers-brc-mh/Reference_data/1KG_Phase3
+
+###################
+# IMPUTE2 1000 Genomes Phase 3
+###################
+
+Impute2_1KG_dir=/scratch/groups/biomarkers-brc-mh/Reference_data/1KG_Phase3/Impute2
+
+# Create directory for the data
+mkdir -p ${Impute2_1KG_dir}
+
+# Download data using wget
+cd ${Impute2_1KG_dir}
+wget https://mathgen.stats.ox.ac.uk/impute/1000GP_Phase3.tgz
+wget https://mathgen.stats.ox.ac.uk/impute/1000GP_Phase3_chrX.tgz
+
+# Decompress data
+tar -zxvf 1000GP_Phase3.tgz
+tar -zxvf 1000GP_Phase3_chrX.tgz
+
+###################
+# PLINK format 1000 genomes phase 3 data
+###################
+# Based on instructions from Hannah Meyer https://cran.r-project.org/web/packages/plinkQC/vignettes/Genomes1000.pdf
+# With adaptations from Joni Coleman's reference resource
+
+Geno_1KG_dir=/scratch/groups/biomarkers-brc-mh/Reference_data/1KG_Phase3/PLINK
+
+mkdir ${Geno_1KG_dir}
+cd ${Geno_1KG_dir}
+
+# Download the 1000Genomes data provided by PLINK (PLINK 2 format)
+pgen=https://www.dropbox.com/s/afvvf1e15gqzsqo/all_phase3.pgen.zst?dl=1
+pvar=https://www.dropbox.com/s/op9osq6luy3pjg8/all_phase3.pvar.zst?dl=1
+sample=https://www.dropbox.com/s/yozrzsdrwqej63q/phase3_corrected.psam?dl=1
+
+wget $pgen
+mv 'all_phase3.pgen.zst?dl=1' all_phase3.pgen.zst
+/users/k1806347/brc_scratch/Software/plink2 --zst-decompress all_phase3.pgen.zst > all_phase3.pgen
+wget $pvar
+mv 'all_phase3.pvar.zst?dl=1' all_phase3.pvar.zst
+wget $sample
+mv 'phase3_corrected.psam?dl=1' all_phase3.psam
+
+# Convert to plink 1 format
+/users/k1806347/brc_scratch/Software/plink2 --pfile ${Geno_1KG_dir}/all_phase3 vzs \
+--max-alleles 2 \
+--make-bed \
+--out ${Geno_1KG_dir}/all_phase3
+
+# Delete the plink2 format data
+rm all_phase3.pgen*
+rm all_phase3.pvar*
+
+# Make FID == IID
+module add apps/R
+R
+Geno_1KG_dir='/scratch/groups/biomarkers-brc-mh/Reference_data/1KG_Phase3/PLINK'
+fam<-read.table(paste0(Geno_1KG_dir,'/all_phase3.fam'), header=F)
+fam$V1<-fam$V2
+write.table(fam, paste0(Geno_1KG_dir,'/all_phase3.fam'), col.names=F, row.names=F, quote=F)
+q()
+n
+
+# Split the plink data by chromosome
+$(echo $(seq 1 22) PAR1 X PAR2 Y MT)
+
+for chr in $(echo $(seq 1 22) PAR1 X PAR2 Y MT); do
+sbatch -p brc,shared --mem 15G /users/k1806347/brc_scratch/Software/plink1.9.sh \
+--bfile ${Geno_1KG_dir}/all_phase3 \
+--chr ${chr} \
+--allow-extra-chr \
+--make-bed \
+--out ${Geno_1KG_dir}/all_phase3.chr${chr}
+done  
+
+# Delete genome wide data
+rm ${Geno_1KG_dir}/all_phase3.bed
+rm ${Geno_1KG_dir}/all_phase3.bim
+rm ${Geno_1KG_dir}/all_phase3.fam
+rm ${Geno_1KG_dir}/all_phase3.log
+
+# For autosomes: Remove variants with 3+ alleles or multiple positions
+for chr in $(seq 1 22); do
+/users/k1806347/brc_scratch/Software/plink1.9.sh \
+--bfile ${Geno_1KG_dir}/all_phase3.chr${chr} \
+--bmerge ${Geno_1KG_dir}/all_phase3.chr${chr} \
+--merge-mode 6 \
+--make-bed \
+--out ${Geno_1KG_dir}/all_phase3.chr${chr}_noDup
+done
+
+for chr in $(seq 1 22); do
+fgrep "'rs" ${Geno_1KG_dir}/all_phase3.chr${chr}_noDup.log | \
+sed -e "s/Warning: Multiple positions seen for variant '//g" -e "s/'\.//g" >> ${Geno_1KG_dir}/all_phase3.chr${chr}_noDup.missnp
+done
+
+for chr in $(seq 1 22); do
+/users/k1806347/brc_scratch/Software/plink1.9.sh \
+--bfile ${Geno_1KG_dir}/all_phase3.chr${chr} \
+--exclude ${Geno_1KG_dir}/all_phase3.chr${chr}_noDup.missnp \
+--make-bed \
+--out ${Geno_1KG_dir}/all_phase3.cleaned.chr${chr}
+done
+
+rm ${Geno_1KG_dir}/*.missnp
+rm ${Geno_1KG_dir}/*.log
+
+for chr in $(seq 1 22); do
+mv ${Geno_1KG_dir}/all_phase3.cleaned.chr${chr}.bed ${Geno_1KG_dir}/all_phase3.chr${chr}.bed
+mv ${Geno_1KG_dir}/all_phase3.cleaned.chr${chr}.bim ${Geno_1KG_dir}/all_phase3.chr${chr}.bim
+mv ${Geno_1KG_dir}/all_phase3.cleaned.chr${chr}.fam ${Geno_1KG_dir}/all_phase3.chr${chr}.fam
+done
+
+####################
+# Compute allele frequencies across all individuals
+####################
+
+mkdir -p ${Geno_1KG_dir}/MAF/ALL
+
+for chr in $(seq 1 22); do
+  /users/k1806347/brc_scratch/Software/plink1.9.sh \
+    --bfile ${Geno_1KG_dir}/all_phase3.chr${chr} \
+    --freq \
+    --out ${Geno_1KG_dir}/MAF/ALL/all_phase3.chr${chr}
+done
+
+####################
+# Prepare keep files for super_populations and populations
+####################
+
+Geno_1KG_dir=/scratch/groups/biomarkers-brc-mh/Reference_data/1KG_Phase3/PLINK
+
+# Create a keep file listing each population super population from the reference.
+mkdir -p ${Geno_1KG_dir}/super_pop_keep_files
+mkdir -p ${Geno_1KG_dir}/pop_keep_files
+
+module add apps/R
+R
+
+Geno_1KG_dir<-'/scratch/groups/biomarkers-brc-mh/Reference_data/1KG_Phase3/PLINK'
+
+pop_data<-read.table(paste0(Geno_1KG_dir, '/all_phase3.psam'), header=F, stringsAsFactors=F)
+
+for(i in unique(pop_data$V6)){
+  write.table(cbind(pop_data$V1[pop_data$V6 == i],pop_data$V1[pop_data$V6 == i]), paste0(Geno_1KG_dir,'/pop_keep_files/',i,'_samples.keep'), col.names=F, row.names=F, quote=F)
+}
+
+for(i in unique(pop_data$V5)){
+  write.table(cbind(pop_data$V1[pop_data$V5 == i],pop_data$V1[pop_data$V5 == i]), paste0(Geno_1KG_dir,'/super_pop_keep_files/',i,'_samples.keep'), col.names=F, row.names=F, quote=F)
+}
+
+q()
+n
+
+####################
+# Subset EUR individuals from the 1KG Phase 3 data
+####################
+# Retain only variants with a MAF > 0.001
+mkdir /scratch/groups/biomarkers-brc-mh/Reference_data/1KG_Phase3/PLINK/EUR
+
+for chr in $(seq 1 22);do
+/users/k1806347/brc_scratch/Software/plink1.9.sh \
+--bfile /scratch/groups/biomarkers-brc-mh/Reference_data/1KG_Phase3/PLINK/all_phase3.chr${chr} \
+--keep /scratch/groups/biomarkers-brc-mh/Reference_data/1KG_Phase3/PLINK/super_pop_keep_files/EUR_samples.keep \
+--maf 0.001 \
+--make-bed \
+--out /scratch/groups/biomarkers-brc-mh/Reference_data/1KG_Phase3/PLINK/EUR/EUR_phase3.MAF_001.chr${chr}
+done
+
+####################
+# Compute allele frequencies within each super population
+####################
+
+Geno_1KG_dir=/scratch/groups/biomarkers-brc-mh/Reference_data/1KG_Phase3/PLINK
+
+for pop in $(echo EAS EUR AMR AFR SAS); do
+  mkdir -p ${Geno_1KG_dir}/MAF/${pop}
+    for chr in $(seq 1 22); do
+      /users/k1806347/brc_scratch/Software/plink1.9.sh \
+        --bfile ${Geno_1KG_dir}/all_phase3.chr${chr} \
+        --keep ${Geno_1KG_dir}/super_pop_keep_files/${pop}_samples.keep \
+        --freq \
+        --out ${Geno_1KG_dir}/MAF/${pop}/all_phase3.${pop}.chr${chr}
+  done
+done
+
+```
+
+***
+
+# Preparing data for GWAS sumstat pipeline
+
+We want to create reference data for each chromosome sepereately, containing CHR, BP (GRCh 37), BP (GRCh 38), A1, A2, IUPAC, FREQ (AFR), FREQ (AMR), FREQ (EAS), FREQ (EUR), FREQ (SAS).
+
+```{r, eval=F, echo=T}
+library(data.table)
+
+chrs<-c(1:22,'X','Y','MT')
+super_pop<-c('AFR','AMR','EAS','EUR','SAS')
+
+for(i in chrs){
+  
+  ######
+  # Read in the reference data
+  ######
+  ref<-list()
+
+  ref[['GRCh37']]<-fread(paste0('/scratch/groups/biomarkers-brc-mh/Reference_data/1KG_Phase3/PLINK/all_phase3.chr',i,'.bim'))
+  ref[['GRCh37']]$V3<-NULL
+  names(ref[['GRCh37']])<-c('chr','snp','pos','a1','a2')
+  
+  if(i=='X'){
+    ref[['GRCh37']]$chr<-as.character(ref[['GRCh37']]$chr)
+    ref[['GRCh37']]$chr<-'X'
+  }
+  if(i=='Y'){
+    ref[['GRCh37']]$chr<-as.character(ref[['GRCh37']]$chr)
+    ref[['GRCh37']]$chr<-'Y'
+  }
+  if(i=='MT'){
+    ref[['GRCh37']]$chr<-as.character(ref[['GRCh37']]$chr)
+    ref[['GRCh37']]$chr<-'M'
+  }
+
+  ######
+  # Liftover from GRCh37 to GRCh38
+  ######
+
+  # Create snp_modifyBuild_offline
+  make_executable <- function(exe) {
+    Sys.chmod(exe, mode = (file.info(exe)$mode | "111"))
+  }
+  
+  snp_modifyBuild_offline<-function (info_snp, liftOver, chain, from = "hg18", to = "hg19"){
+    if (!all(c("chr", "pos") %in% names(info_snp)))
+      stop2("Please use proper names for variables in 'info_snp'. Expected %s.",
+            "'chr' and 'pos'")
+    liftOver <- normalizePath(liftOver)
+    make_executable(liftOver)
+    BED <- tempfile(fileext = ".BED")
+    info_BED <- with(info_snp, data.frame(paste0("chr", chr),
+                                          pos0 = pos - 1L, pos, id = seq_len(nrow(info_snp))))
+    bigreadr::fwrite2(info_BED, BED, col.names = FALSE, sep = " ")
+    lifted<-'/users/k1806347/tmp/tmp.lifted'
+    unmapped<-'/users/k1806347/tmp/tmp.unmapped'
+    system(paste(liftOver, BED, chain, lifted, unmapped))
+    new_pos <- bigreadr::fread2(lifted)
+    bad <- grep("^#", readLines(unmapped), value = TRUE, invert = TRUE)
+    print(paste0(length(bad)," variants have not been mapped."))
+    info_snp$pos <- NA
+    info_snp$pos[new_pos$V4] <- new_pos$V3
+    info_snp
+  }
+
+  # Liftover BP to GRCh38
+  ref[['GRCh38']]<-snp_modifyBuild_offline(ref[['GRCh37']], liftOver='/users/k1806347/brc_scratch/Software/MyGit/GenoPred/GenoPredPipe/resources/software/liftover/liftover', chain='/users/k1806347/brc_scratch/Software/MyGit/GenoPred/GenoPredPipe/resources/data/liftover/hg19ToHg38.over.chain.gz', from = "hg19", to = "hg38")
+  
+  # Combine the two builds 
+  tmp<-ref[['GRCh37']]
+  names(tmp)<-c('CHR','SNP','BP_GRCh37','A1','A2')
+  tmp$BP_GRCh38<-ref[['GRCh38']]$pos
+  rm(ref)
+  
+  # Insert IUPAC codes into ref
+  tmp$IUPAC[tmp$A1 == 'A' & tmp$A2 =='T' | tmp$A1 == 'T' & tmp$A2 =='A']<-'W'
+  tmp$IUPAC[tmp$A1 == 'C' & tmp$A2 =='G' | tmp$A1 == 'G' & tmp$A2 =='C']<-'S'
+  tmp$IUPAC[tmp$A1 == 'A' & tmp$A2 =='G' | tmp$A1 == 'G' & tmp$A2 =='A']<-'R'
+  tmp$IUPAC[tmp$A1 == 'C' & tmp$A2 =='T' | tmp$A1 == 'T' & tmp$A2 =='C']<-'Y'
+  tmp$IUPAC[tmp$A1 == 'G' & tmp$A2 =='T' | tmp$A1 == 'T' & tmp$A2 =='G']<-'K'
+  tmp$IUPAC[tmp$A1 == 'A' & tmp$A2 =='C' | tmp$A1 == 'C' & tmp$A2 =='A']<-'M'
+  
+  if(i %in% 1:22){
+    # Read in reference frequency data for each super population
+    for(k in super_pop){
+      freq<-fread(paste0('/scratch/groups/biomarkers-brc-mh/Reference_data/1KG_Phase3/PLINK/MAF/',k,'/all_phase3.',k,'.chr',i,'.frq'))
+    
+      # The freq files have come from the reference files, so we can assume they are on the same strand
+      freq_match<-merge(tmp, freq[,c('SNP','A1','A2','MAF'), with=F], by=c('SNP','A1','A2'))
+      freq_swap<-merge(tmp, freq[,c('SNP','A1','A2','MAF'), with=F], by.x=c('SNP','A1','A2'), by.y=c('SNP','A2','A1'))
+      freq_swap$MAF<-1-freq_swap$MAF
+      tmp_freq<-rbind(freq_match, freq_swap)
+      tmp_freq<-tmp_freq[match(tmp$SNP, tmp_freq$SNP),]
+  
+      tmp[[paste0('FREQ_',k)]]<-tmp_freq$MAF
+    }
+  } else {
+    # For X, Y and MT, don't insert MAF
+    tmp$FREQ_AFR<-NA
+    tmp$FREQ_AMR<-NA
+    tmp$FREQ_EAS<-NA
+    tmp$FREQ_EUR<-NA
+    tmp$FREQ_SAS<-NA
+    
+    if(i=='X'){
+      tmp$CHR<-23
+    }
+    if(i=='Y'){
+      tmp$CHR<-24
+    }
+    if(i=='MT'){
+      tmp$CHR<-26
+    }
+  }
+  
+  tmp<-tmp[,c("CHR","SNP","BP_GRCh37","BP_GRCh38","A1","A2","IUPAC","FREQ_AFR","FREQ_AMR","FREQ_EAS","FREQ_EUR","FREQ_SAS"), with=F]
+
+  saveRDS(tmp, file = paste0('/scratch/groups/gwas_sumstats/1kg_ref/1kg_ref_chr',i,'.rds'))
+}
+
+```
+
+
+
