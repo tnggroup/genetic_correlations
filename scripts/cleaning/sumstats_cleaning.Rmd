@@ -1061,13 +1061,36 @@ INDELS are reported in such a varied way across GWAS, that we will only harmonis
 We will also only insert MAF for non-ambiguous SNPs.
 
 ```{r}
+
+# Create IUPAC code function
+snp_iupac<-function(x=NA, y=NA){
+  if(length(x) != length(y)){
+    print('x and y are different lengths')
+  } else {
+    iupac<-rep(NA, length(x))
+    iupac[x == 'A' & y =='T' | x == 'T' & y =='A']<-'W'
+    iupac[x == 'C' & y =='G' | x == 'G' & y =='C']<-'S'
+    iupac[x == 'A' & y =='G' | x == 'G' & y =='A']<-'R'
+    iupac[x == 'C' & y =='T' | x == 'T' & y =='C']<-'Y'
+    iupac[x == 'G' & y =='T' | x == 'T' & y =='G']<-'K'
+    iupac[x == 'A' & y =='C' | x == 'C' & y =='A']<-'M'
+    return(iupac)
+  }
+}
+
+# Create function to change allele to complement
+snp_allele_comp<-function(x=NA){
+  x_new<-x
+  x_new[x == 'A']<-'T'
+  x_new[x == 'T']<-'A'
+  x_new[x == 'G']<-'C'
+  x_new[x == 'C']<-'G'
+  x_new[!(x %in% c('A','T','G','C'))]<-NA
+  return(x_new)
+}
+
 # Insert IUPAC codes into target
-cSumstats$IUPAC[cSumstats$A1 == 'A' & cSumstats$A2 =='T' | cSumstats$A1 == 'T' & cSumstats$A2 =='A']<-'W'
-cSumstats$IUPAC[cSumstats$A1 == 'C' & cSumstats$A2 =='G' | cSumstats$A1 == 'G' & cSumstats$A2 =='C']<-'S'
-cSumstats$IUPAC[cSumstats$A1 == 'A' & cSumstats$A2 =='G' | cSumstats$A1 == 'G' & cSumstats$A2 =='A']<-'R'
-cSumstats$IUPAC[cSumstats$A1 == 'C' & cSumstats$A2 =='T' | cSumstats$A1 == 'T' & cSumstats$A2 =='C']<-'Y'
-cSumstats$IUPAC[cSumstats$A1 == 'G' & cSumstats$A2 =='T' | cSumstats$A1 == 'T' & cSumstats$A2 =='G']<-'K'
-cSumstats$IUPAC[cSumstats$A1 == 'A' & cSumstats$A2 =='C' | cSumstats$A1 == 'C' & cSumstats$A2 =='A']<-'M'
+cSumstats$IUPAC<-snp_iupac(cSumstats$A1, cSumstats$A2)
 
 # Define super population
 super_pop<-'EUR' # Should be specified by user
@@ -1144,9 +1167,26 @@ if(chr_bp_avail){
       cSumstats_chr<-cSumstats[cSumstats$CHR == i,]
       ref_target<-merge(cSumstats_chr, tmp, by.x='ORIGBP', by.y=paste0('REF.BP_',target_build))
       
+      # Identify SNPs that are opposite strands
+      flipped<-ref_target[(ref_target$IUPAC.x == 'R' & ref_target$IUPAC.y == 'Y') | 
+                            (ref_target$IUPAC.x == 'Y' & ref_target$IUPAC.y == 'R') | 
+                            (ref_target$IUPAC.x == 'K' & ref_target$IUPAC.y == 'M') |
+                            (ref_target$IUPAC.x == 'M' & ref_target$IUPAC.y == 'K'),]
+      
+      # Change target alleles to compliment for flipped variants
+      flipped$A1.x<-snp_allele_comp(flipped$A1.x)
+      flipped$A2.x<-snp_allele_comp(flipped$A2.x)
+      
+      # Update IUPAC codes
+      flipped$IUPAC.x<-snp_iupac(flipped$A1.x, flipped$A2.x)
+      
       # Identify SNPs that have matched alleles
       matched<-ref_target[ref_target$IUPAC.x == ref_target$IUPAC.y,]
-  
+      matched<-rbind(matched, flipped)
+      
+      # Flip REF.FRQ if alleles are swapped
+      matched$REF.FRQ[matched$A1.x != matched$A1.y]<-1-matched$REF.FRQ[matched$A1.x != matched$A1.y]
+      
       # Remove REF.FRQ for ambiguous SNPs
       if(!is.na(super_pop)){
         matched$REF.FRQ[matched$IUPAC.x %in% c('W','S')]<-NA
@@ -1154,45 +1194,23 @@ if(chr_bp_avail){
         matched$REF.FRQ<-NA
       }
       
-      # For ambiguous SNPs, set ref A1 and A2 as target A1 and A2
-      matched$A1.y[matched$IUPAC.x %in% c('W','S')]<-matched$A1.x[matched$IUPAC.x %in% c('W','S')]
-      matched$A2.y[matched$IUPAC.x %in% c('W','S')]<-matched$A2.x[matched$IUPAC.x %in% c('W','S')]
-      
-      # Identify SNPs that are opposite strands
-      flipped<-ref_target[(ref_target$IUPAC.x == 'R' & ref_target$IUPAC.y == 'Y') | 
-                          (ref_target$IUPAC.x == 'Y' & ref_target$IUPAC.y == 'R') | 
-                          (ref_target$IUPAC.x == 'K' & ref_target$IUPAC.y == 'M') |
-                          (ref_target$IUPAC.x == 'M' & ref_target$IUPAC.y == 'K'),]
-      
-      # For strand flipped variants, change to match reference
-      if('FRQ' %in% names(cSumstats)){
-        flipped$FRQ<-1-flipped$FRQ
-      }
-      if('BETA' %in% names(cSumstats)){
-        flipped$BETA<--flipped$BETA
-      }
-      if('OR' %in% names(cSumstats)){
-        flipped$OR<-exp(-log(flipped$OR))
-      }
-      
-      # Retain reference CHR, BP, A1, and A2 information
-      matched_flipped<-rbind(matched, flipped)
-      matched_flipped$A1<-matched_flipped$A1.y
-      matched_flipped$A1.y<-NULL
-      matched_flipped$A1.x<-NULL
-      matched_flipped$A2<-matched_flipped$A2.y
-      matched_flipped$A2.y<-NULL
-      matched_flipped$A2.x<-NULL
-      matched_flipped$IUPAC<-matched_flipped$IUPAC.y
-      matched_flipped$IUPAC.y<-NULL
-      matched_flipped$REF.CHR<-matched_flipped$CHR
-      matched_flipped[[paste0('REF.BP_',target_build)]]<-matched_flipped$ORIGBP
+      # Retain reference CHR, BP, but target A1, and A2 information
+      matched$A1<-matched$A1.x
+      matched$A1.y<-NULL
+      matched$A1.x<-NULL
+      matched$A2<-matched$A2.x
+      matched$A2.y<-NULL
+      matched$A2.x<-NULL
+      matched$IUPAC<-matched$IUPAC.x
+      matched$IUPAC.y<-NULL
+      matched$REF.CHR<-matched$CHR
+      matched[[paste0('REF.BP_',target_build)]]<-matched$ORIGBP
 
-      # Idntify SNPs that are unmatched
-      unmatched_chr<-cSumstats_chr[!(paste0(cSumstats_chr$ORIGBP,':',cSumstats_chr$IUPAC) %in% paste0(matched_flipped$ORIGBP,':',matched_flipped$IUPAC.x)),]
-      matched_flipped$IUPAC.x<-NULL
+      # Identify SNPs that are unmatched
+      unmatched_chr<-cSumstats_chr[!(paste0(cSumstats_chr$ORIGBP,':',cSumstats_chr$IUPAC) %in% paste0(matched$ORIGBP,':',matched$IUPAC.x)),]
+      matched$IUPAC.x<-NULL
 
-      cSumstats_matched<-rbind(cSumstats_matched, matched_flipped)
+      cSumstats_matched<-rbind(cSumstats_matched, matched)
       cSumstats_unmatched<-rbind(cSumstats_unmatched, unmatched_chr)
     }
     
@@ -1207,7 +1225,7 @@ if(chr_bp_avail){
     cSumstats_harm<-rbind(cSumstats_matched, cSumstats_unmatched)
   }
 } else {
-  if(rsid_avail = T){
+  if(rsid_avail){
     # Run per chromosome to reduce memory requirements
     chrs<-c(1:22,'X','Y','MT')
   
@@ -1234,51 +1252,46 @@ if(chr_bp_avail){
       # Merge target and reference by SNP ID
       ref_target<-merge(cSumstats, tmp, by='SNP')
       
+            # Identify SNPs that are opposite strands
+      flipped<-ref_target[(ref_target$IUPAC.x == 'R' & ref_target$IUPAC.y == 'Y') | 
+                            (ref_target$IUPAC.x == 'Y' & ref_target$IUPAC.y == 'R') | 
+                            (ref_target$IUPAC.x == 'K' & ref_target$IUPAC.y == 'M') |
+                            (ref_target$IUPAC.x == 'M' & ref_target$IUPAC.y == 'K'),]
+      
+      # Change target alleles to compliment for flipped variants
+      flipped$A1.x<-snp_allele_comp(flipped$A1.x)
+      flipped$A2.x<-snp_allele_comp(flipped$A2.x)
+      
+      # Update IUPAC codes
+      flipped$IUPAC.x<-snp_iupac(flipped$A1.x, flipped$A2.x)
+      
       # Identify SNPs that have matched alleles
       matched<-ref_target[ref_target$IUPAC.x == ref_target$IUPAC.y,]
-  
+      matched<-rbind(matched, flipped)
+      
+      # Flip REF.FRQ if alleles are swapped
+      matched$REF.FRQ[matched$A1.x != matched$A1.y]<-1-matched$REF.FRQ[matched$A1.x != matched$A1.y]
+      
       # Remove REF.FRQ for ambiguous SNPs
       if(!is.na(super_pop)){
         matched$REF.FRQ[matched$IUPAC.x %in% c('W','S')]<-NA
       } else {
         matched$REF.FRQ<-NA
       }
-      
-      # For ambiguous SNPs, set ref A1 and A2 as target A1 and A2
-      matched$A1.y[matched$IUPAC.x %in% c('W','S')]<-matched$A1.x[matched$IUPAC.x %in% c('W','S')]
-      matched$A2.y[matched$IUPAC.x %in% c('W','S')]<-matched$A2.x[matched$IUPAC.x %in% c('W','S')]
+
+      # Retain reference CHR, BP, but target A1, and A2 information
+      matched$A1<-matched$A1.x
+      matched$A1.y<-NULL
+      matched$A1.x<-NULL
+      matched$A2<-matched$A2.x
+      matched$A2.y<-NULL
+      matched$A2.x<-NULL
+      matched$IUPAC<-matched$IUPAC.x
+      matched$IUPAC.y<-NULL
+      matched$IUPAC.x<-NULL
+      matched$REF.SNP<-matched$SNP
   
-      # Identify SNPs that are opposite strands
-      flipped<-ref_target[(ref_target$IUPAC.x == 'R' & ref_target$IUPAC.y == 'Y') | 
-                          (ref_target$IUPAC.x == 'Y' & ref_target$IUPAC.y == 'R') | 
-                          (ref_target$IUPAC.x == 'K' & ref_target$IUPAC.y == 'M') |
-                          (ref_target$IUPAC.x == 'M' & ref_target$IUPAC.y == 'K'),]
-      
-      # For strand flipped variants, change to match reference
-      if('FRQ' %in% names(cSumstats)){
-        flipped$FRQ<-1-flipped$FRQ
-      }
-      if('BETA' %in% names(cSumstats)){
-        flipped$BETA<--flipped$BETA
-      }
-      if('OR' %in% names(cSumstats)){
-        flipped$OR<-exp(-log(flipped$OR))
-      }
-      
-      # Retain reference CHR, BP, A1, and A2 information
-      matched_flipped<-rbind(matched, flipped)
-      matched_flipped$A1<-matched_flipped$A1.y
-      matched_flipped$A1.y<-NULL
-      matched_flipped$A1.x<-NULL
-      matched_flipped$A2<-matched_flipped$A2.y
-      matched_flipped$A2.y<-NULL
-      matched_flipped$A2.x<-NULL
-      matched_flipped$IUPAC<-matched_flipped$IUPAC.y
-      matched_flipped$IUPAC.y<-NULL
-      matched_flipped$IUPAC.x<-NULL
-      matched_flipped$REF.SNP<-matched_flipped$SNP
-  
-      cSumstats_matched_chr<-rbind(matched_flipped)
+      cSumstats_matched_chr<-rbind(matched)
       cSumstats_matched<-rbind(cSumstats_matched, cSumstats_matched_chr)
     }
     
