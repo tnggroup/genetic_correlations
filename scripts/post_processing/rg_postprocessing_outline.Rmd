@@ -5,6 +5,9 @@ date: "28/08/2021"
 output: html_document
 ---
 
+
+#Set up
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,
                       comment=NA,
@@ -29,6 +32,38 @@ date = Sys.Date()
 date
 ```
 
+# Source credentials files
+This file includes the file path to the King's College London Microsoft Teams channel to store the raw data files of the GWAS summary statistics (intermediate solution before we move the final version to the rosalind cluster). However, we probably will save all summary statistics raw files on SharePoint/Teams to save space on rosalind.
+sumstats_path
+
+The file also contains the login details for your google work account: google_account_details
+```{r Credentials file}
+source(file = "../credentials/credentials.R")
+```
+
+# GWAS summary statistics overview sheet
+
+Login to googlesheets
+```{r Login to google sheets}
+gs4_auth(email = google_account_details)
+```
+
+Import google spreadsheet that contains the information of the GWAS
+```{r Google spreadsheet of GWAS dictionary}
+gwas_sheet <- read_sheet(
+  ss = "https://docs.google.com/spreadsheets/d/1Wmj4Qzumkzks6541vQJqxaUBxjfL4KLQo7_K_oquacI/edit#gid=0",
+  sheet = "SGDP_GWASLIST_EDITTHIS",
+  col_names = TRUE,
+  trim_ws = TRUE, # Trims whitespace,
+  guess_max = 600,
+  na = c("", "NULL", "NA")
+  )
+colnames(gwas_sheet)
+gwas_sheet
+```
+
+#Input data for post-processing
+
 What input do we need for this rmarkdown?
 LDSC rg results between a selected trait of interest and all traits in the summary statistics repository (or a shorter list of specific list of traits). All traits have had mhc region removed before rg estimation (and are significantly heritable?). rg results are only calculated in one direction to avoid repetition. 
 
@@ -37,67 +72,31 @@ LDSC rg results between a selected trait of interest and all traits in the summa
 
 Option 1: up to date list of all GWAS traits for rg analysis
 ```{r read in up to date list of traits}
-trait_list_all <- c("insert/file/path/list.txt")
+trait_list_all <- c(
+  paste0(sumstats_path, "/data/full_trait_list.txt")
+  ) 
 ```
 
 Option 2: shorter list of specific traits for rg analysis
 ```{r read in sub selected trait list}
-trait_list_short <- c("insert/file/path/list.txt")
+trait_list_subset <- c(
+  paste0(file_path, "/data/subset_trait_list.txt")
+  ) 
 ```
 
-2) Read in Up to date table with full GWAS information of each trait. Currently in csv format linked with the flask app, or in the google sheet.
-
-# option 1: CSV
-```{r csv read in full GWAS info all traits}
-GWAS_info_sheet <- c("insert/file/path/sheet.csv")
-```
-
-# option 2: google sheet
-
-Login to googlesheets
-```{r Login to google sheets}
-gs4_auth(email = "emailname@kcl.ac.uk")
-```
-
-```{r google read in full GWAS info all traits}
-GWAS_info_sheet <- read_sheet(
-  ss = "https://docs.google.com/spreadsheets/d/1Wmj4Qzumkzks6541vQJqxaUBxjfL4KLQo7_K_oquacI/edit#gid=0", #link to google doc
-  sheet = "SGDP_GWASLIST_EDITTHIS", #sheet name with data in
-  col_names = TRUE, #  use the first row as column names
-  trim_ws = TRUE, # Trims whitespace,
-  guess_max = 600, # Max number of data rows to use for guessing column types +++ATK do we need this? change to +700?
-  na = c("", "NULL", "NA") #Character vector of strings to interpret as missing values. 
-  )
-
-colnames(GWAS_info_sheet)
-
-GWAS_info_sheet
-```
-
+# Check GWAS sumstats
+MHC region removed check
 ```{r check mhc removed }
 # add once we have decided what format this is in (remove using SNP list?)
 ```
 
-```{r check traits h2 significantly greater than 0}
-standard_error_ci <-
-  # calculate the confidence interval around the point estimate (rg mean)
-  get_confidence_interval(point_estimate = rg,
-                          # at the 95% confidence level
-                          level = .95,
-                          # using the standard error
-                          type = "se") #this computes lower_ci and upper_ci
+Filter traits with low/ non significant heritability 
+```{r check traits h2 meet threshold}
+# use h2 z score cut off of 5 or 2.5? z = h2/se or 2*pnorm(-(h2/se))
 
-#or just calculate it 
-lower_ci <- (rg-1.96*se)
-upper_ci <-(rg+1.96*se)
+#check if h2 is significantly different from 0? Can calculate p value using calculate p using R as pchisq((h2/se)^2,1,lower.tail = FALSE) (https://groups.google.com/g/ldsc_users/c/adiEP9SB0U8/m/n0K-duUaAQAJ) or equivalent for Z score 2*pnorm(-(h2/se))
 
-GWAS_info_sheet %>%
-  filter(
-    lower_ci <= 0 # lower confidence interval of h2 estimate less than or equal to 0
-    ) %>%
-  nrow()
 
-# or use h2 z score cut off of 5 or 2.5? z = rg/se
 ```
 
 3) Read in rg data for your trait of interest
@@ -263,7 +262,38 @@ We also have multiple GWAS for one phenotype e.g. MDD -
 
 Use AN GWAS plot script (Watson et al 2019)
 ```{r plot rg results}
-
+plot <- ggplot(data = dat, aes(x=(dat$Phenotype2), 
+                                 y=dat$rg, 
+                                 label=rg)) +
+                 theme_linedraw() + #change to theme_bw if want to save as pdf if linedraw theme wont save as pdf
+                 geom_bar(stat='identity', aes(fill=Category), width=.5) +
+  geom_errorbar(aes(ymin =  rg-se, 
+                    ymax = rg+se),
+                width = 0.2,
+                size=0.3,
+                colour="#303535") + 
+  scale_fill_manual(values = coul) +
+labs(subtitle="Ordered by genetic correlation with (insert trait) within each category", 
+       title= "Genetic correlations between (insert trait) and heritable traits",
+       x="Other phenotype\n",
+       y="Genetic correlation") +
+  theme(plot.title = element_text(size=12,
+                                  hjust = 0,
+                                  face="bold"),
+        plot.subtitle = element_text(size=12,
+                                          hjust = 0,
+                                face="italic"),
+        axis.text = element_text(size=10),
+         plot.caption = element_text(hjust = 0,
+                                          size =12,
+                                         face="italic"),
+        axis.title.y=element_blank(),
+        legend.title = element_text(face='bold'),
+        axis.line = element_line(size=1))                          
+  scale_y_continuous(limits=c(-1,1),
+                     breaks=seq(-1,1,0.2))                          
+    plot + coord_flip()
+    ggsave(filename = "rgs_plot_.png")
 ```
 
 Publication table
