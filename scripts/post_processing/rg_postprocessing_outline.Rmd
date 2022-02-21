@@ -71,6 +71,7 @@ LDSC rg results between a selected trait of interest and all traits in the summa
 1) Read in list of traits to be analysed (in GWAS code format e.g. ADHD05, mhc region removed )
 
 Option 1: up to date list of all GWAS traits for rg analysis
++++ATK add at the end of cleaning script? Replaces old list of all traits with updated version to include the trait thats just been added? This list needs to be traits that are included in AFTER checking for mhc region and mean chi square. 
 ```{r read in up to date list of traits}
 trait_list_all <- c(
   paste0(sumstats_path, "/data/full_trait_list.txt")
@@ -78,19 +79,23 @@ trait_list_all <- c(
 ```
 
 Option 2: shorter list of specific traits for rg analysis
++++ATK the user would add this themselves. Do we want this as a function? Or does the user just add a list to the script here?
 ```{r read in sub selected trait list}
 trait_list_subset <- c(
   paste0(file_path, "/data/subset_trait_list.txt")
   ) 
 ```
 
-# Check GWAS sumstats
++++atk check GWAS steps should be added before running genetic correlations
+Check GWAS sumstats
 MHC region removed check
+++ATK this needs to be done before the genetic correltions step
 ```{r check mhc removed }
 # add once we have decided what format this is in (remove using SNP list?)
 ```
 
-Filter traits with low/ non significant heritability 
+Filter traits with low/ non significant heritability
++++ ATK this needs to be done before the genetic correlations step - otherwise waste of resources and steps. This could be a threshold of mean chi square 1.02 - 
 ```{r check traits h2 meet threshold}
 # use h2 z score cut off of 5 or 2.5? z = h2/se or 2*pnorm(-(h2/se))
 
@@ -101,10 +106,7 @@ Filter traits with low/ non significant heritability
 
 3) Read in rg data for your trait of interest
 
-+++ATK: this depends on if we are using LDSC in python to run rg, or are we using Genomic SEM in R to run rg? 
-
-if LDSC:
-convert already existing bash scripts to R - or just read bash script?
++++ATK add bash scripts here?
 ```{r read in rg results}
 
 ```
