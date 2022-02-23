@@ -61,7 +61,7 @@ column_parser <- add_option(
   help = "Number of individuals in the sample."
   )
 
-clOptions <- parse_args(column_parser)
+column_options <- parse_args(column_parser)
 ```
 
 Retrieve the recent date
@@ -121,7 +121,7 @@ _Set your file path_, when testing
 filePaths <- c(
   paste0(sumstats_path, "/data_raw/CUD_EUR_full_public_11.14.2020.gz")
   ) 
-# filePaths <- clOptions$file
+# filePaths <- column_options$file
 ```
 
 ### Trait names
@@ -129,7 +129,7 @@ A list of nice trait names which could be fit for a publication table/graph/plot
 _Set your nice trait name_, when testing
 ```{r Trait names}
 traitNames <- c("Cannabis use disorder (2020)") 
-#traitNames <- clOptions$names
+#traitNames <- column_options$names
 ```
 
 ### Code
@@ -138,7 +138,7 @@ These codes consist of 4 letters; for examples investigate the GWAS spreadsheet.
  #Set your trait code string_, when testing
 ```{r Code}
 traitCodes <- c("CUDI01")
-#traitCodes <- clOptions$code
+#traitCodes <- column_options$code
 ```
 
 ### Creating the sumstats.meta object
@@ -154,7 +154,7 @@ row.names(sumstats.meta) <- traitCodes
 ### Sample size
 Explicitly set total N (e.g., a vector of sample sizes)
 ```{r Sample size}
-cN <- clOptions$`sample-size`
+cN <- column_options$`sample-size`
 ```
 
 ### Indels
