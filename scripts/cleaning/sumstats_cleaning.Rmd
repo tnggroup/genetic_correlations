@@ -27,44 +27,17 @@ library(tidyverse)
 
 
 ```{r command line setup}
-column_parser <- OptionParser()
+clParser <- OptionParser()
+clParser <- add_option(clParser, c("-t", "--task"), type="character", default="clean",
+                help="The explicit task to run:\nclean: Clean GWAS sumstat [default %default]")
+clParser <- add_option(clParser, c("-f", "--file"), type="character",
+                help="The file to process")
+clParser <- add_option(clParser, c("-c", "--code"), type="character",
+                help="The code to use for the dataset from the specified file.")
+clParser <- add_option(clParser, c("-n", "--sample-size"), type="numeric",
+                help="Number of individuals in the sample.")
 
-column_parser <- 
-  add_option(
-    object = column_parser,
-    opt_str = c("-t", "--task"),
-    type = "character",
-    default="clean",
-    help="The explicit task to run:\nclean: Clean GWAS sumstat [default %default]"
-    )
-
-column_parser <-
-  add_option(
-    object = column_parser,
-    opt_str = c("-f", "--file"),
-    type = "character",
-    help = "The file to process"
-    )
-
-column_parser <-
-  add_option(
-    object = column_parser,
-    opt_str = c("-c", "--code"),
-    type = "character",
-    help = "The code to use for the dataset from the specified file."
-    )
-
-column_parser <-
-  add_option(
-    object = column_parser,
-    opt_str = c("-n", "--sample-size"),
-    type = "numeric",
-    help = "Number of individuals in the sample."
-    )
-
-column_options <- parse_args(
-  object = column_parser
-  )
+clOptions<-parse_args(clParser)
 ```
 
 # Script settings
@@ -72,7 +45,7 @@ column_options <- parse_args(
 filename.rmd<-"sumstats_cleaning.Rmd"
 
 #explicitly set total N
-cN <- column_options$`sample-size`
+cN <- clOptions$`sample-size`
 #setting for keeping or removing indels
 keepIndel<-F
 mhc.filter<-37
@@ -459,9 +432,9 @@ parseCHRColumn <- function(text){
 THIS IS WHERE YOU SET UP YOUR DATASET SETTINGS! ENTER THE SETTINGS FOR YOUR DATASET AS WAS DONE FOR THE ADHD EXAMPLE GWAS BELOW.
 +++CH: Maybe we can annotate this a little more?
 ```{r}
-filePaths <- column_options$file
-traitNames <- column_options$code
-traitCodes <- column_options$code
+filePaths <- clOptions$file
+traitNames <- clOptions$code
+traitCodes <- clOptions$code
 #test or temporary placeholders
 filePaths<-c("../../data_raw/CUD_EUR_full_public_11.14.2020.gz")
 traitNames<-c("Cannabis use disorder (2020)")
@@ -478,7 +451,7 @@ row.names(sumstats.meta)<-traitCodes
 +++CH: to read in the data file, I would use the data.table package because it is much faster than the basic R functions to read in data
 https://cran.r-project.org/web/packages/data.table/vignettes/datatable-intro.html
 ```{r read in sumstats}
-filePaths <- column_options$file
+filePaths <- clOptions$file
 #test
 filePaths<-c("../../data_raw/CUD_EUR_full_public_11.14.2020.gz")
 
