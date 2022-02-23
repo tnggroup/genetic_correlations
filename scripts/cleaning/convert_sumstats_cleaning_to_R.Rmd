@@ -1,0 +1,16 @@
+---
+title: "Convert sumstats_cleaning.Rmd to R script"
+author: "Christopher Huebel"
+date: "23/02/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Specify file name
+This file name is needed to export the whole file as an R file
+```{r Specify file name}
+filename.rmd <- "sumstats_cleaning.Rmd"
+```

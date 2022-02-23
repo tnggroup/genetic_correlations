@@ -71,11 +71,7 @@ date = Sys.Date()
 date
 ```
 
-Specify file name
-This file name is needed to export the whole file as an R file
-```{r Specify file name}
-filename.rmd <- "sumstats_cleaning.Rmd"
-```
+
 
 ## Source credentials files
 This file includes the file path to the King's College London Microsoft Teams channel to store the raw data files of the GWAS summary statistics (intermediate solution before we move the final version to the rosalind cluster). However, we probably will save all summary statistics raw files on SharePoint/Teams to save space on rosalind.
