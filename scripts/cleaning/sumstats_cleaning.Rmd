@@ -30,38 +30,38 @@ library(tidyverse)
 
 ## Command line set up
 ```{r command line setup}
-clParser <- OptionParser()
+column_parser <- OptionParser()
 
-clParser <- add_option(
-  object = clParser,
+column_parser <- add_option(
+  object = column_parser,
   opt_str = c("-t", "--task"),
   type= "character",
   default="clean",
   help = "The explicit task to run:\nclean: Clean GWAS sumstat [default %default]"
   )
 
-clParser <- add_option(
-  object = clParser,
+column_parser <- add_option(
+  object = column_parser,
   opt_str = c("-f", "--file"),
   type = "character",
   help="The file to process"
   )
 
-clParser <- add_option(
-  object = clParser,
+column_parser <- add_option(
+  object = column_parser,
   opt_str = c("-c", "--code"),
   type = "character",
   help = "The code to use for the dataset from the specified file."
   )
 
-clParser <- add_option(
-  object = clParser,
+column_parser <- add_option(
+  object = column_parser,
   opt_str = c("-n", "--sample-size"),
   type = "numeric",
   help = "Number of individuals in the sample."
   )
 
-clOptions <- parse_args(clParser)
+clOptions <- parse_args(column_parser)
 ```
 
 Retrieve the recent date
