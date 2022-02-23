@@ -23,7 +23,6 @@ Package setup
 #devtools::install_github("johanzvrskovec/shru")
 library(optparse)
 library(data.table)
-library(summarytools)
 library(shru)
 library(googlesheets4)
 library(tidyverse)
