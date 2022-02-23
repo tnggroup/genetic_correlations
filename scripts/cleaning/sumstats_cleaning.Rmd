@@ -1,6 +1,6 @@
 ---
 title: "rg results summary tables template"
-author: "Abigail ter Kuile"
+author: "Abigail ter Kuile, Christopher Huebel, Alish Palmos Johan Zrvskovec, Oliver Pain"
 date: "28/08/2021"
 output: html_document
 ---
