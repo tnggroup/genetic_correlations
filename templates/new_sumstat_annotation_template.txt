@@ -1,0 +1,39 @@
+key	value
+#Comments can be entered like this.
+
+#This is a template for annotating new GWAS sumstats. The annotation file should have the same name as the sumstats file but with the suffix .txt.
+#The file consists of a list of key-value pairs (rows). The key and the value should be separated by whitespace such as tabs. The key can't contain whitespace. This format will make it easy for a program to read the information later.
+
+#The keys are presented in a rough order of priority. Please provide as much information about the GWAS sumstat as possible. Remove unused rows and text.
+
+name  *Name of your trait
+
+doi *DOI link either full or just the doi part (ex. 10.1136/bmj.m3871)
+
+pmid  *pmid
+
+permission  [free,free to ukbb,on demand,private]
+
+cohort *comma separated list of cohort codes of cohorts that are included (ukbb,glad,edgi etc..)
+
+phenotype_type  [trt - trait, dis - disorder, bio - biomarker]
+
+ancestry  [ausabr - Aboriginal Australian, amcarafr - African American or Afro-Caribbean, afr - African unspecified, cas - Central Asian, eas - East Asian, eur - European, gme - Greater Middle Eastern (Middle Eastern, North African, or Persian), amlathis - Hispanic or Latin American, amnat - Native American, unrep - Not reported, oce - Oceanian, oth - Other, amixo - Other admixed ancestry, sas - South Asian, seas - South East Asian, afrss - Sub-Saharan African, multi - Multiple populations]
+
+sex [male,female,other,mix,unspecified]
+
+n_case  *# cases or total in case of continuous variable
+
+n_control *# controls
+
+phenotype *Text hinting about what phenotype may be preferred to associate with the trait
+
+category  *Text hinting about what category would be preferred to associate with the trait (anthropometric,autoimmune,blood,circulatory,eye and adnexa,genitourinary,mental and behavioural,metabolism:,amino acids,metabolism: glucose,metabolism: lipids,metabolism: other,musculoskeletal and connective,nervous system,respiratory,skin)
+
+
+notes *Any notes
+
+
+
+
+
