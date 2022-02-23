@@ -1,0 +1,224 @@
+---
+title: "Collate GWAS Information"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+***
+
+This script creates a file describing each GWAS, including information stored within the SQL database (as input manually), as well as the following additional information:
+
+- Title, abstract, link to reference from PubMed
+- LDSC statistics
+
+***
+
+# Set up RMD options and environment
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE,
+                      comment=NA,
+                      prompt=FALSE,
+                      cache=FALSE)
+```
+
+Clear global environment
+```{r}
+remove(list = ls())
+```
+
+***
+
+# Set output parameter
+
+```{r}
+opt<-list()
+
+# This is an example output parameter
+opt$output<-'/users/k1806347/brc_scratch/Data/GWAS_sumstats/Rosalind_repository/example'
+
+# Identify the directory for the output
+opt$output_dir<-dirname(opt$output)
+
+# Create output directory if it doesn't exist
+if(!file.exists(opt$output_dir)){
+  dir.create(opt$output_dir)
+}
+```
+
+***
+
+# Load required packages
+
+```{r}
+
+library(data.table)
+library(easyPubMed)
+
+```
+
+***
+
+# Load up-to-date SQL database csv
+
+```{r}
+csv_new<-fread('/scratch/users/k1806347/Software/genetic_correlations/data_gwas_sumstats_repository_2021/database_export_gwas_reference_category_phenotype.tsv',fill=T)
+
+# For testing, create mini version
+csv_new<-csv_new[1:10,]
+
+```
+
+***
+
+# Create or update GWAS inforamtion file
+
+The process of downloading PubMed information is slow, and therefore it is most efficient to update a pre-existing GWAS information file to include new entries.
+
+```{r}
+# Read in previous GWAS information file if available
+opt$gwas_info<-NA
+
+if(!is.na(opt$gwas_info)){
+  # Read previously created gwas_info file
+  gwas_info<-fread(opt$gwas_info)
+  
+  # Identify entries in csv_new that are not in gwas_info
+  new_gwas<-csv_new[!(csv_new$code %in% gwas_info$code),]
+  
+  # Quit if no new entries are detected
+  if(sum(!(csv_new$code %in% gwas_info$code)) == 0){
+    cat('No new entries detected.\n')
+    q()
+  } else {
+    cat(dim(new_gwas)[1],'new entries detected.\n')
+  }
+
+} else {
+  # No previous gwas_info file exists, so run for all entries in csv_new
+  new_gwas<-csv_new
+  cat(dim(new_gwas)[1],'new entries detected.\n')
+}
+
+```
+
+***
+
+# Download PubMed information
+
+```{r}
+
+new_gwas$article_title<-NA
+new_gwas$article_abstract<-NA
+
+for(i in which(!is.na(new_gwas$pmid))){
+  pmid_temp<-get_pubmed_ids(new_gwas$pmid[i], api_key = NULL)
+  dat<-fetch_pubmed_data(pmid_temp, format='xml')
+  new_gwas$article_title[i] <- custom_grep(dat, "ArticleTitle", "char")
+  new_gwas$article_abstract[i] <- paste0(custom_grep(dat, "AbstractText", "char"), collapse=' ')
+  cat(paste0(round(i/sum(!is.na(new_gwas$pmid)),2)*100,"% complete\n"))
+}
+
+```
+
+***
+
+# Integrate LDSC statistics
+
+```{r}
+
+new_gwas$ldsc_h2_observed<-NA
+new_gwas$ldsc_h2_se<-NA
+new_gwas$ldsc_lambda_GC<-NA
+new_gwas$ldsc_mean_chi2<-NA
+new_gwas$ldsc_intercept<-NA
+new_gwas$ldsc_intercept_se<-NA
+new_gwas$ldsc_ratio<-NA
+new_gwas$ldsc_ratio_se<-NA
+
+ldsc_logs<-list.files(path='/scratch/groups/ukbiobank/sumstats/munged', pattern='_herit.log')
+ldsc_logs<-gsub('_herit.log','',ldsc_logs)
+
+for(i in 1:dim(new_gwas)[1]){
+  if((new_gwas$code[i] %in% ldsc_logs)){
+    ldsc_logs_i<-read.fwf(paste0('/scratch/groups/ukbiobank/sumstats/munged/',new_gwas$code[i],'_herit.log'),widths = 1000000)
+        
+    new_gwas$ldsc_h2_observed[i]<-as.numeric(gsub(' .*','', gsub('Total Observed scale h2: ','',ldsc_logs_i[grepl('Total Observed scale h2: ', ldsc_logs_i$V1),])))
+    new_gwas$ldsc_h2_se[i]<-as.numeric(gsub("\\)",'', gsub(".*\\(",'', gsub('Total Observed scale h2: ','',ldsc_logs_i[grepl('Total Observed scale h2: ', ldsc_logs_i$V1),]))))
+    new_gwas$ldsc_lambda_GC[i]<-as.numeric(gsub('Lambda GC: ','',ldsc_logs_i[grepl('Lambda GC: ', ldsc_logs_i$V1),]))
+    new_gwas$ldsc_mean_chi2[i]<-as.numeric(gsub("Mean Chi\\^2: ",'',ldsc_logs_i[grepl("Mean Chi", ldsc_logs_i$V1),]))
+    new_gwas$ldsc_intercept[i]<-as.numeric(gsub(' .*','', gsub("Intercept: ",'',ldsc_logs_i[grepl("Intercept: ", ldsc_logs_i$V1),])))
+    new_gwas$ldsc_intercept_se[i]<-as.numeric(gsub("\\)",'', gsub(".*\\(",'', gsub("Intercept: ",'',ldsc_logs_i[grepl("Intercept: ", ldsc_logs_i$V1),]))))
+    
+    if((new_gwas$ldsc_intercept[i]-1)/(new_gwas$ldsc_mean_chi2[i]-1) > 0){
+      new_gwas$ldsc_ratio[i]<-as.numeric(gsub(' .*','', gsub("Ratio: ",'',ldsc_logs_i[grepl("Ratio: ", ldsc_logs_i$V1),])))
+      new_gwas$ldsc_ratio_se[i]<-as.numeric(gsub("\\)",'', gsub(".*\\(",'', gsub("Ratio: ",'',ldsc_logs_i[grepl("Ratio: ", ldsc_logs_i$V1),]))))
+    } else {
+      new_gwas$ldsc_ratio[i]<-'<0'
+      new_gwas$ldsc_ratio_se[i]<-'NA'
+    }
+  }
+}
+
+```
+
+***
+
+# Compare with information in GWAS catalogue
+
+```{r}
+
+library(gwasrapidd)
+studies <- get_studies(pubmed_id = as.character(new_gwas$pmid[!is.na(new_gwas$pmid)]))
+
+# This package provides a lot of useful information and is quick to run. If we are not interested in abstracts, we could skip using PubMed entirely.
+# One issue is instances where more than one GWAS was released per PMID
+# The information could be manually filtered to check for errors
+# The only reliable solution programmatically is to only check sample size for PMID with one set of sumstats.
+# The same is true in our repository, as there are often multiple GWAS per pubmed ID.
+
+tmp<-merge(studies@publications, studies@studies, by='study_id')
+tmp<-tmp[,c('study_id','pubmed_id','title','reported_trait','initial_sample_size'),]
+dup<-unique(tmp$pubmed_id[duplicated(tmp$pubmed_id)])
+tmp<-tmp[!(tmp$pubmed_id %in% dup),]
+
+n_tmp<-studies@ancestries[studies@ancestries$study_id %in% tmp$study_id,]
+n_tmp<-n_tmp[n_tmp$type == 'initial',]
+
+n_tmp_sum<-NULL
+for(i in unique(n_tmp$study_id)){
+  n_tmp_sum<-rbind(n_tmp_sum,data.frame(study_id=i,
+                                        n=sum(n_tmp$number_of_individuals[n_tmp$study_id == i])))
+}
+
+tmp<-merge(tmp, n_tmp_sum, by='study_id')
+
+new_gwas_nodup<-new_gwas[!(new_gwas$pmid %in% new_gwas$pmid[duplicated(new_gwas$pmid)])]
+new_gwas_nodup<-merge(new_gwas_nodup, tmp, by.x='pmid', by.y='pubmed_id', all.x=T)
+
+# Some studies still don't always match well as there may only be one version of sumstats available in each repository, but different versions. e.g. cross-disorder GWAS
+
+new_gwas_nodup[,c('pmid','code','name','n_total','n','reported_trait')]
+
+```
+
+***
+
+# Write out updated GWAS information file
+
+```{r}
+
+# Combine with previously created gwas_info file if present
+if(is.na(opt$gwas_info) == F){
+  new_gwas<-rbind(gwas_info, new_gwas)
+}
+
+# Save new/updated gwas_info
+write.csv(new_gwas, paste0(opt$output,'.',Sys.Date(),'.csv'), row.names=F, quote=T)
+
+```
+
+
