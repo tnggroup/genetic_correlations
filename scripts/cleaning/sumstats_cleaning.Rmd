@@ -1,11 +1,10 @@
 ---
 title: "rg results summary tables template"
-author: "Abigail ter Kuile, Christopher Huebel, Johan Zvrskovec, Alish Palmos, Oliver Pain"
+author: "Abigail ter Kuile"
 date: "28/08/2021"
 output: html_document
 ---
 
-# Set up
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,
                       comment=NA,
@@ -18,7 +17,7 @@ Clear global environment
 remove(list = ls())
 ```
 
-Package setup
+# Package setup
 ```{r Packages}
 library(optparse)
 library(data.table)
