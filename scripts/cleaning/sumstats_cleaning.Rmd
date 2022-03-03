@@ -620,17 +620,27 @@ if(
 ```
 
 ## FRQ filter
+Remove if FRQ is lower than 0.005 and greater than 0.995
 ```{r FRQ filter}
-if(any(colnames(cSumstats)=="FRQ")){
-  rm <- (!is.na(cSumstats$FRQ) & (cSumstats$FRQ<0.005 | cSumstats$FRQ>0.995)) #if outside of bounds 
+if(
+  any(colnames(cSumstats)=="FRQ")
+  ){
+  
+  # If outside of bounds 
+  rm <- (!is.na(cSumstats$FRQ) 
+         & (cSumstats$FRQ<0.005 | cSumstats$FRQ>0.995))
+  
   cSumstats <- cSumstats[!rm, ]
-  cat("Removing ", sum(rm), " SNPs with FRQ <", frq.filter, "; ", nrow(cSumstats), " remain")
-  sumstats_meta[cCode,c("n_removed_frq")]<-sum(rm)
-} else {
-  cat("Warning: The dataset does not contain a FRQ or MAF column to apply the specified filter on.")
-}
-
-sumstats_meta$n_removed_frq
+  
+  cat("Removing", sum(rm), "SNPs with FRQ <", frq.filter, ";", nrow(cSumstats), "remain")
+  
+  sumstats_meta[cCode,c("n_removed_frq")] <- sum(rm)
+  
+  } else {
+  
+    cat("Warning: The dataset does not contain a FRQ or MAF column to apply the specified filter on.")
+    
+    }
 ```
 
 
