@@ -851,6 +851,7 @@ cat(
 
 ?Read in reference from plink formats
 +++CH: Do we need to create the log file folder?
++++CH: This needs fixing before I can continue double checking the script
 ```{r read in reference}
 
 ```
