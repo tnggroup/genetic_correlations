@@ -6,6 +6,8 @@ output: html_document
 ---
 
 # Rmd set up
+
+## General set up
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,
                       comment=NA,
@@ -29,7 +31,7 @@ library(googlesheets4)
 library(tidyverse)
 ```
 
-# Command line set up
+## Command line set up
 ```{r command line setup}
 column_parser <- OptionParser()
 
@@ -85,7 +87,7 @@ source(file = "../credentials/credentials.R")
 ```
 
 
-# GWAS summary statistics overview sheet
+## GWAS summary statistics overview sheet
 
 Login to googlesheets
 ```{r Login to google sheets}
@@ -117,35 +119,39 @@ _Set your file path_, when testing
 ```{r Paths}
 filePaths <- c(
   paste0(sumstats_path, "/data_raw/CUD_EUR_full_public_11.14.2020.gz")
-  ) 
+  )
 # filePaths <- column_options$file
+filePaths
 ```
 
 ### Trait names
 A list of nice trait names which could be fit for a publication table/graph/plot
 _Set your nice trait name_, when testing
 ```{r Trait names}
-traitNames <- c("Cannabis use disorder (2020)") 
+traitNames <- c("Cannabis use disorder (2020)")
 #traitNames <- column_options$names
+traitNames
 ```
 
 ### Code
 A list of codes you want to identify your traits by (different from the nice names), used to reference a trait by a string
 These codes consist of 4 letters; for examples investigate the GWAS spreadsheet. Try to identify similar traits.
- #Set your trait code string_, when testing
+_Set your trait code string_, when testing
 ```{r Code}
 traitCodes <- c("CUDI01")
 #traitCodes <- column_options$code
+traitCodes
 ```
 
-### Creating the sumstats.meta object
-Sumatats.meta is an output containing an overview with information of the cleaning steps that is generated throughout the cleaning pipeline for each GWAS trait.
-```{r Creating the sumstats.meta object}
-sumstats.meta <- data.frame(
+### Creating the sumstats_meta object
+sumstats_meta is an object containing an overview with information of the cleaning steps that is generated throughout the cleaning pipeline for each GWAS trait.
+```{r Creating the sumstats_meta object}
+sumstats_meta <- data.frame(
   name = traitNames
   )
 
-row.names(sumstats.meta) <- traitCodes
+row.names(sumstats_meta) <- traitCodes
+sumstats_meta
 ```
 
 ### Sample size
@@ -156,30 +162,31 @@ cN <- column_options$`sample-size`
 
 ### Indels
 Setting for keeping or removing indels
-```{r Sample size}
+```{r Indels}
 keepIndel <- FALSE # or change to TRUE
 ```
 
 ### MHC filter
 Activate/deactivate MHC filter
-```{r Sample size}
++++CH: What does 37 mean here?
+```{r MHC filter}
 mhc.filter <- 37
 ```
 
-### Supemunge?
+### Supermunge
 Activate/deactivate supermunge
++++CH: This needs one line explanation what supermunge does.
 ```{r Supermunge setting}
-doSupermunge <- T
+doSupermunge <- TRUE
 ```
 
 
-
 ### Standardised colum names
-This chunk creates one function called "standardise_GWAS_column_names". The function interprets the columns of the original raw GWAS summary statistics and replaces them with standard column names. The standard column names are the first item in the vector:
+This chunk reads in a function called "standardise_GWAS_column_names". The function interprets the columns of the original raw GWAS summary statistics and replaces them with standard column names. The standard column names are the first item in the vector:
 SNP	CHR	ORIGBP	A1	A2	FREQ	FREQ_CASES	P	INFO	OR/BETA/Z	SE	N	Ncas	Ncon
-We have chosen ORIGBP as output name, because the summary statistics are based on different genome builds which means SNPs will be located at different BPs
+We have chosen ORIGBP as output name, because the summary statistics are based on different genome builds which means SNPs will be located at different BPs positions.
 To avoid follow-up software using the BP column (cave: different genome builds), we named it ORIGBP.
-The function stops if the essential columns SNP, A1, A2, P, BETA or OR or Z 
+The function stops if the essential columns SNP, A1, A2, P, BETA or OR or Z are not found.
 
 ```{r Standardise GWAS column names}
 source(file = "../functions/standardise_GWAS_column_names.R")
@@ -225,9 +232,9 @@ cSumstats <- data.table::fread(
 
 #number of rows before touching the data
 nRowsRaw <- nrow(cSumstats)
-sumstats.meta[cCode,c("n_snp_raw")]<-nRowsRaw #add number of SNPs raw to sumstats.meta (meta data file)
+sumstats_meta[cCode,c("n_snp_raw")]<-nRowsRaw #add number of SNPs raw to sumstats_meta (meta data file)
 
-sumstats.meta$n_snp_raw
+sumstats_meta$n_snp_raw
 ```
 
 
@@ -337,7 +344,7 @@ if(any(colnames(cSumstats)=="N_CAS") && any(colnames(cSumstats)=="N_CON")) {
   cSumstats$N[which(is.na(cSumstats$N))]<-cN #default behaviour - add explicit N only to missing values.
 } else if(!any(colnames(cSumstats)=="N")) {
   warning("\nNo N column detected!\n")
-  sumstats.meta[cCode,c("noN")]<-T
+  sumstats_meta[cCode,c("noN")]<-T
 }
 ```
 
@@ -351,10 +358,10 @@ if(round(median(cSumstats$EFFECT,na.rm=T)) == 1) #from Genomic SEM code
 if(any(colnames(cSumstats) == "BETA") == 0 & any(colnames(cSumstats) == "OR")){
     cSumstats$BETA<-log(cSumstats$OR) #calculate BETA from log of OR
     cat("BETA column inserted based on log OR value")
-    sumstats.meta[cCode,c("Effect")]<-"OR"
+    sumstats_meta[cCode,c("Effect")]<-"OR"
 } else if(any(colnames(cSumstats) == "BETA")) {
     cat("BETA column detected")
-    sumstats.meta[cCode,c("Effect")]<-"BETA"
+    sumstats_meta[cCode,c("Effect")]<-"BETA"
     }
 ```
 
@@ -369,11 +376,11 @@ We know that BETA exists if any effect provided previously
 if(any(colnames(cSumstats) == "Z") == 0 & any(colnames(cSumstats)=="BETA")){
   cSumstats$Z <- sign(cSumstats$BETA)*sqrt(qchisq(cSumstats$P,1,lower=F)) #calculate Z value using qchisq
   cat("Z column inserted based on P value and sign(BETA)")
-  sumstats.meta[cCode,c("Z")]<-"P,sign(BETA)"
+  sumstats_meta[cCode,c("Z")]<-"P,sign(BETA)"
 } else if(any(colnames(cSumstats)=="SE") & any(colnames(cSumstats)=="BETA")){
   cSumstats$Z <- cSumstats$BETA/cSumstats$SE
   cat("Z column inserted based on BETA value and SE")
-  sumstats.meta[cCode,c("Z")]<-"BETA,SE"
+  sumstats_meta[cCode,c("Z")]<-"BETA,SE"
 }
 ```
 
@@ -387,7 +394,7 @@ if(any(colnames(cSumstats) == "SE") == 0){
     cSumstats$SE<-abs(cSumstats$BETA/cSumstats$Z) #calculate SE from BETA and Z
   }
   cat("SE column inserted based on BETA/OR and P")
-  sumstats.meta[cCode,c("SE")]<-"BETA,Z"
+  sumstats_meta[cCode,c("SE")]<-"BETA,Z"
   }
 ```
 
@@ -395,7 +402,7 @@ if(any(colnames(cSumstats) == "SE") == 0){
 ## Meta data about sufficient columns for analyses
 Add information to metadata if there are enough columns for PRS and pathway analysis
 ```{r add meta data for PRS & pathway analysis}
-sumstats.meta[cCode,c("enough_columns_PRS")] <- #sufficient columns for PRS analysis
+sumstats_meta[cCode,c("enough_columns_PRS")] <- #sufficient columns for PRS analysis
   any(colnames(cSumstats)=="SNP") &
   any(colnames(cSumstats)=="P") &
   (any(colnames(cSumstats)=="BETA") |
@@ -404,11 +411,11 @@ sumstats.meta[cCode,c("enough_columns_PRS")] <- #sufficient columns for PRS anal
   any(colnames(cSumstats)=="A1") &
   any(colnames(cSumstats)=="A2")
 
-sumstats.meta[cCode,c("enough_columns_pathway_analysis")] <- #sufficient columns  for pathway analysis
+sumstats_meta[cCode,c("enough_columns_pathway_analysis")] <- #sufficient columns  for pathway analysis
   any(colnames(cSumstats)=="SNP") &
   any(colnames(cSumstats)=="P")
 
-sumstats.meta
+sumstats_meta
 ```
 
 
@@ -421,30 +428,30 @@ Clean if missing P column
 ```{r clean missing p}
 if(any(colnames(cSumstats)=="P")){
   cond <- is.na(cSumstats$P)
-  sumstats.meta[cCode,c("n_removed_missing_p")]<-sum(cond)
+  sumstats_meta[cCode,c("n_removed_missing_p")]<-sum(cond)
   cSumstats<-cSumstats[which(!cond),]
 }
 
-sumstats.meta$n_removed_missing_p
+sumstats_meta$n_removed_missing_p
 ```
 
 Clean if missing effect columns 
 ```{r clean missing effect}
 if(any(colnames(cSumstats)=="BETA")){ 
   cond <- is.na(cSumstats$BETA) #if NA for BETA value remove variant
-  sumstats.meta[cCode,c("n_removed_missing_effect")]<-sum(cond)
+  sumstats_meta[cCode,c("n_removed_missing_effect")]<-sum(cond)
   cSumstats<-cSumstats[which(!cond),]
 } else if(any(colnames(cSumstats)=="OR")) {
   cond <- is.na(cSumstats$OR) #if NA for OR value remove variant
-  sumstats.meta[cCode,c("n_removed_missing_effect")]<-sum(cond)
+  sumstats_meta[cCode,c("n_removed_missing_effect")]<-sum(cond)
   cSumstats<-cSumstats[which(!cond),]
 } else if(any(colnames(cSumstats)=="Z")) {
   cond <- is.na(cSumstats$Z) #if NA for Z value remove variant
-  sumstats.meta[cCode,c("n_removed_missing_effect")]<-sum(cond)
+  sumstats_meta[cCode,c("n_removed_missing_effect")]<-sum(cond)
   cSumstats<-cSumstats[which(!cond),]
 }
 
-sumstats.meta$n_removed_missing_effect
+sumstats_meta$n_removed_missing_effect
 ```
 
 
@@ -456,10 +463,10 @@ Deal with duplicate variants
 if(any(colnames(cSumstats)=="SNP") & any(colnames(cSumstats)=="A1") & any(colnames(cSumstats)=="A2")) {
   cSumstats.n <- nrow(cSumstats)
   cSumstats <- unique(cSumstats,by = c("SNP","A1","A2"))
-  sumstats.meta[cCode,c("n_removed_duplicates")]<-cSumstats.n-nrow(cSumstats)
+  sumstats_meta[cCode,c("n_removed_duplicates")]<-cSumstats.n-nrow(cSumstats)
 }
 
-sumstats.meta$n_removed_duplicates
+sumstats_meta$n_removed_duplicates
 ```
 
 
@@ -475,12 +482,12 @@ if(any(colnames(cSumstats)=="P")){
   rm <- (!is.na(cSumstats$P) & (cSumstats$P>1 | cSumstats$P<0)) #if outside of bounds P < 0 or P > 1
   cSumstats <- cSumstats[!rm, ]
   cat("Removing ", sum(rm), " SNPs with P < 0 or P > 1; ", nrow(cSumstats), " remain") 
-  sumstats.meta[cCode,c("n_removed_p")]<-sum(rm)
+  sumstats_meta[cCode,c("n_removed_p")]<-sum(rm)
 } else {
   cat("Warning: The dataset does not contain a P column to apply the specified filter on.")
 }
 
-sumstats.meta$n_removed_p
+sumstats_meta$n_removed_p
 ```
 
 ## FRQ filter
@@ -489,12 +496,12 @@ if(any(colnames(cSumstats)=="FRQ")){
   rm <- (!is.na(cSumstats$FRQ) & (cSumstats$FRQ<0.005 | cSumstats$FRQ>0.995)) #if outside of bounds 
   cSumstats <- cSumstats[!rm, ]
   cat("Removing ", sum(rm), " SNPs with FRQ <", frq.filter, "; ", nrow(cSumstats), " remain")
-  sumstats.meta[cCode,c("n_removed_frq")]<-sum(rm)
+  sumstats_meta[cCode,c("n_removed_frq")]<-sum(rm)
 } else {
   cat("Warning: The dataset does not contain a FRQ or MAF column to apply the specified filter on.")
 }
 
-sumstats.meta$n_removed_frq
+sumstats_meta$n_removed_frq
 ```
 
 
@@ -504,12 +511,12 @@ if(any(colnames(cSumstats)=="INFO")){
   rm <- (!is.na(cSumstats$INFO) & cSumstats$INFO<0.6)
   cSumstats <- cSumstats[!rm, ]
   cat("Removing ", sum(rm), " SNPs with INFO < 0.6; ", nrow(cSumstats), " remain")
-  sumstats.meta[cCode,c("n_removed_info")]<-sum(rm)
+  sumstats_meta[cCode,c("n_removed_info")]<-sum(rm)
 } else {
   cat("Warning: The dataset does not contain an INFO column to apply the specified filter on.")
 }
 
-sumstats.meta$n_removed_info
+sumstats_meta$n_removed_info
 ```
 
 ## OR filter
@@ -519,12 +526,12 @@ if(any(colnames(cSumstats)=="OR")){
   rm <- (!is.na(cSumstats$OR) & cSumstats$OR>10000)
   cSumstats <- cSumstats[!rm, ]
   cat("Removing ", sum(rm), " SNPs with OR > 10000; ", nrow(cSumstats), " remain")
-  sumstats.meta[cCode,c("n_removed_or")]<-sum(rm)
+  sumstats_meta[cCode,c("n_removed_or")]<-sum(rm)
 } else {
   cat("Warning: The dataset does not contain an INFO column to apply the specified filter on.")
 }
 
-sumstats.meta$n_removed_or
+sumstats_meta$n_removed_or
 ```
 
 ## N filter - (from Ollies script)
@@ -536,10 +543,10 @@ if(any(colnames(cSumstats)=="N")){
   rm <- (!is.na(cSumstats$N) & (cSumstats$N > N_median+(3*N_sd) | cSumstats$N < N_median-(3*N_sd)))
   cSumstats <- cSumstats[!rm, ]
   cat("Removing ", sum(rm), " SNPs with N outside median(N) +- 3SD(N); ", nrow(cSumstats), " remain")
-  sumstats.meta[cCode,c("n_removed_n")]<-sum(rm)
+  sumstats_meta[cCode,c("n_removed_n")]<-sum(rm)
 }
 
-sumstats.meta$n_removed_n
+sumstats_meta$n_removed_n
 ```
 
 # SE filter - from Ollies script
@@ -549,10 +556,10 @@ if(any(colnames(cSumstats)=="SE")){
   rm <- (!is.na(cSumstats$SE) & cSumstats$SE == 0) #if SE is 0 or NA - remove
   cSumstats <- cSumstats[!rm, ]
   cat("Removing ", sum(rm), " SNPs with SE = 0; ", nrow(cSumstats), " remain")
-  sumstats.meta[cCode,c("n_removed_se")]<-sum(rm)
+  sumstats_meta[cCode,c("n_removed_se")]<-sum(rm)
 }
 
-sumstats.meta$n_removed_se
+sumstats_meta$n_removed_se
 ```
 
 #indels
@@ -567,11 +574,11 @@ if(keepIndel == T){ #if set at True, keeps indels
   cSumstats$A1 <- as.character(toupper(cSumstats$A1), c("A", "C", "G", "T"))
   cSumstats$A2 <- as.character(toupper(cSumstats$A2), c("A", "C", "G", "T"))
   rm <- (is.na(cSumstats$A1) | is.na(cSumstats$A2))
-  sumstats.meta[cCode,c("n_removed_indels")]<-sum(cond)
+  sumstats_meta[cCode,c("n_removed_indels")]<-sum(cond)
   cSumstats<-cSumstats[!rm,]
 }
 
-sumstats.meta$n_removed_indels
+sumstats_meta$n_removed_indels
 ```
 
 
@@ -592,12 +599,12 @@ if(any(colnames(cSumstats) == "SE") == 1){
       cSumstats$P_check<-NULL
       
       cat("Genomic control detected. P-value recomputed using BETA and SE.")
-      sumstats.meta[cCode,c("GC")]<-T
+      sumstats_meta[cCode,c("GC")]<-T
      
     } else {
      
       cat("Genomic control was not detected.")
-      sumstats.meta[cCode,c("GC")]<-F
+      sumstats_meta[cCode,c("GC")]<-F
     
       cSumstats$P_check<-NULL
     }
@@ -640,9 +647,9 @@ The block below relies on the Z value being up to date.
 ```{r Calculate lambda GC}
 #http://genometoolbox.blogspot.com/2014/08/how-to-calculate-genomic-inflation.html
 
-sumstats.meta[cCode,c("lambdaGC")] <- median(cSumstats$Z^2)/qchisq(0.5,1)
+sumstats_meta[cCode,c("lambdaGC")] <- median(cSumstats$Z^2)/qchisq(0.5,1)
 
-cat("\nThe genomic inflation factor (lambda GC) was calculated as: ",round(sumstats.meta[cCode,c("lambdaGC")],digits = 2))
+cat("\nThe genomic inflation factor (lambda GC) was calculated as: ",round(sumstats_meta[cCode,c("lambdaGC")],digits = 2))
 
 ```
 
@@ -674,9 +681,9 @@ if(any(cSumstats$FRQ>1) || any(cSumstats$FRQ<0)) {
       
       cSumstats$FRQ<-alleleFRQ
       
-      cSumstats.meta<-rbind(cSumstats.meta,list("FRQ","Fitted (flipped) according to reference allele order"))
+      csumstats_meta<-rbind(csumstats_meta,list("FRQ","Fitted (flipped) according to reference allele order"))
       
-      sumstats.meta[iFile,c("FRQ.flipped")] <- T
+      sumstats_meta[iFile,c("FRQ.flipped")] <- T
       
       } else {
         
@@ -684,9 +691,9 @@ if(any(cSumstats$FRQ>1) || any(cSumstats$FRQ<0)) {
         
         cSumstats$FRQ<-ifelse(cond.invertedMAF,1-cSumstats$FRQ,cSumstats$FRQ)
         
-        cSumstats.meta<-rbind(cSumstats.meta,list("FRQ","Set to MAF"))
+        csumstats_meta<-rbind(csumstats_meta,list("FRQ","Set to MAF"))
         
-        sumstats.meta[iFile,c("FRQ.flipped")]<-F
+        sumstats_meta[iFile,c("FRQ.flipped")]<-F
         
       }
   }
@@ -703,7 +710,7 @@ if(any(cSumstats$FRQ>1) || any(cSumstats$FRQ<0)) {
   ### Does not have FRQ
   #### Note that FRQ is not present
   
-  if(sumstats.meta[iFile,c("no_FRQ")]<-T){
+  if(sumstats_meta[iFile,c("no_FRQ")]<-T){
     
   cSumstats.warnings<-c(cSumstats.warnings,"No FRQ column present!")
   
