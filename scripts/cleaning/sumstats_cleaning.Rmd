@@ -738,15 +738,12 @@ if(
     }
 ```
 
-#indels
+# Indels
 
 +++Ollie: Preferable to not remove these as standard in light cleaning.
 
 ```{r indels filter}
-if(keepIndel == T){ #if set at True, keeps indels
-  cSumstats$A1 <- as.character(toupper(cSumstats$A1))
-  cSumstats$A2 <- as.character(toupper(cSumstats$A2))
-} else if(keepIndel == F){ #if set at False, removes indels
+if(keepIndel == F){ #if set at False, removes indels
   cSumstats$A1 <- as.character(toupper(cSumstats$A1), c("A", "C", "G", "T"))
   cSumstats$A2 <- as.character(toupper(cSumstats$A2), c("A", "C", "G", "T"))
   rm <- (is.na(cSumstats$A1) | is.na(cSumstats$A2))
