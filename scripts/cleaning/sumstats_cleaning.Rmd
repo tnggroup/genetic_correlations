@@ -21,6 +21,7 @@ remove(list = ls())
 Package setup
 ```{r Packages}
 #devtools::install_github("johanzvrskovec/shru")
+
 library(optparse)
 library(data.table)
 library(shru)
@@ -28,15 +29,15 @@ library(googlesheets4)
 library(tidyverse)
 ```
 
-## Command line set up
+# Command line set up
 ```{r command line setup}
 column_parser <- OptionParser()
 
 column_parser <- add_option(
   object = column_parser,
   opt_str = c("-t", "--task"),
-  type= "character",
-  default="clean",
+  type = "character",
+  default ="clean",
   help = "The explicit task to run:\nclean: Clean GWAS sumstat [default %default]"
   )
 
@@ -44,7 +45,7 @@ column_parser <- add_option(
   object = column_parser,
   opt_str = c("-f", "--file"),
   type = "character",
-  help="The file to process"
+  help = "The file to process"
   )
 
 column_parser <- add_option(
@@ -72,9 +73,9 @@ date
 ```
 
 
-
 ## Source credentials files
 This file includes the file path to the King's College London Microsoft Teams channel to store the raw data files of the GWAS summary statistics (intermediate solution before we move the final version to the rosalind cluster). However, we probably will save all summary statistics raw files on SharePoint/Teams to save space on rosalind.
+
 sumstats_path
 
 The file also contains the login details for your google work account: google_account_details
@@ -172,14 +173,6 @@ doSupermunge <- T
 ```
 
 
-### R script export
-Running this will produce an R script with the same name as the Rmd file.
-+++CH: Do we really need this in this script or should this be a separate file?
-```{r Purl export, include=FALSE, purl=FALSE, eval=FALSE}
-knitr::purl(filename.rmd)
-```
-
-+++CH: Maybe we want to put this functions in separate R scripts and source them like we do in the other scripts?
 
 ### Standardised colum names
 This chunk creates one function called "standardise_GWAS_column_names". The function interprets the columns of the original raw GWAS summary statistics and replaces them with standard column names. The standard column names are the first item in the vector:
