@@ -118,7 +118,7 @@ A list of file paths you want to be processed in parallel. In the function this 
 _Set your file path_, when testing
 ```{r Paths}
 filePaths <- c(
-  paste0(sumstats_path, "/data_raw/CUD_EUR_full_public_11.14.2020.gz")
+  paste0(sumstats_path, "/data_raw/sum_stats_raw/CUD_EUR_full_public_11.14.2020.gz")
   )
 # filePaths <- column_options$file
 filePaths
@@ -208,11 +208,11 @@ https://cran.r-project.org/web/packages/data.table/vignettes/datatable-intro.htm
 
 _Future_
 +++JZ: TODO replace commas with field separators as in Helena's script
-+++CH: Has this happened?
-```{r read in sumstats}
++++CH: Has this happened? Do we need to include a loop are will we run the script for each sum stats separately?
+```{r Read in sumstats}
 cCode <- traitCodes[1]
 
-cFilePath <- filePaths[1] #we will probably want to have a loop over the provided files
+cFilePath <- filePaths[1] # +++CH: we will probably want to have a loop over the provided files??
 
 cSumstats <- data.table::fread(
   file = cFilePath,
@@ -227,7 +227,7 @@ cSumstats <- data.table::fread(
     )
   )
 
-#number of rows before touching the data
+# Number of rows before touching the data
 nRowsRaw <- nrow(cSumstats)
 sumstats_meta[cCode,c("n_snp_raw")]<-nRowsRaw #add number of SNPs raw to sumstats_meta (meta data file)
 
@@ -235,14 +235,16 @@ sumstats_meta$n_snp_raw
 ```
 
 
-
 ## Interpret columns
 Checks the existence of columns based on list of column names in chunk above (Standardise GWAS column names). Renames columns to standardised names.
+It also deletes duplicated columns.
 ```{r interpret columns}
 newNames <- standardise_GWAS_column_names(
   column_names = colnames(cSumstats)
   )
+
 print(newNames)
+
 colnames(cSumstats) <- newNames$std
 ```
 
@@ -254,18 +256,27 @@ Set correct R data formats
 Transform to data table
 ```{r Transform to data table}
 cSumstats <- setDT(cSumstats)
+str(cSumstats)
 ```
 
 Clean or fix variant SNP column
+This chunk converts the content in the SNP column to a character.
 ```{r Fix SNP column}
 cSumstats.keys <- c('SNP')
+cSumstats.keys
+
 cSumstats$SNP <- as.character(cSumstats$SNP)
+str(cSumstats$SNP)
 ```
 
 Format A1 and A2 to upper case
+and as a character column
 ```{r Format A1 and A2 to upper case}
 cSumstats$A1 <- toupper(as.character(cSumstats$A1))
+str(cSumstats$A1)
+
 cSumstats$A2 <- toupper(as.character(cSumstats$A2))
+str(cSumstats$A2)
 ```
 
 Parse SNP (if needed)
@@ -275,19 +286,27 @@ cSumstats$SNP <- tolower(parse_SNP_column_as_rs_number(cSumstats$SNP))
 if(any(colnames(cSumstats)=="CHR")) {
   cSumstats$CHR <- toupper(as.character(cSumstats$CHR))
   cSumstats.keys <- c(cSumstats.keys,'CHR')
+  str(cSumstats$CHR)
 }
 
 if(any(colnames(cSumstats)=="BP")) {
   cSumstats$BP <- as.integer(cSumstats$BP)
   cSumstats.keys <- c(cSumstats.keys,'BP')
+  str(cSumstats$BP)
 }
+
+cSumstats.keys
 ```
 
 Set data table index on selected keys
-+++CH: Johan, what does this do, please explain
-+++JZ: It orders and indexes the data based on the key columns specified in the cols argument. Any data.table matching using the key columns will be performed more quickly when it has been run previously. It may have to be re-run if you change the data.table too much.
+
+It orders and indexes the data based on the key columns specified in the cols argument. Any data.table matching using the key columns will be performed more quickly when it has been run previously. It may have to be re-run if you change the data.table too much.
 ```{r Set data table index on selected keys}
-setkeyv(cSumstats,cols = cSumstats.keys)
+setkeyv(
+  x = cSumstats,
+  cols = cSumstats.keys,
+  verbose = TRUE
+  )
 ```
 
 
@@ -296,30 +315,42 @@ Interpret BGENIE SNP format
 Check if daner like columns present
 ref: https://docs.google.com/document/d/1TWIhr8-qpCXB13WCXcU1_HDio8lC_MeWoAg2jlggrtU/edit
 ```{r Interpret daner like format}
-if(!any(colnames(cSumstats)=="FRQ") & !any(colnames(cSumstats)=="N_CAS") & !any(colnames(cSumstats)=="N_CON")){
-  danerNcas<-colnames(cSumstats)[startsWith(colnames(cSumstats),prefix = "FRQ_A_")][1]
-  danerNcon<-colnames(cSumstats)[startsWith(colnames(cSumstats),prefix = "FRQ_U_")][1]
-  if(!is.na(danerNcas) & !is.na(danerNcon)){
-    #add number of cases and number of controls
+if(
+  !any(colnames(cSumstats)=="FRQ") 
+  & !any(colnames(cSumstats)=="N_CAS") 
+  & !any(colnames(cSumstats)=="N_CON"))
+  {
+  danerNcas <- colnames(cSumstats)[
+    startsWith(colnames(cSumstats),
+               prefix = "FRQ_A_")
+    ][1]
+  
+  danerNcon <- colnames(cSumstats)[
+    startsWith(colnames(cSumstats),
+               prefix = "FRQ_U_")
+    ][1]
+  
+  if(
+    !is.na(danerNcas)
+    & !is.na(danerNcon))
+    {
+    
+    # Add number of cases and number of controls
     cSumstats$N_CAS <- danerNcas
     cSumstats$N_CON <- danerNcon
-    #add case and control specific effect allele frequencies
+    
+    # Add case and control specific effect allele frequencies
     colnames(cSumstats)[danerNcas] <- "FRQ_CASES"
     colnames(cSumstats)[danerNcon] <- "FRQ_CONTROLS"
+    
+    colnames(cSumstats)
   }
-  
-}
-```
-
-
-Rename duplicate columns
-Deal with duplicate columns - use the first occurrence
-```{r Rename duplicate columns}
-#+++JZ: Moved this part to the column name standardisation script to de-clutter the main script
+  }
 ```
 
 
 +++JZ: DO WE WANT TO CONVERT CHR TO NUMERIC VALUES?
++++CH: Yes, please convert CHR to numeric
 ```{r Convert to numeric columns}
 
 ```
@@ -334,31 +365,56 @@ Deal with duplicate columns - use the first occurrence
 Add columns on sample size, enough for PRS enough for pathway analysis
 
 ```{r add missing N columns}
-if(any(colnames(cSumstats)=="N_CAS") && any(colnames(cSumstats)=="N_CON")) {
-  ### Calculate total N from number of cases and number of controls if they are present. Overwrite any specific total N.
+if(
+  any(colnames(cSumstats)=="N_CAS") 
+  && any(colnames(cSumstats)=="N_CON"))
+  {
+  
+  # Calculate total N from number of cases and number of controls if they are present. Overwrite any specific total N.
   cSumstats$N <- cSumstats$N_CAS + cSumstats$N_CON
-} else if(!is.null(cN)) {
-  cSumstats$N[which(is.na(cSumstats$N))]<-cN #default behaviour - add explicit N only to missing values.
-} else if(!any(colnames(cSumstats)=="N")) {
-  warning("\nNo N column detected!\n")
-  sumstats_meta[cCode,c("noN")]<-T
-}
+  
+  } else if(!is.null(cN)) {
+    
+  cSumstats$N[which(is.na(cSumstats$N))] <- cN #default behaviour: add explicit N only to missing values.
+  
+  } else if(!any(colnames(cSumstats)=="N")) {
+  
+    warning("\nNo N column detected!\n")
+    
+    sumstats_meta[cCode,c("noN")]<-T
+    
+    }
 ```
 
 ## Add BETA column if missing
-JZ moved this here so we can rely on BETA existing if either BETA or OR are present in the raw data file. We can't know if the effect is a non-OR unless we check though.
-+++CH: Johan, what do you mean by "We can't know if the effect is a non-OR unless we check though."?
-+++JZ: You can check if the effect is an odds ratio if the (rounded) median is 1. Other comparisons you can do is comparing the Z-values and P if SE is present while using combinations of log(EFFECT/SE) or e^(EFFECT/SE)
-if(round(median(cSumstats$EFFECT,na.rm=T)) == 1) #from Genomic SEM code
+
+We can rely on BETA existing if either BETA or OR are present in the raw data file.
+We cannot know if the effect is a non-OR unless we check though.
+We check if the effect is an odds ratio if the (rounded) median is 1.
+Other comparisons one can do is comparing the Z-values and P if SE is present while using combinations of log(EFFECT/SE) or e^(EFFECT/SE)
+
+if(round(median(cSumstats$EFFECT,na.rm=T)) == 1) from Genomic SEM code
 ```{r add BETA column if missing}
-# if no BETA column
-if(any(colnames(cSumstats) == "BETA") == 0 & any(colnames(cSumstats) == "OR")){
-    cSumstats$BETA<-log(cSumstats$OR) #calculate BETA from log of OR
-    cat("BETA column inserted based on log OR value")
-    sumstats_meta[cCode,c("Effect")]<-"OR"
-} else if(any(colnames(cSumstats) == "BETA")) {
+# If no BETA column, but OR column detected
+if(
+  any(colnames(cSumstats) == "BETA") == 0 
+  & any(colnames(cSumstats) == "OR"))
+  {
+  
+  cSumstats$BETA <- log(cSumstats$OR) #calculate BETA from log of OR
+  
+  cat("BETA column inserted based on log OR value")
+  
+  sumstats_meta[cCode,c("Effect")]<-"OR"
+  
+  } else if(
+    any(colnames(cSumstats) == "BETA")
+    ) {
+    
     cat("BETA column detected")
+    
     sumstats_meta[cCode,c("Effect")]<-"BETA"
+    
     }
 ```
 
