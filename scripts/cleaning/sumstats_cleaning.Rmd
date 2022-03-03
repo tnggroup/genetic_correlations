@@ -667,32 +667,49 @@ if(
 
 ## OR filter
 +++JZ: TODO - adapt to all kinds of effect types
++++CH: Have we extended this to other effect sizes? OR?
 ```{r OR filter}
-if(any(colnames(cSumstats)=="OR")){
+if(
+  any(colnames(cSumstats)=="OR")
+  ){
+  
   rm <- (!is.na(cSumstats$OR) & cSumstats$OR>10000)
+  
   cSumstats <- cSumstats[!rm, ]
-  cat("Removing ", sum(rm), " SNPs with OR > 10000; ", nrow(cSumstats), " remain")
-  sumstats_meta[cCode,c("n_removed_or")]<-sum(rm)
-} else {
-  cat("Warning: The dataset does not contain an INFO column to apply the specified filter on.")
-}
-
-sumstats_meta$n_removed_or
+  
+  cat("Removing", sum(rm), "SNPs with OR > 10000;", nrow(cSumstats), "remain")
+  
+  sumstats_meta[cCode,c("n_removed_or")] <- sum(rm)
+  
+  } else {
+    
+    cat("Warning: The dataset does not contain an INFO column to apply the specified filter on.")
+    
+    }
 ```
 
 ## N filter - (from Ollies script)
 +++ATK: do we want to remove SNPs that have a large N as set here? Or just SNPs with small N? 
 ```{r N filter}
-if(any(colnames(cSumstats)=="N")){
-  N_sd<-sd(cSumstats$N)
-  N_median<-median(cSumstats$N)
-  rm <- (!is.na(cSumstats$N) & (cSumstats$N > N_median+(3*N_sd) | cSumstats$N < N_median-(3*N_sd)))
+if(
+  any(colnames(cSumstats)=="N")
+  ){
+  
+  N_sd <- sd(cSumstats$N)
+  
+  N_median <- median(cSumstats$N)
+  
+  rm <- (
+    !is.na(cSumstats$N) 
+    & (cSumstats$N > N_median+(3*N_sd) | cSumstats$N < N_median-(3*N_sd))
+    )
+  
   cSumstats <- cSumstats[!rm, ]
-  cat("Removing ", sum(rm), " SNPs with N outside median(N) +- 3SD(N); ", nrow(cSumstats), " remain")
-  sumstats_meta[cCode,c("n_removed_n")]<-sum(rm)
+  
+  cat("Removing", sum(rm), " SNPs with N outside median(N) ± 3SD(N); ", nrow(cSumstats), "remain")
+  
+  sumstats_meta[cCode,c("n_removed_n")] <- sum(rm)
 }
-
-sumstats_meta$n_removed_n
 ```
 
 # SE filter - from Ollies script
