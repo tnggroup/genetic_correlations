@@ -598,17 +598,25 @@ sumstats_meta$n_removed_duplicates
 # Clean based on values
 
 ## P filter
+If outside of bounds P < 0 or P > 1
 ```{r P filter}
-if(any(colnames(cSumstats)=="P")){
-  rm <- (!is.na(cSumstats$P) & (cSumstats$P>1 | cSumstats$P<0)) #if outside of bounds P < 0 or P > 1
+if(
+  any(colnames(cSumstats)=="P")
+  ){
+  
+  rm <- (!is.na(cSumstats$P) & (cSumstats$P > 1 | cSumstats$P < 0))
+  
   cSumstats <- cSumstats[!rm, ]
-  cat("Removing ", sum(rm), " SNPs with P < 0 or P > 1; ", nrow(cSumstats), " remain") 
+  
+  cat("Removing", sum(rm), "SNPs with P < 0 or P > 1;", nrow(cSumstats), "remain")
+  
   sumstats_meta[cCode,c("n_removed_p")]<-sum(rm)
-} else {
-  cat("Warning: The dataset does not contain a P column to apply the specified filter on.")
-}
-
-sumstats_meta$n_removed_p
+  
+  } else {
+    
+    cat("Warning: The dataset does not contain a P column to apply the specified filter on.")
+    
+    }
 ```
 
 ## FRQ filter
