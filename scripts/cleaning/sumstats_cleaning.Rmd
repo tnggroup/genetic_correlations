@@ -742,6 +742,7 @@ if(
 # Indels
 This is not part of the light cleaning. The standard is TRUE
 If it is set to FALSE, this chunk will remove indels
++++CH: There is something wrong with this chunk. It doesn't do what it is supposed to do
 ```{r indels filter}
 if(keep_indel == FALSE)
   { 
@@ -760,12 +761,11 @@ sumstats_meta$n_removed_indels
 ```
 
 
-#Check and correct for Genomic Control
+# Check and correct for Genomic Control
 
-+++JZ Only relies on BETA as we know it exists if any effect provided previously
+This chunk only relies on BETA as we know it exists based on any effect from the raw data file
 
-Added from Ollie's script:
-```{r check and correct for genomic control}
+```{r Check and correct for genomic control}
 if(any(colnames(cSumstats) == "SE") == 1){
   if(any(colnames(cSumstats) == "BETA") == 1){
     cSumstats$Z<-cSumstats$BETA/cSumstats$SE ####change to Z_check?
@@ -793,8 +793,6 @@ if(any(colnames(cSumstats) == "SE") == 1){
   cat("SE column is not present, genomic control cannot be detected.")
  
 }
-
-
 ```
  
 Need to add from Helenas (below):
