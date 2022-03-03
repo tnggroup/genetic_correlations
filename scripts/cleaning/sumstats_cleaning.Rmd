@@ -162,8 +162,9 @@ cN <- column_options$`sample-size`
 
 ### Indels
 Setting for keeping or removing indels
+The standrad should be TRUE. The light cleaning should contain the indels
 ```{r Indels}
-keepIndel <- FALSE # or change to TRUE
+keep_indel <- TRUE # or change to FALSE
 ```
 
 ### MHC filter
@@ -739,15 +740,19 @@ if(
 ```
 
 # Indels
-
-+++Ollie: Preferable to not remove these as standard in light cleaning.
-
+This is not part of the light cleaning. The standard is TRUE
+If it is set to FALSE, this chunk will remove indels
 ```{r indels filter}
-if(keepIndel == F){ #if set at False, removes indels
+if(keep_indel == FALSE)
+  { 
   cSumstats$A1 <- as.character(toupper(cSumstats$A1), c("A", "C", "G", "T"))
+  
   cSumstats$A2 <- as.character(toupper(cSumstats$A2), c("A", "C", "G", "T"))
+  
   rm <- (is.na(cSumstats$A1) | is.na(cSumstats$A2))
-  sumstats_meta[cCode,c("n_removed_indels")]<-sum(cond)
+  
+  sumstats_meta[cCode,c("n_removed_indels")] <- sum(cond)
+  
   cSumstats<-cSumstats[!rm,]
 }
 
