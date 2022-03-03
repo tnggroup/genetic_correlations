@@ -812,8 +812,8 @@ if(
  
 Need to add from Helenas (below):
 Helena: /mnt/lustre/groups/ukbiobank/sumstats/scripts/computeLambdaAndCorrect.r
++++ATK: is there anything we want to add from Helena's below?
 ```{r genomic control Helena's script}
-##++++ATK: is there anything we want to add from Helena's below? http://genometoolbox.blogspot.com/2014/08/how-to-calculate-genomic-inflation.html
 #arg <- commandArgs(TRUE)
 #output <- arg[2]
 #
@@ -833,40 +833,60 @@ Helena: /mnt/lustre/groups/ukbiobank/sumstats/scripts/computeLambdaAndCorrect.r
 #close(gz1)
 ```
 
-# GC calculation: Lambda
-The block below relies on the Z value being up to date.
-```{r Calculate lambda GC}
-#http://genometoolbox.blogspot.com/2014/08/how-to-calculate-genomic-inflation.html
+# Genomic Control calculation: Lambda
 
+The block below relies on the Z value being up to date.
+http://genometoolbox.blogspot.com/2014/08/how-to-calculate-genomic-inflation.html
+
+```{r Calculate lambda GC}
 sumstats_meta[cCode,c("lambdaGC")] <- median(cSumstats$Z^2)/qchisq(0.5,1)
 
-cat("\nThe genomic inflation factor (lambda GC) was calculated as: ",round(sumstats_meta[cCode,c("lambdaGC")],digits = 2))
+cat(
+  "\nThe genomic inflation factor (lambda GC) was calculated as:",
+  round(sumstats_meta[cCode,c("lambdaGC")],
+        digits = 2)
+  )
+```
+
+
+?Read in reference from plink formats
++++CH: Do we need to create the log file folder?
+```{r read in reference}
 
 ```
 
-#
+# MAF and frequency columns
 
-#Deal with maf and frequencey columns
-  
-
-NOTE: This would only work if in the harmonization step earlier, the MAF_REF column was insterted into the cSumstats dataframe (so need to add harmonisation step before this step)
+NOTE: This would only work if in the harmonization step earlier, the MAF_REF column was inserted into the cSumstats dataframe (so need to add harmonisation step before this step)
 
 +++Alish: this is slightly different to what we were previously doing in Helena's script. Discuss in meeting?
++++CH: Did we import the reference? I'm confused.
 
-#Compares to reference and inverts MAFs if they are incorrect based on average allele frequency.
+# Compares to reference and inverts MAFs if they are incorrect based on average allele frequency.
 ```{r allele Frequency columns and MAF inversion}
 # Check FRQ column is valid
 
-if(any(cSumstats$FRQ>1) || any(cSumstats$FRQ<0)) {
-      
-      stop(paste0('\nThere are FRQ values larger than 1 (',sum(cSumstats$FRQ>1),') or less than 0 (',sum(cSumstats$FRQ<0),') which is outside of the possible FRQ range.')
-      )
-    }
+if(
+  any(cSumstats$FRQ > 1) || any(cSumstats$FRQ < 0)
+  ) {
+  
+  stop(paste0('\nThere are FRQ values larger than 1 (',
+              sum(cSumstats$FRQ>1),
+              ') or less than 0 (',
+              sum(cSumstats$FRQ<0),
+              ') which is outside of the possible FRQ range.')
+  )
+}
+
 
 ### Invert FRQ based on the previous reference matching
-  if(!is.null(cond.invertedAlleleOrder) & !harmoniseAllelesToReference) {
-    
-    alleleFRQ <- ifelse(cond.invertedAlleleOrder, (1-cSumstats$FRQ), cSumstats$FRQ)
+
+if(
+  !is.null(cond.invertedAlleleOrder) 
+  & !harmoniseAllelesToReference) 
+  {
+  
+  alleleFRQ <- ifelse(cond.invertedAlleleOrder, (1-cSumstats$FRQ), cSumstats$FRQ)
     
     if(mean(alleleFRQ)<mean(cSumstats$FRQ)){
       
@@ -930,17 +950,15 @@ if(any(cSumstats$FRQ>1) || any(cSumstats$FRQ<0)) {
 
 
 # Save cleaned file and log output
-
 +++JZ: When converted to a function we would want to provide this as an argument (with the possibility of a default value).
 ```{r save cleaned file as .gz file in cleaned folder}
 cSumstats %>%
   gzfile(
-    file = paste0("../cleaned/", cCode, ".gz", sep="\t"))
-
+    file = paste0("../cleaned/", cCode, ".gz", sep="\t")
+    )
 ```
 
 # Update overview spreadsheet
-
 +++JZ: TODO
 ```{r update overview metadata spreadsheet}
 
@@ -951,13 +969,14 @@ cSumstats %>%
 
 +++CH: Additionally, a log file should be created and be saved in the log file folder
 ```{r create log file and save in log file folder}
-
+sumstats_meta %>%
+  write_tsv(
+    file = paste0("../cleaned/log/", cCode, "_log.txt"),
+    col_names = TRUE
+    )
 ```
 
-?Read in reference from plink formats
-```{r read in reference}
 
-```
 
 
 ## MHC removal (separate from cleaning script)
