@@ -689,7 +689,10 @@ if(
 ```
 
 ## N filter - (from Ollies script)
+We are removing SNPs with Ns that are ± 3 SD from the median sample size
+
 +++ATK: do we want to remove SNPs that have a large N as set here? Or just SNPs with small N? 
++++CH: Why are we doing this? What is the rationale? Can we add more explanation?
 ```{r N filter}
 if(
   any(colnames(cSumstats)=="N")
@@ -712,17 +715,27 @@ if(
 }
 ```
 
-# SE filter - from Ollies script
+# SE filter
 Note: if SE is 0 then this is flagged because it can cause issues in downstream analyses
 ```{r SE filter}
-if(any(colnames(cSumstats)=="SE")){
-  rm <- (!is.na(cSumstats$SE) & cSumstats$SE == 0) #if SE is 0 or NA - remove
+if(
+  any(colnames(cSumstats)=="SE")
+  ){
+  
+  # If SE is 0 or NA, SNP gets removed
+  rm <- (!is.na(cSumstats$SE) & cSumstats$SE == 0)
+  
   cSumstats <- cSumstats[!rm, ]
-  cat("Removing ", sum(rm), " SNPs with SE = 0; ", nrow(cSumstats), " remain")
-  sumstats_meta[cCode,c("n_removed_se")]<-sum(rm)
-}
-
-sumstats_meta$n_removed_se
+  
+  cat("Removing", sum(rm), "SNPs with SE = 0 or NA;", nrow(cSumstats), "remain")
+  
+  sumstats_meta[cCode,c("n_removed_se")] <- sum(rm)
+  
+  } else {
+    
+    cat("Warning: The dataset does not contain an SE column to apply the specified filter on.")
+    
+    }
 ```
 
 #indels
