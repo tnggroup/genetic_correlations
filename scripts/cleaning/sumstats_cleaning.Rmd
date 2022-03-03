@@ -764,27 +764,42 @@ sumstats_meta$n_removed_indels
 # Check and correct for Genomic Control
 
 This chunk only relies on BETA as we know it exists based on any effect from the raw data file
-
++++CH: for the checking of the Genomic Control do we need to change to Z_check
++++CH: Have we generated Z_check somewhere before?
 ```{r Check and correct for genomic control}
-if(any(colnames(cSumstats) == "SE") == 1){
-  if(any(colnames(cSumstats) == "BETA") == 1){
-    cSumstats$Z<-cSumstats$BETA/cSumstats$SE ####change to Z_check?
-    cSumstats$P_check<-2*pnorm(-abs(cSumstats$Z))
-    cSumstats$Z<-NULL
+if(
+  any(colnames(cSumstats) == "SE") == 1)
+  {
+  if(
+    any(colnames(cSumstats) == "BETA") == 1
+    )
+    {
+    
+    cSumstats$Z <- cSumstats$BETA/cSumstats$SE ## change to Z_check?
+    
+    cSumstats$P_check <- 2*pnorm(-abs(cSumstats$Z))
+    
+    cSumstats$Z <- NULL
 
-    if(abs(mean(cSumstats$P[!is.na(cSumstats$P_check)]) - mean(cSumstats$P_check[!is.na(cSumstats$P_check)])) > 0.01){
-      cSumstats$P<-cSumstats$P_check
-      cSumstats$P_check<-NULL
+    if(
+      abs(mean(cSumstats$P[!is.na(cSumstats$P_check)]) - mean(cSumstats$P_check[!is.na(cSumstats$P_check)])) > 0.01)
+      {
+      
+      cSumstats$P <- cSumstats$P_check
+      
+      cSumstats$P_check <- NULL
       
       cat("Genomic control detected. P-value recomputed using BETA and SE.")
-      sumstats_meta[cCode,c("GC")]<-T
+      
+      sumstats_meta[cCode,c("GC")] <- TRUE
      
     } else {
      
       cat("Genomic control was not detected.")
-      sumstats_meta[cCode,c("GC")]<-F
+      
+      sumstats_meta[cCode,c("GC")] <- FALSE
     
-      cSumstats$P_check<-NULL
+      cSumstats$P_check <- NULL
     }
     
   }
