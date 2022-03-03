@@ -570,13 +570,21 @@ sumstats_meta$n_removed_missing_effect
 
 ## Duplicated data
 
-Deal with duplicate variants
+Deal with duplicated variants
+Remove duplicated variants across SNP, A1 and A2 columns
 ```{r clean duplicate data}
-# Remove duplicated variants across SNP, A1 and A2
-if(any(colnames(cSumstats)=="SNP") & any(colnames(cSumstats)=="A1") & any(colnames(cSumstats)=="A2")) {
+if(
+  any(colnames(cSumstats)=="SNP") 
+  & any(colnames(cSumstats)=="A1") 
+  & any(colnames(cSumstats)=="A2")
+  ) {
+  
   cSumstats.n <- nrow(cSumstats)
-  cSumstats <- unique(cSumstats,by = c("SNP","A1","A2"))
-  sumstats_meta[cCode,c("n_removed_duplicates")]<-cSumstats.n-nrow(cSumstats)
+  
+  cSumstats <- unique(cSumstats, by = c("SNP","A1","A2"))
+  
+  sumstats_meta[cCode,c("n_removed_duplicates")] <- cSumstats.n-nrow(cSumstats)
+  
 }
 
 sumstats_meta$n_removed_duplicates
