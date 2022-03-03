@@ -645,17 +645,24 @@ if(
 
 
 ## INFO filter
+We remove SNPs with an INFO score lower than 0.6
 ```{r INFO filter}
-if(any(colnames(cSumstats)=="INFO")){
+if(
+  any(colnames(cSumstats)=="INFO")
+  ){
+  
   rm <- (!is.na(cSumstats$INFO) & cSumstats$INFO<0.6)
+  
   cSumstats <- cSumstats[!rm, ]
-  cat("Removing ", sum(rm), " SNPs with INFO < 0.6; ", nrow(cSumstats), " remain")
-  sumstats_meta[cCode,c("n_removed_info")]<-sum(rm)
-} else {
-  cat("Warning: The dataset does not contain an INFO column to apply the specified filter on.")
+  
+  cat("Removing", sum(rm), "SNPs with INFO <0.6;", nrow(cSumstats), "remain")
+  
+  sumstats_meta[cCode,c("n_removed_info")] <- sum(rm)
+  
+  } else {
+    
+    cat("Warning: The dataset does not contain an INFO column to apply the specified filter on.")
 }
-
-sumstats_meta$n_removed_info
 ```
 
 ## OR filter
