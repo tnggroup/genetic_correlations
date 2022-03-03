@@ -534,28 +534,41 @@ sumstats_meta$n_removed_missing_p
 ```
 
 
-
 Clean if missing effect columns 
 ```{r clean missing effect}
-if(any(colnames(cSumstats)=="BETA")){ 
-  cond <- is.na(cSumstats$BETA) #if NA for BETA value remove variant
-  sumstats_meta[cCode,c("n_removed_missing_effect")]<-sum(cond)
+if(
+  any(colnames(cSumstats)=="BETA") # if BETA present
+  ){
+  
+  # If NA for BETA value, remove variant
+  cond <- is.na(cSumstats$BETA) 
+  sumstats_meta[cCode,c("n_removed_missing_effect")] <- sum(cond)
   cSumstats<-cSumstats[which(!cond),]
-} else if(any(colnames(cSumstats)=="OR")) {
-  cond <- is.na(cSumstats$OR) #if NA for OR value remove variant
-  sumstats_meta[cCode,c("n_removed_missing_effect")]<-sum(cond)
+  
+} else if(
+  any(colnames(cSumstats)=="OR")
+  ) {
+  
+  #If NA for OR value, remove variant
+  cond <- is.na(cSumstats$OR) 
+  sumstats_meta[cCode,c("n_removed_missing_effect")] <- sum(cond)
   cSumstats<-cSumstats[which(!cond),]
-} else if(any(colnames(cSumstats)=="Z")) {
+  
+} else if(
+  any(colnames(cSumstats)=="Z")
+  ) {
+  
   cond <- is.na(cSumstats$Z) #if NA for Z value remove variant
-  sumstats_meta[cCode,c("n_removed_missing_effect")]<-sum(cond)
+  sumstats_meta[cCode,c("n_removed_missing_effect")] <- sum(cond)
   cSumstats<-cSumstats[which(!cond),]
+  
 }
 
 sumstats_meta$n_removed_missing_effect
 ```
 
 
-## Duplicate data
+## Duplicated data
 
 Deal with duplicate variants
 ```{r clean duplicate data}
