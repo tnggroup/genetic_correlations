@@ -403,7 +403,8 @@ if(
   & any(colnames(cSumstats) == "OR"))
   {
   
-  cSumstats$BETA <- log(cSumstats$OR) #calculate BETA from log of OR
+  # Calculate BETA from log of OR
+  cSumstats$BETA <- log(cSumstats$OR) 
   
   cat("BETA column inserted based on log OR value")
   
@@ -459,15 +460,29 @@ if(
 
 
 ## Add missing effect standard errors column 
-If missing, add standard errors from beta & z (we always have BETA now if any effect provided previously)
+If missing, add standard errors from beta & z.
+(We always have BETA now if any effect provided previously.)
 ```{r insert SE column if missing}
 # if no SE column
-if(any(colnames(cSumstats) == "SE") == 0){ 
-  if(any(colnames(cSumstats) == "BETA") == 1){ #take BETA if BETA column exists
-    cSumstats$SE<-abs(cSumstats$BETA/cSumstats$Z) #calculate SE from BETA and Z
+if(
+  any(colnames(cSumstats) == "SE") == 0
+  )
+  {
+  
+  # Take BETA if BETA column exists
+  if(any(colnames(cSumstats) == "BETA") == 1)
+    
+    {
+    
+    # Calculate SE from BETA and Z
+    cSumstats$SE <- abs(cSumstats$BETA/cSumstats$Z)
+    
   }
+  
   cat("SE column inserted based on BETA/OR and P")
-  sumstats_meta[cCode,c("SE")]<-"BETA,Z"
+  
+  sumstats_meta[cCode, c("SE")] <- "BETA,Z"
+  
   }
 ```
 
@@ -475,16 +490,18 @@ if(any(colnames(cSumstats) == "SE") == 0){
 ## Meta data about sufficient columns for analyses
 Add information to metadata if there are enough columns for PRS and pathway analysis
 ```{r add meta data for PRS & pathway analysis}
-sumstats_meta[cCode,c("enough_columns_PRS")] <- #sufficient columns for PRS analysis
-  any(colnames(cSumstats)=="SNP") &
-  any(colnames(cSumstats)=="P") &
-  (any(colnames(cSumstats)=="BETA") |
-     any(colnames(cSumstats)=="OR") |
-     any(colnames(cSumstats)=="Z") ) &
-  any(colnames(cSumstats)=="A1") &
-  any(colnames(cSumstats)=="A2")
+# Sufficient columns for PRS
+sumstats_meta[cCode, c("enough_columns_PRS")] <-
+  any(colnames(cSumstats) == "SNP") &
+  any(colnames(cSumstats) == "P") &
+  (any(colnames(cSumstats) == "BETA") |
+     any(colnames(cSumstats) == "OR") |
+     any(colnames(cSumstats) == "Z") ) &
+  any(colnames(cSumstats) == "A1") &
+  any(colnames(cSumstats) == "A2")
 
-sumstats_meta[cCode,c("enough_columns_pathway_analysis")] <- #sufficient columns  for pathway analysis
+# Sufficient columns for pathway analysis
+sumstats_meta[cCode,c("enough_columns_pathway_analysis")] <-
   any(colnames(cSumstats)=="SNP") &
   any(colnames(cSumstats)=="P")
 
@@ -494,19 +511,29 @@ sumstats_meta
 
 # Cleaning
 
-##Missing data
+## Missing data
 
 Remove variants with missing P values and missing effect columns
 Clean if missing P column
 ```{r clean missing p}
-if(any(colnames(cSumstats)=="P")){
+if(
+  any(colnames(cSumstats)=="P")
+  )
+  {
+  # If P is na
   cond <- is.na(cSumstats$P)
-  sumstats_meta[cCode,c("n_removed_missing_p")]<-sum(cond)
-  cSumstats<-cSumstats[which(!cond),]
+  
+  # Create column n_removed_missing_p in meta file
+  sumstats_meta[cCode, c("n_removed_missing_p")] <- sum(cond)
+  
+  # Subsets sum stats that are not na in the P column
+  cSumstats <- cSumstats[which(!cond),]
 }
 
 sumstats_meta$n_removed_missing_p
 ```
+
+
 
 Clean if missing effect columns 
 ```{r clean missing effect}
