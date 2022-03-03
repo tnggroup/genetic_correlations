@@ -394,6 +394,8 @@ We check if the effect is an odds ratio if the (rounded) median is 1.
 Other comparisons one can do is comparing the Z-values and P if SE is present while using combinations of log(EFFECT/SE) or e^(EFFECT/SE)
 
 if(round(median(cSumstats$EFFECT,na.rm=T)) == 1) from Genomic SEM code
+
++++CH: Are we using the median of the effect size to double check it?
 ```{r add BETA column if missing}
 # If no BETA column, but OR column detected
 if(
@@ -422,18 +424,36 @@ if(
 
 ## Add missing Z column
 We know that BETA exists if any effect provided previously
-+++JZ: Need to be inferred from both the P and the sign of any existing effect. If the effect is not known we cannot know the direction of Z either just from P. Can be calculated from EFFECT and SE but the SE may not be reliable as it can be given on the ln scale or not. There are ways we can check this and maybe it should be part of the light cleaning as well.
+Need to be inferred from both the P and the sign of any existing effect.
+If the effect estimate is not known, we cannot know the direction of Z from just P.
+Can be calculated from EFFECT and SE but the SE may not be reliable as it can be given on the ln scale or not.
+There are ways we can check this and maybe it should be part of the light cleaning as well.
 
++++CH: Are we currently checking if SE is ln(SE) or SE?
 ```{r insert Z column if missing}
 # if no Z column
-if(any(colnames(cSumstats) == "Z") == 0 & any(colnames(cSumstats)=="BETA")){
-  cSumstats$Z <- sign(cSumstats$BETA)*sqrt(qchisq(cSumstats$P,1,lower=F)) #calculate Z value using qchisq
+if(
+  any(colnames(cSumstats) == "Z") == 0 
+  & any(colnames(cSumstats)=="BETA")
+  )
+  {
+  
+  # Calculate Z value using qchisq
+  cSumstats$Z <- sign(cSumstats$BETA)*sqrt(qchisq(cSumstats$P,1,lower=F))
+  
   cat("Z column inserted based on P value and sign(BETA)")
+  
   sumstats_meta[cCode,c("Z")]<-"P,sign(BETA)"
-} else if(any(colnames(cSumstats)=="SE") & any(colnames(cSumstats)=="BETA")){
-  cSumstats$Z <- cSumstats$BETA/cSumstats$SE
-  cat("Z column inserted based on BETA value and SE")
-  sumstats_meta[cCode,c("Z")]<-"BETA,SE"
+  } else if(
+    any(colnames(cSumstats)=="SE") 
+    & any(colnames(cSumstats)=="BETA")
+    ) {
+    
+    cSumstats$Z <- cSumstats$BETA/cSumstats$SE
+    
+    cat("Z column inserted based on BETA value and SE")
+    
+    sumstats_meta[cCode,c("Z")]<-"BETA,SE"
 }
 ```
 
