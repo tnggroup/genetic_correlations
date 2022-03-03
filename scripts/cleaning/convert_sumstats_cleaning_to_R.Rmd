@@ -14,3 +14,9 @@ This file name is needed to export the whole file as an R file
 ```{r Specify file name}
 filename.rmd <- "sumstats_cleaning.Rmd"
 ```
+
+### R script export
+Running this will produce an R script with the same name as the Rmd file.
+```{r Purl export, include=FALSE, purl=FALSE, eval=FALSE}
+knitr::purl(filename.rmd)
+```
