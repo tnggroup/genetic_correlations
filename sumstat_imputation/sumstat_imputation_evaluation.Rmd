@@ -1,0 +1,342 @@
+---
+title: "GWAS Summary Statistic Imputation"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(data.table)
+```
+
+Here, we evaluate a range of GWAS summary statistic imputation methods. This study design includes using a set of GWAS summary statistics, randomly removing varying proportions of genetic variants across the genome, imputing these variants back in, and then comparing the observed and imputed Z-scores.
+
+***
+
+### Collate example GWAS summary statistics
+
+We will using five European GWAS as an example. I am going to use GWAS that have been QC'd for a previous, akin to the QC performed the Rosalind cleaning script being prepared currently. I am selecting GWAS that have come from various consortia an numbers of variants available.
+
+<details><summary>Show code</summary>
+
+```{bash, eval=F, echo=T}
+mkdir -p /users/k1806347/brc_scratch/Analyses/sumstat_imputation/original
+
+gwas=$(echo ADHD05 ANXI02 COAD01 OBES01 SMOK04)
+
+for gwas_i in ${gwas};do
+  cp /users/k1806347/brc_scratch/Analyses/local_rg_pgs/GWAS_sumstats_nonhm3/${gwas_i}.cleaned.gz /users/k1806347/brc_scratch/Analyses/sumstat_imputation/original/
+  cp /users/k1806347/brc_scratch/Analyses/local_rg_pgs/GWAS_sumstats_nonhm3/${gwas_i}.cleaned.log /users/k1806347/brc_scratch/Analyses/sumstat_imputation/original/
+done
+
+```
+
+</details>
+
+***
+
+### Remove subsets of SNPs
+
+<details><summary>Show code</summary>
+
+```{r, eval=F, echo=T}
+library(data.table)
+
+set.seed(1)
+
+gwas<-c('ADHD05','ANXI02','COAD01','OBES01','SMOK04')
+prop<-seq(0.05, 0.3, 0.05)
+  
+for(gwas_i in gwas){
+  dir.create(paste0('/users/k1806347/brc_scratch/Analyses/sumstat_imputation/filtered/',gwas_i), recursive=T)
+  sumstats<-fread(paste0('/users/k1806347/brc_scratch/Analyses/sumstat_imputation/original/',gwas_i,'.cleaned.gz'))
+  for(prop_i in prop){
+    fwrite(sumstats[-sample(round(nrow(sumstats)*prop_i)),], paste0('/users/k1806347/brc_scratch/Analyses/sumstat_imputation/filtered/',gwas_i,'/',gwas_i,'.cleaned.',gsub('*.\\.','',prop_i),'_missing.gz'))
+  }
+}
+
+```
+
+</details>
+
+***
+
+### Run sumstat imputation
+
+Three imputation methods are being applied:
+- ImpG within the FIZI software (run by Ollie)
+- An LD score based method derived by Johan (run by Johan)
+- SSIMP (run by Brett)
+
+***
+
+##### ImpG (FIZI)
+
+Ollie has prepared an Rscript which implements the FIZI software
+
+<details><summary>Show code</summary>
+
+```{bash, eval=F, echo=T}
+
+#######
+# Subset the plink reference to MAF > 1% & < 0.49
+#######
+
+mkdir /users/k1806347/brc_scratch/Analyses/sumstat_imputation/LDREF
+
+# Remove variants with low variance i.e. MAF < 0.01 | MAF > 0.49
+for i in $(seq 1 22); do
+  /users/k1806347/brc_scratch/Software/plink1.9.sh \
+  --bfile /scratch/groups/biomarkers-brc-mh/Reference_data/1KG_Phase3/PLINK/EUR/EUR_phase3.MAF_001.chr${i} \
+  --maf 0.01 \
+  --max-maf 0.49 \
+  --make-bed \
+  --out /users/k1806347/brc_scratch/Analyses/sumstat_imputation/LDREF/EUR_phase3.MAF_01_49.chr${i}
+done
+
+#######
+# Run for filtered GWAS
+#######
+
+gwas=$(echo ADHD05 ANXI02 COAD01 OBES01 SMOK04)
+prop=$(echo 05 1 15 2 25 3)
+
+# Create directory
+mkdir -p /users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG
+
+# Create file listing GWAS that haven't been processed.
+> /users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/todo.txt
+for gwas_i in ${gwas};do
+for prop_i in ${prop};do
+if [ ! -f /users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/${gwas_i}/${gwas_i}.${prop_i}.imputed.gz ]; then
+echo $gwas_i $prop_i >> /users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/todo.txt
+fi
+done
+done
+
+# Create shell script to run using sbatch
+cat > /users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/sbatch.sh << 'EOF'
+#!/bin/sh
+
+#SBATCH -p brc,shared
+#SBATCH --mem 5G
+
+. /users/k1806347/brc_scratch/Software/MyGit/GenoPred/config_used/Pipeline_prep.config
+
+gwas_i=$(awk -v var="$SLURM_ARRAY_TASK_ID" 'NR == var {print $1}' /users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/todo.txt)
+prop_i=$(awk -v var="$SLURM_ARRAY_TASK_ID" 'NR == var {print $2}' /users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/todo.txt)
+
+/users/k1806347/brc_scratch/Software/Rscript.sh /mnt/lustre/users/k1806347/Software/MyGit/GenoFunc/GenoFuncPipe/scripts/sumstat_imputer.R \
+  --sumstats /users/k1806347/brc_scratch/Analyses/sumstat_imputation/filtered/${gwas_i}/${gwas_i}.cleaned.${prop_i}_missing.gz \
+  --ref_plink_chr /users/k1806347/brc_scratch/Analyses/sumstat_imputation/LDREF/EUR_phase3.MAF_01_49.chr \
+  --fizi /users/k1806347/brc_scratch/Software/fizi/bin/fizi \
+  --output /users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/${gwas_i}/${gwas_i}.${prop_i} \
+  --min_prop 0.1 \
+  --n_cores 10
+  
+EOF
+
+sbatch --array 1-$(wc -l /users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/todo.txt | cut -d' ' -f1)%3 /users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/sbatch.sh
+
+#######
+# Run for unfiltered (original) GWAS
+#######
+
+gwas=$(echo ADHD05 ANXI02 COAD01 OBES01 SMOK04)
+for gwas_i in ${gwas};do
+  if [ ! -f /users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/${gwas_i}/${gwas_i}.unfiltered.imputed.gz ]; then
+
+    sbatch -p brc,shared --mem 5G /users/k1806347/brc_scratch/Software/Rscript.sh /mnt/lustre/users/k1806347/Software/MyGit/GenoFunc/GenoFuncPipe/scripts/sumstat_imputer.R \
+        --sumstats /users/k1806347/brc_scratch/Analyses/sumstat_imputation/original/${gwas_i}.cleaned.gz \
+  --ref_plink_chr /users/k1806347/brc_scratch/Analyses/sumstat_imputation/LDREF/EUR_phase3.MAF_01_49.chr \
+        --fizi /users/k1806347/brc_scratch/Software/fizi/bin/fizi \
+        --output /users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/${gwas_i}/${gwas_i}.unfiltered \
+        --min_prop 0.1 \
+        --n_cores 10
+        
+    fi
+done
+
+```
+
+</details>
+
+***
+
+### Evaluation
+
+***
+
+##### ImpG
+
+<details><summary>Show code</summary>
+
+```{r, eval=F, echo=T}
+
+library(data.table)
+
+gwas<-c('ADHD05','ANXI02','COAD01','OBES01','SMOK04')
+prop<-seq(0.05, 0.3, 0.05)
+test<-c('unfiltered',gsub('.*\\.','',prop))
+
+######
+# Compare the number of variants before and after imputation
+######
+
+n_all<-NULL
+for(gwas_i in gwas){
+  for(test_i in test){
+    log<-readLines(paste0('/users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/',gwas_i,'/',gwas_i,'.',test_i,'.log'))
+  n_before<-as.numeric(gsub('.* ','',gsub(' variants.','',log[grepl('Before imputation', log)])))
+  n_after<-as.numeric(gsub('.* ','',gsub(' variants.','',log[grepl('After applying R2', log)])))
+  n_orig<-as.numeric(gsub(' .*','',log[grepl('variants were present in the GWAS', log)]))
+  n_imput<-as.numeric(gsub(' .*','',log[grepl('variants are imputed.', log)]))
+  n_all<-rbind(n_all, 
+              data.frame(GWAS=gwas_i,
+                         N_before=n_before,
+                         N_after=n_after,
+                         N_orig=n_orig,
+                         N_imput=n_imput,
+                         Test=test_i))
+  }
+}
+
+n_all$Test<-as.character(n_all$Test)
+n_all$Test[n_all$Test != 'unfiltered']<-paste0('0.',n_all$Test[n_all$Test != 'unfiltered'])
+n_all$Test<-gsub('unfiltered', 'Unfiltered', n_all$Test)
+n_all$Test<-factor(n_all$Test, levels=unique(n_all$Test))
+
+n_all$Difference<-n_all$N_after - n_all$N_before
+
+library(ggplot2)
+library(cowplot)
+
+n_all_melt<-melt(n_all)
+
+png('/users/k1806347/brc_scratch/Analyses/sumstat_imputation/ImpG_nsnp_before_after.png', res=300, units = 'px', width= 3500, height=2000)
+ggplot(data=n_all_melt, aes(x=Test, y=value/1000000)) +
+  geom_bar(data=n_all_melt[n_all_melt$variable == 'N_before' | n_all_melt$variable == 'N_after',], aes(x=Test, y=value/1000000, fill=variable), stat="identity", position=position_dodge()) +
+  geom_text(data=n_all_melt[n_all_melt$variable == 'Difference',], aes(label = value, x = Test, y = (6e+6)/1000000), position = position_dodge(width = 0.8), vjust = -0.6) +
+  facet_grid(GWAS ~ .) +
+  ylim(c(0,(8e+6)/1000000)) +
+  theme_half_open() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  background_grid(major = 'y', minor = 'y') +
+  labs(y="N Variants (M)", x='', fill='')
+dev.off()
+
+#####
+# Plot the number of original and imputed variants after imputation
+#####
+
+png('/users/k1806347/brc_scratch/Analyses/sumstat_imputation/ImpG_nsnp_orig_imput.png', res=300, units = 'px', width= 3500, height=2000)
+ggplot(data=n_all_melt[n_all_melt$variable == 'N_before' | n_all_melt$variable == 'N_orig' | n_all_melt$variable == 'N_imput',], aes(x=Test, y=value/1000000, fill=variable)) +
+  geom_bar(stat="identity", position=position_dodge()) +
+  facet_grid(GWAS ~ .) +
+  theme_half_open() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  background_grid(major = 'y', minor = 'y') +
+  labs(y="N Variants (M)", x='', fill='')
+dev.off()
+
+#####
+# Check correlation between imputed and observed Z scores
+#####
+
+imp_cor<-NULL
+for(gwas_i in gwas){
+  plot_list<-list()
+  original<-fread(paste0('/users/k1806347/brc_scratch/Analyses/sumstat_imputation/original/',gwas_i,'.cleaned.gz'))
+  
+  if(!('BETA' %in% names(original))){
+    original$BETA<-log(original$OR)
+  }
+
+  # Calculate Z an sign based on BETA
+  original$Z<-abs(qnorm(original$P/2))
+  original$Z<-sign(original$BETA)*original$Z
+
+  original<-original[,c('SNP','A1','A2','Z','N'),with=F]
+
+  for(prop_i in prop){
+    imputed<-fread(paste0('/users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/',gwas_i,'/',gwas_i,'.',gsub('.*\\.','',prop_i),'.imputed.gz'))
+    
+    # Check if some chromosomes are missing entirely
+    print(gwas_i)
+    print(prop_i)
+    print(c(1:22)[!(1:22 %in% unique(imputed$CHR))])
+    
+    # Remove SNPs that were present in GWAS
+    imputed<-imputed[imputed$TYPE != 'gwas',]
+    imputed<-imputed[,c('SNP','A1','A2','Z','R2.BLUP','N'),with=F]
+    
+    
+    
+    # Calculate correlation between imputed and observed Z scores
+    if(length(intersect(original$SNP, imputed$SNP)) == 0){
+      imp_cor<-rbind(imp_cor, data.frame(GWAS=gwas_i,
+                                         Prop=prop_i,
+                                         N_imp=0,
+                                         Cor=NA))
+    } else {
+      
+      matched<-merge(original, imputed, by=c('SNP','A1','A2'))
+      swapped<-merge(original, imputed, by.x=c('SNP','A1','A2'), by.y=c('SNP','A2','A1'))
+      swapped$Z.y<- -swapped$Z.y
+      both<-rbind(matched, swapped)
+      
+      imp_cor<-rbind(imp_cor, data.frame(GWAS=gwas_i,
+                                   Prop=prop_i,
+                                   N_imp=nrow(both),
+                                   Cor=cor(both$Z.x, both$Z.y)))
+      
+      plot_list[[paste0(gwas_i,'.',prop_i)]]<-ggplot(both, aes(x=Z.x, Z.y, colour=R2.BLUP)) +
+        geom_abline(intercept =0 , slope = 1) +
+        geom_point() +
+        labs(x='Observed Z',y='Imputed Z', title=paste0(gwas_i,', Prop = ',prop_i,', N = ',nrow(both))) +
+        coord_fixed() +
+        theme_half_open() +
+        background_grid()
+    }
+  }
+  png(paste0('/users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/',gwas_i,'_imp_eval.png'), units='px', height=2500, width=4000, res=300)
+  print(plot_grid(plotlist =plot_list))
+  dev.off()
+}
+
+write.csv(imp_cor, '/users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/imp_eval.csv', row.names=F)
+
+```
+
+</details>
+
+***
+
+### Results
+
+***
+
+##### ImpG
+
+<details><summary>Show results</summary>
+
+![](/users/k1806347/brc_scratch/Analyses/sumstat_imputation/ImpG_nsnp_before_after.png)
+![](/users/k1806347/brc_scratch/Analyses/sumstat_imputation/ImpG_nsnp_orig_imput.png)
+![](/users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/ADHD05_imp_eval.png)
+![](/users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/ANXI02_imp_eval.png)
+![](/users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/COAD01_imp_eval.png)
+![](/users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/OBES01_imp_eval.png)
+![](/users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/SMOK04_imp_eval.png)
+
+```{r, eval=T, echo=F}
+res<-fread('/users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/imp_eval.csv')
+
+kable(res, rownames = FALSE, caption='ImpG observed-imputed Z correlation')
+
+```
+
+</details>
+
+***
+***
+
