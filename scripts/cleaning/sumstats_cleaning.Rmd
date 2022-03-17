@@ -94,7 +94,7 @@ Login to googlesheets
 gs4_auth(email = google_account_details)
 ```
 
-
++++JZ: We need to discuss which data to use here - the existing (outdated?) content of the Google spreadsheet or the content of the database extract which we have in a file. Update the spreadsheet to the content fo the file?
 Import google spreadsheet that contains the information of the GWAS
 ```{r Google spreadsheet of GWAS dictionary}
 gwas_sheet <- read_sheet(
