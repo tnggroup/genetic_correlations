@@ -94,7 +94,7 @@ Login to googlesheets
 gs4_auth(email = google_account_details)
 ```
 
-
++++JZ: We need to discuss which data to use here - the existing (outdated?) content of the Google spreadsheet or the content of the database extract which we have in a file. Update the spreadsheet to the content fo the file?
 Import google spreadsheet that contains the information of the GWAS
 ```{r Google spreadsheet of GWAS dictionary}
 gwas_sheet <- read_sheet(
@@ -872,51 +872,36 @@ INDELS are reported in such a varied way across GWAS, that we will only harmonis
 
 We will also only insert MAF for non-ambiguous SNPs.
 
-```{r}
-# Create IUPAC code function
-snp_iupac <- function(x = NA, y = NA){
-  if(length(x) != length(y)){
-    print('x and y are different lengths')
-  } else {
-    iupac <- rep(NA, length(x))
-    iupac[x == 'A' & y =='T' | x == 'T' & y =='A'] <- 'W'
-    iupac[x == 'C' & y =='G' | x == 'G' & y =='C'] <- 'S'
-    iupac[x == 'A' & y =='G' | x == 'G' & y =='A'] <- 'R'
-    iupac[x == 'C' & y =='T' | x == 'T' & y =='C'] <- 'Y'
-    iupac[x == 'G' & y =='T' | x == 'T' & y =='G'] <- 'K'
-    iupac[x == 'A' & y =='C' | x == 'C' & y =='A'] <- 'M'
-    return(iupac)
-  }
-}
+```{r Read in functions for manipulating allele codes}
+source(file = "../functions/snp_allele.R")
+```
 
-# Create function to change allele to complement
-snp_allele_comp<-function(x=NA){
-  x_new<-x
-  x_new[x == 'A']<-'T'
-  x_new[x == 'T']<-'A'
-  x_new[x == 'G']<-'C'
-  x_new[x == 'C']<-'G'
-  x_new[!(x %in% c('A','T','G','C'))]<-NA
-  return(x_new)
-}
-
+```{r insert IUPAC codes}
 # Insert IUPAC codes into target
 cSumstats$IUPAC<-snp_iupac(cSumstats$A1, cSumstats$A2)
 
+```
+
+```{r define super population of GWAS sample}
 # Define super population
 super_pop<-'EUR' # Should be specified by user
 # super_pop <- clOptions$population
 
-###########
-# Merge with the reference
-###########
+```
+
+```{r check presence of CHR, BP and RSID information}
 # Initially target should be merged with the reference based on CHR, BP and IUPAC. RSIDs will be inserted for all SNPs, and reference MAF will be inserted for all non-ambiguous SNPs if the super population is specified.
 # If CHR and BP are unavailable, but RSID is present, target will be merged with the reference by RSID and IUPAC. CHR and BP will be inserted for all SNPs, and reference MAF will be inserted for all non-ambiguous SNPs if the super population is specified.
 
-# Check whether RSIDs are available for majority of SNPs in GWAS
+# Check whether chromosome and base pair position information is present
 chr_bp_avail<-sum(c('CHR','ORIGBP') %in% names(cSumstats)) == 2 
+
+# Check whether RSIDs are available for majority of SNPs in GWAS
 rsid_avail<-(sum(grepl('rs', cSumstats$SNP)) > 0.9*length(cSumstats$SNP))
 
+```
+
+```{r merge with reference}
 if(chr_bp_avail){
   ###
   # Determine build
@@ -1005,9 +990,7 @@ if(chr_bp_avail){
       if(!is.na(super_pop)){
         matched$REF.FRQ[matched$IUPAC.x %in% c('W','S')]<-NA
       } else {
-
         matched$REF.FRQ<-NA
-        
       }
       
       # Retain reference CHR, BP, but target A1, and A2 information
@@ -1111,7 +1094,7 @@ if(chr_bp_avail){
       cSumstats_matched<-rbind(cSumstats_matched, cSumstats_matched_chr)
     }
     
-    # Idntify SNPs that are unmatched
+    # Identify SNPs that are unmatched
     unmatched<-cSumstats[!(cSumstats$SNP %in% cSumstats_matched$SNP),]
     
     # Reinsert variants in GWAS that could not be matched to the reference
