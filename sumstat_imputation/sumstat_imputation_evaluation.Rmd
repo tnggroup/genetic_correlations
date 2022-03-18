@@ -338,6 +338,9 @@ limpEvaluationResults$filepath<-normalizePath("/Users/jakz/project/JZ_GED_PHD_C1
 folderpathFiltered <- normalizePath("/Users/jakz/project/JZ_GED_PHD_C1/working_directory/cleaned_filtered",mustWork = T)
 folderpathImputed <- normalizePath("/Users/jakz/project/JZ_GED_PHD_C1/working_directory/LIMP",mustWork = T)
 
+filepathSNPReference <- normalizePath("/Users/jakz/project/JZ_GED_PHD_C1/data/combined.hm3_1kg.snplist.vanilla.jz2020.txt", mustWork = T)
+#folderpathLDscores <- normalizePath("/Users/jakz/project/JZ_GED_PHD_C1/data/eur_w_ld_chr.1KG_Phase3", mustWork = T)
+
 
 traitList <- c("ADHD05","ANXI02","COAD01","OBES01","SMOK04")
 levelList <- c("05","1","15","2","25","3")
@@ -345,6 +348,16 @@ levelList <- c("05","1","15","2","25","3")
 ######
 # Compare the number of variants before and after imputation
 ######
+
+for(gwas_i in traitList){
+  #gwas_i <- "ADHD05"
+  shru::supermunge(
+    filePaths = file.path(folderpathFiltered,paste0(gwas_i,".cleaned.gz")),
+    refFilePath = filepathSNPReference,
+    traitNames = paste0(gwas_i,".munged"),
+    pathDirOutput = folderpathFiltered
+  ) 
+}
 
 
 
@@ -421,13 +434,17 @@ dev.off()
 
 #HERE!!! NOT DONE!!
 imp_cor<-NULL
-for(gwas_i in gwas){
+for(gwas_i in traitList){
+  #gwas_i <- "ADHD05"
+  if(gwas_i == "ADHD05") next
   plot_list<-list()
-  original<-fread(paste0('/users/k1806347/brc_scratch/Analyses/sumstat_imputation/original/',gwas_i,'.cleaned.gz'))
+  original<-fread(file = file.path(folderpathFiltered,paste0(gwas_i,".munged.gz")), na.strings =c(".",NA,"NA",""), encoding = "UTF-8",check.names = T, fill = T, blank.lines.skip = T, data.table = T, nThread = 8, showProgress = F)
   
-  if(!('BETA' %in% names(original))){
-    original$BETA<-log(original$OR)
-  }
+  original$BETA<-original$EFFECT
+  
+  # if(!('BETA' %in% names(original))){
+  #   original$BETA<-log(original$OR)
+  # }
 
   # Calculate Z an sign based on BETA
   original$Z<-abs(qnorm(original$P/2))
@@ -435,53 +452,53 @@ for(gwas_i in gwas){
 
   original<-original[,c('SNP','A1','A2','Z','N'),with=F]
 
-  for(prop_i in prop){
-    imputed<-fread(paste0('/users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/',gwas_i,'/',gwas_i,'.',gsub('.*\\.','',prop_i),'.imputed.gz'))
+  for(cLevel in levelList){
+    #cLevel <- "05"
+    imputed<-fread(file = file.path(folderpathImputed,gwas_i,paste0(gwas_i,".",cLevel,".imputed.gz")), na.strings =c(".",NA,"NA",""), encoding = "UTF-8",check.names = T, fill = T, blank.lines.skip = T, data.table = T, nThread = 8, showProgress = F)
     
     # Check if some chromosomes are missing entirely
     print(gwas_i)
-    print(prop_i)
+    print(cLevel)
     print(c(1:22)[!(1:22 %in% unique(imputed$CHR))])
     
     # Remove SNPs that were present in GWAS
-    imputed<-imputed[imputed$TYPE != 'gwas',]
-    imputed<-imputed[,c('SNP','A1','A2','Z','R2.BLUP','N'),with=F]
+    imputed<-imputed[imputed$SNP %in% original$SNP,]
+    imputed<-imputed[!is.na(imputed$INFO.LIMP),]
+    imputed<-imputed[,c('SNP','A1','A2','Z','INFO.LIMP','N','NEF'),with=F]
+    
     
     
     
     # Calculate correlation between imputed and observed Z scores
     if(length(intersect(original$SNP, imputed$SNP)) == 0){
       imp_cor<-rbind(imp_cor, data.frame(GWAS=gwas_i,
-                                         Prop=prop_i,
+                                         Prop=cLevel,
                                          N_imp=0,
                                          Cor=NA))
     } else {
       
-      matched<-merge(original, imputed, by=c('SNP','A1','A2'))
-      swapped<-merge(original, imputed, by.x=c('SNP','A1','A2'), by.y=c('SNP','A2','A1'))
-      swapped$Z.y<- -swapped$Z.y
-      both<-rbind(matched, swapped)
+      both<-merge(original, imputed, by=c('SNP'))
       
       imp_cor<-rbind(imp_cor, data.frame(GWAS=gwas_i,
-                                   Prop=prop_i,
+                                   Prop=cLevel,
                                    N_imp=nrow(both),
                                    Cor=cor(both$Z.x, both$Z.y)))
       
-      plot_list[[paste0(gwas_i,'.',prop_i)]]<-ggplot(both, aes(x=Z.x, Z.y, colour=R2.BLUP)) +
+      plot_list[[paste0(gwas_i,'.',cLevel)]]<-ggplot(both, aes(x=Z.x, Z.y, colour=INFO.LIMP)) +
         geom_abline(intercept =0 , slope = 1) +
         geom_point() +
-        labs(x='Observed Z',y='Imputed Z', title=paste0(gwas_i,', Prop = ',prop_i,', N = ',nrow(both))) +
+        labs(x='Observed Z',y='Imputed Z', title=paste0(gwas_i,', Prop = ',cLevel,', N = ',nrow(both))) +
         coord_fixed() +
         theme_half_open() +
         background_grid()
     }
   }
-  png(paste0('/users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/',gwas_i,'_imp_eval.png'), units='px', height=2500, width=4000, res=300)
+  png(file.path(folderpathImputed,paste0(gwas_i,'_imp_eval.png')), units='px', height=2500, width=4000, res=300)
   print(plot_grid(plotlist =plot_list))
   dev.off()
 }
 
-write.csv(imp_cor, '/users/k1806347/brc_scratch/Analyses/sumstat_imputation/imputed/ImpG/imp_eval.csv', row.names=F)
+write.csv(imp_cor, file.path(folderpathImputed,paste0('imp_eval.csv')), row.names=F)
 
 ```
 
