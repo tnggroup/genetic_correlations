@@ -376,22 +376,20 @@ saveRDS(object = limpEvaluationResults,file = limpEvaluationResults$filepath)
 #limpEvaluationResults <- readRDS(file=limpEvaluationResults$filepath)
 
 
-#NOT FINISHED, HERE!!!!
 
+limpEvaluationResults$n_all$Test<-as.character(limpEvaluationResults$n_all$Test)
+limpEvaluationResults$n_all$Test[limpEvaluationResults$n_all$Test != 'unfiltered']<-paste0('0.',limpEvaluationResults$n_all$Test[limpEvaluationResults$n_all$Test != 'unfiltered'])
+limpEvaluationResults$n_all$Test<-gsub('unfiltered', 'Unfiltered', limpEvaluationResults$n_all$Test)
+limpEvaluationResults$n_all$Test<-factor(limpEvaluationResults$n_all$Test, levels=unique(limpEvaluationResults$n_all$Test))
 
-n_all$Test<-as.character(n_all$Test)
-n_all$Test[n_all$Test != 'unfiltered']<-paste0('0.',n_all$Test[n_all$Test != 'unfiltered'])
-n_all$Test<-gsub('unfiltered', 'Unfiltered', n_all$Test)
-n_all$Test<-factor(n_all$Test, levels=unique(n_all$Test))
-
-n_all$Difference<-n_all$N_after - n_all$N_before
+limpEvaluationResults$n_all$Difference<-limpEvaluationResults$n_all$N_after - limpEvaluationResults$n_all$N_before
 
 library(ggplot2)
 library(cowplot)
 
-n_all_melt<-melt(n_all)
+n_all_melt<-melt(limpEvaluationResults$n_all)
 
-png('/users/k1806347/brc_scratch/Analyses/sumstat_imputation/ImpG_nsnp_before_after.png', res=300, units = 'px', width= 3500, height=2000)
+png(file.path(folderpathImputed,'nsnp_before_after.png'), res=300, units = 'px', width= 3500, height=2000)
 ggplot(data=n_all_melt, aes(x=Test, y=value/1000000)) +
   geom_bar(data=n_all_melt[n_all_melt$variable == 'N_before' | n_all_melt$variable == 'N_after',], aes(x=Test, y=value/1000000, fill=variable), stat="identity", position=position_dodge()) +
   geom_text(data=n_all_melt[n_all_melt$variable == 'Difference',], aes(label = value, x = Test, y = (6e+6)/1000000), position = position_dodge(width = 0.8), vjust = -0.6) +
@@ -407,7 +405,7 @@ dev.off()
 # Plot the number of original and imputed variants after imputation
 #####
 
-png('/users/k1806347/brc_scratch/Analyses/sumstat_imputation/ImpG_nsnp_orig_imput.png', res=300, units = 'px', width= 3500, height=2000)
+png(file.path(folderpathImputed,'nsnp_orig_imput.png'), res=300, units = 'px', width= 3500, height=2000)
 ggplot(data=n_all_melt[n_all_melt$variable == 'N_before' | n_all_melt$variable == 'N_orig' | n_all_melt$variable == 'N_imput',], aes(x=Test, y=value/1000000, fill=variable)) +
   geom_bar(stat="identity", position=position_dodge()) +
   facet_grid(GWAS ~ .) +
@@ -421,6 +419,7 @@ dev.off()
 # Check correlation between imputed and observed Z scores
 #####
 
+#HERE!!! NOT DONE!!
 imp_cor<-NULL
 for(gwas_i in gwas){
   plot_list<-list()
