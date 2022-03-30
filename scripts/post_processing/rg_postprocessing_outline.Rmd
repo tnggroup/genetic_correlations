@@ -41,6 +41,23 @@ The file also contains the login details for your google work account: google_ac
 source(file = "../credentials/credentials.R")
 ```
 
+# Set output parameter for user
+
+```{r}
+opt<-list()
+
+# This is an example output parameter
+opt$output<-'/users/k_number/brc_scratch/Data/GWAS_sumstats/Rosalind_repository/example'
+
+# Identify the directory for the output
+opt$output_dir<-dirname(opt$output)
+
+# Create output directory if it doesn't exist
+if(!file.exists(opt$output_dir)){
+  dir.create(opt$output_dir)
+}
+```
+
 # GWAS summary statistics overview sheet
 
 Login to googlesheets
@@ -69,44 +86,27 @@ LDSC rg results between a selected trait of interest and all traits in the summa
 
 
 1) Read in list of traits to be analysed (in GWAS code format e.g. ADHD05, mhc region removed )
++++ATK this depends on how we decide we want to store out rg ldsc regression output results
 
-Option 1: up to date list of all GWAS traits for rg analysis
-+++ATK add at the end of cleaning script? Replaces old list of all traits with updated version to include the trait thats just been added? This list needs to be traits that are included in AFTER checking for mhc region and mean chi square. 
+Option 1: read in up to date list of all GWAS traits from rg analysis step
+
++++ATK This list will be created in a separate step, where traits are filtered for mean chi square 1.02 and mhc region removed
 ```{r read in up to date list of traits}
 trait_list_all <- c(
   paste0(sumstats_path, "/data/full_trait_list.txt")
   ) 
 ```
 
-Option 2: shorter list of specific traits for rg analysis
-+++ATK the user would add this themselves. Do we want this as a function? Or does the user just add a list to the script here?
+Option 2: shorter list of specific traits for rg analysis that the user would add themselves. 
 ```{r read in sub selected trait list}
 trait_list_subset <- c(
   paste0(file_path, "/data/subset_trait_list.txt")
   ) 
 ```
 
-+++atk check GWAS steps should be added before running genetic correlations
-Check GWAS sumstats
-MHC region removed check
-++ATK this needs to be done before the genetic correltions step
-```{r check mhc removed }
-# add once we have decided what format this is in (remove using SNP list?)
-```
+2) Read in rg data for your trait of interest
 
-Filter traits with low/ non significant heritability
-+++ ATK this needs to be done before the genetic correlations step - otherwise waste of resources and steps. This could be a threshold of mean chi square 1.02 - 
-```{r check traits h2 meet threshold}
-# use h2 z score cut off of 5 or 2.5? z = h2/se or 2*pnorm(-(h2/se))
-
-#check if h2 is significantly different from 0? Can calculate p value using calculate p using R as pchisq((h2/se)^2,1,lower.tail = FALSE) (https://groups.google.com/g/ldsc_users/c/adiEP9SB0U8/m/n0K-duUaAQAJ) or equivalent for Z score 2*pnorm(-(h2/se))
-
-
-```
-
-3) Read in rg data for your trait of interest
-
-+++ATK add bash scripts here?
++++ATK this depends on how we decide to store out rg ldsc results. If we decide to store them as just log output files, then we can add bash script that we previously used here
 ```{r read in rg results}
 
 ```
@@ -117,7 +117,10 @@ Filter traits with low/ non significant heritability
 
 2) Joining datasets:
 #Step) join the rg results with the GWAS information file to get full GWAS info for each trait
-Merge 
+
+
++++ATK again, this is assuming we ar storing our rg output results separatly from our GWAS information sheet. 
++++ATK Ollie's script collage_gwas_info reads into a csv. Are we using csv or google sheet as the updated spread sheet?
 ```{r join info GWAS sheet with rg results}
 rgs_gwas_info <- 
   left_join(
@@ -130,9 +133,11 @@ colnames(rgs_gwas_info)
 
 3) Filtering
 For both summary table for plotting and supplementary table:
+
 #step) Only extract GWAS traits that are not private. 
 Filter by permissions and exclude all private sumstats
-NOTE: need to simplify the current permissions category 
+
++++ATK: need to simplify the current permissions category 
 ```{r filter based on permissions}
 rgs_filtered <- rgs_gwas_info %>% 
   filter(
@@ -140,11 +145,11 @@ rgs_filtered <- rgs_gwas_info %>%
   )
 ```
 
-#optional step if only interested in certain trait categories
+#optional step if the user is only interested in certain trait categories
 ```{r by trait cateogry}
 rgs_filtered_cat <- rgs_filtered %>%
   filter(
-    category = "insert_category" #add category as relevent
+    category = "insert_category" #add category as relevant 
   )
 ```
 
@@ -162,9 +167,9 @@ rgs_filtered <- rgs_filtered %>%
     )
   )
 
-summary(
-  rgs_filtered$P.Bonferroni
-  )
+#check
+rgs_filtered %>% 
+  summary(P.Bonferroni)
 ```
 
 ```{r create FDR column }
@@ -177,9 +182,9 @@ rgs_filtered <- rgs_filtered %>%
     )
   )
 
-summary(
-  rgs_filtered$FDR.Q.value
-  )
+#check
+rgs_filtered %>% 
+  summary(FDR.Q.value)
 ```
 
 Add column with FDR significant label
@@ -190,7 +195,7 @@ rgs_filtered <-
     FDR_significant =
       case_when(
         FDR.Q.value < 0.05 ~ "significant",
-        FDR.Q.value > 0.05 ~ "not"
+        FDR.Q.value > 0.05 ~ "not significant"
       )
   )
 
@@ -206,7 +211,8 @@ note: we already have this script in python
 ```{r matrix decomposition for bonferonni threshold}
 rgs_filtered <- rgs_filtered %>%
   mutate(
-   P.Bonferroni_matrix =
+   P.Bonferroni_matrix = 
+     )
      #find Helena's script for this?
 ```
 
@@ -218,43 +224,87 @@ e.g. Watson et al 2019 (AN GWAS) columns: Phenotype, rg, se, P (green = bonferon
 but could also include Z value of rg, gcov_int, gcov_int_se, h2_obs, h2_obs_se, h2_int	h2_int_se - or h2 Z and mean chi square which could be useful? Topher has a script that extracted h2 information for each GWAS
 
 Select columns for supplementary tables
++++ATK update column renaming when we know what input we are reading results from (GWAS info sheet and rg results)
 ```{r create dataframe for supplementary tables}
 rgs_supplmentary_table <- 
-  rgs_supplmentary_table %>%
+  rgs_filtered %>%
     select(
       Phenotype,
-      rg, 
-      se, 
-      z,
+      PMID,
+      mean_chi^2,
+      h2_obs, #heritability information for each trait
+      h2_obs_se,
+      h2_int,
+      h2_int_se,
+      h2_z, 
+      rg, #genetic correlations result for each trait with trait of interest
+      rg_se, 
+      rg_z,
       p,
-      FDR_significant, ### add other methods too 
-      Phenotype category,
-      PMID, 
-      code, 
+      P.Bonferroni,
+      FDR_significant,
+      P.Bonferroni_matrix,
+      Phenotype_category,
+      code, #trait code
       ancestry
+      ) # +++ATK: do we want ancestry?
       
+#Check
+rgs_supplmentary_table %>%
+  glimpse()
 ```
 
 4) Saving new tables
 #what is the preffered format for saving the new table? google sheets? excel sheet for supplementary materials? Save summary table as rds for plotting?
 Save as excel, google sheets, txt
-```{r save supplementary table}
+```{r save supplementary table as csv}
+# Save new/updated gwas_info
+rgs_supplmentary_table %>% 
+  write_csv(
+    file = paste0(opt$output,
+                  "rgs_table_",
+                  Sys.Date(),
+                  ".csv")
+  )
 
 ```
 
+```{r save supplementary table as rds}
+
+rgs_supplmentary_table %>% 
+  saveRDS(
+    file = paste0(opt$output,
+                  "rgs_table_",
+                  Sys.Date(),
+                  ".rds")
+    )
+```
+
+
+
 5) Plotting
-Decide on significance threshold for plotting. Note: matrix decomposition threshold as less stringent.
+
+Notes for the user on deciding which traits to include for plotting:
+1) If only showing significant traits, decide on significance threshold. Note: matrix decomposition threshold is less stringent.
+2) If more than one GWAS is available for a phenotype, the researcher may only want to show specific GWAS for each phenotype e.g. most powerful, or certain cohorts, selected based on type of phenotyping. 
 
 Note: trait labels for plotting. This needs to be added to in the google spreadsheet, and then trait labels column for plotting will be used in stead of 'phenotype'
+```{r Check names of significant traits}
+rgs_supplmentary_table %>% 
+  filter
+```
 
-We also have multiple GWAS for one phenotype e.g. MDD - 
+
 ```{r vector of signficant traits for plotting}
-# i.e. the researcher may only want to show specific GWAS for each phenotype e.g. most powerful, or certain cohorts, selected based on type of phenotyping. A
+traits_plotting <- c("trait name 1",
+                     "trait name 2"
+                     )
 ```
 
 
 ```{r filter based on vector of traits}
-
+dat %>% 
+  select(all_of(traits_plotting))
 ```
 
 
