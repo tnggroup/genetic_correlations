@@ -667,8 +667,9 @@ if(
 ```
 
 ## OR filter
-+++JZ: TODO - adapt to all kinds of effect types
-+++CH: Have we extended this to other effect sizes? OR?
+
+We do not filter by BETA as these values may not actually be BETAs (standardised), so the expected scale may vary substantially. BETAs can be esitmated based on P value, N and allele frequency, but this involves several assumptions that may be inappropriate, such as mismatch between GWAS and reference population, or incorrect sample size specification.
+
 ```{r OR filter}
 if(
   any(colnames(cSumstats)=="OR")
@@ -690,30 +691,53 @@ if(
 ```
 
 ## N filter - (from Ollies script)
-We are removing SNPs with Ns that are ± 3 SD from the median sample size
+We are removing SNPs with Ns that are ± 3 SD from the median sample size. We use a 3SD from the median threshold as this is the threshold used by SBayesR in GCTB, an analysis that is sensitive to sample size variance across variants (https://cnsgenomics.com/software/gctb/#Tutorial). We will filter variants by their effective sample size, which is simply N for contiuous phenotypes, but 4/(1/Ncases+1/Nctrls) for binary phenotypes. Sometime the effective sample size is reported in the summary statistics, or it can be estimated using N_CASE and N_CON values (note. this approach may be inaccurate for GWAS meta-analysis results as the proportion of cases and controls will likely vary across each cohort).
 
-+++ATK: do we want to remove SNPs that have a large N as set here? Or just SNPs with small N? 
-+++CH: Why are we doing this? What is the rationale? Can we add more explanation?
 ```{r N filter}
-if(
-  any(colnames(cSumstats)=="N")
-  ){
+if(any(names(sumstats) == 'NEF')){
+  # NEF is present in sumstats so variants will be filtered by provided NEF
+  N_sd <- sd(cSumstats$NEF)
+  N_median <- median(cSumstats$NEF)
   
-  N_sd <- sd(cSumstats$N)
+  cSumstats$N_outlier<-cSumstats$NEF > N_median+(3*N_sd) | cSumstats$NEF < N_median-(3*N_sd)
   
-  N_median <- median(cSumstats$N)
-  
-  rm <- (
-    !is.na(cSumstats$N) 
-    & (cSumstats$N > N_median+(3*N_sd) | cSumstats$N < N_median-(3*N_sd))
-    )
-  
-  cSumstats <- cSumstats[!rm, ]
-  
-  cat("Removing", sum(rm), " SNPs with N outside median(N) ± 3SD(N); ", nrow(cSumstats), "remain")
-  
-  sumstats_meta[cCode,c("n_removed_n")] <- sum(rm)
+  cat(sum(cSumstats$N_outlier, na.rm=T), "SNPs have reported NEF outside median(N) ± 3SD(N).\n", sep='')
+  sumstats_meta[cCode,c("n_outlier_n")] <- sum(cSumstats$N_outlier, na.rm=T)
+
+} else {
+  if(any(names(sumstats) == 'N_CAS') & any(names(sumstats) == 'N_CON')){
+    # NEF isn't present, but N_CAS and N_CON are present, so we will calculate NEF from N_CAS and N_CON.
+    cSumstats$NEF_est<-4/(1/cSumstats$N_CAS+1/cSumstats$N_CON)
+    
+    N_sd <- sd(cSumstats$NEF_est)
+    N_median <- median(cSumstats$NEF_est)
+    
+    cSumstats$N_outlier<-cSumstats$NEF_est > N_median+(3*N_sd) | cSumstats$NEF < N_median-(3*N_sd)
+    
+    cat(sum(cSumstats$N_outlier, na.rm=T), "SNPs have estimated NEF outside median(N) ± 3SD(N).\n", sep='')
+    sumstats_meta[cCode,c("n_outlier_n")] <- sum(cSumstats$N_outlier, na.rm=T)
+
+  } else {
+    # NEF nor N_CAS/N_CON columns are present. We will therefore filter by N
+    if(length(unique(cSumstats$N)) > 1){
+      # There is variation in the N column
+      N_sd <- sd(cSumstats$N)
+      N_median <- median(cSumstats$N)
+      
+      cSumstats$N_outlier<-cSumstats$N > N_median+(3*N_sd) | cSumstats$N < N_median-(3*N_sd)
+      
+      cat(sum(cSumstats$N_outlier, na.rm=T), "SNPs have N outside median(N) ± 3SD(N).\n", sep='')
+      sumstats_meta[cCode,c("n_outlier_n")] <- sum(cSumstats$N_outlier, na.rm=T)
+    } else {
+      # Per variant sample size information is not available. Set column indicating outliers to NA
+      cSumstats$N_outlier<-NA
+      cat("Per variant sample size is not avialable.\n", sep='')
+      sumstats_meta[cCode,c("n_outlier_n")] <- NA
+
+    }
+  }
 }
+
 ```
 
 # SE filter
@@ -1143,10 +1167,14 @@ if('FRQ' %in% names(cSumstats) & !is.na(super_pop)){
 # Save cleaned file and log output
 +++JZ: When converted to a function we would want to provide this as an argument (with the possibility of a default value).
 ```{r save cleaned file as .gz file in cleaned folder}
-cSumstats %>%
-  gzfile(
-    file = paste0("../cleaned/", cCode, ".gz", sep="\t")
-    )
+#cSumstats %>%
+#  gzfile(
+#    file = paste0("../cleaned/", cCode, ".gz", sep="\t")
+#    )
+
+# Changed to fwrite for compression as have had experience where gzfile truncates the output.
+fwrite(cSumstats, paste0("../cleaned/", cCode, ".gz"), sep='\t', na='NA', quote=F)
+
 ```
 
 # Update overview spreadsheet
