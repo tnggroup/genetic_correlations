@@ -1,6 +1,6 @@
 ---
-title: "rg results summary tables template"
-author: "Abigail ter Kuile, Christopher Huebel, Alish Palmos Johan Zrvskovec, Oliver Pain"
+title: "Cleaning script for GWAS summary statistics repository pipeline"
+author: "Abigail ter Kuile, Christopher Huebel, Alish Palmos, Johan Zrvskovec, Oliver Pain"
 date: "28/08/2021"
 output: html_document
 ---
@@ -165,20 +165,6 @@ Setting for keeping or removing indels
 The standrad should be TRUE. The light cleaning should contain the indels
 ```{r Indels}
 keep_indel <- TRUE # or change to FALSE
-```
-
-### MHC filter
-Activate/deactivate MHC filter
-+++CH: What does 37 mean here?
-```{r MHC filter}
-mhc.filter <- 37
-```
-
-### Supermunge
-Activate/deactivate supermunge
-+++CH: This needs one line explanation what supermunge does.
-```{r Supermunge setting}
-doSupermunge <- TRUE
 ```
 
 
@@ -667,8 +653,9 @@ if(
 ```
 
 ## OR filter
-+++JZ: TODO - adapt to all kinds of effect types
-+++CH: Have we extended this to other effect sizes? OR?
+
+We do not filter by BETA as these values may not actually be BETAs (standardised), so the expected scale may vary substantially. BETAs can be esitmated based on P value, N and allele frequency, but this involves several assumptions that may be inappropriate, such as mismatch between GWAS and reference population, or incorrect sample size specification.
+
 ```{r OR filter}
 if(
   any(colnames(cSumstats)=="OR")
@@ -690,30 +677,53 @@ if(
 ```
 
 ## N filter - (from Ollies script)
-We are removing SNPs with Ns that are ± 3 SD from the median sample size
+We are removing SNPs with Ns that are ± 3 SD from the median sample size. We use a 3SD from the median threshold as this is the threshold used by SBayesR in GCTB, an analysis that is sensitive to sample size variance across variants (https://cnsgenomics.com/software/gctb/#Tutorial). We will filter variants by their effective sample size, which is simply N for contiuous phenotypes, but 4/(1/Ncases+1/Nctrls) for binary phenotypes. Sometime the effective sample size is reported in the summary statistics, or it can be estimated using N_CASE and N_CON values (note. this approach may be inaccurate for GWAS meta-analysis results as the proportion of cases and controls will likely vary across each cohort).
 
-+++ATK: do we want to remove SNPs that have a large N as set here? Or just SNPs with small N? 
-+++CH: Why are we doing this? What is the rationale? Can we add more explanation?
 ```{r N filter}
-if(
-  any(colnames(cSumstats)=="N")
-  ){
+if(any(names(sumstats) == 'NEF')){
+  # NEF is present in sumstats so variants will be filtered by provided NEF
+  N_sd <- sd(cSumstats$NEF)
+  N_median <- median(cSumstats$NEF)
   
-  N_sd <- sd(cSumstats$N)
+  cSumstats$N_outlier<-cSumstats$NEF > N_median+(3*N_sd) | cSumstats$NEF < N_median-(3*N_sd)
   
-  N_median <- median(cSumstats$N)
-  
-  rm <- (
-    !is.na(cSumstats$N) 
-    & (cSumstats$N > N_median+(3*N_sd) | cSumstats$N < N_median-(3*N_sd))
-    )
-  
-  cSumstats <- cSumstats[!rm, ]
-  
-  cat("Removing", sum(rm), " SNPs with N outside median(N) ± 3SD(N); ", nrow(cSumstats), "remain")
-  
-  sumstats_meta[cCode,c("n_removed_n")] <- sum(rm)
+  cat(sum(cSumstats$N_outlier, na.rm=T), "SNPs have reported NEF outside median(N) ± 3SD(N).\n", sep='')
+  sumstats_meta[cCode,c("n_outlier_n")] <- sum(cSumstats$N_outlier, na.rm=T)
+
+} else {
+  if(any(names(sumstats) == 'N_CAS') & any(names(sumstats) == 'N_CON')){
+    # NEF isn't present, but N_CAS and N_CON are present, so we will calculate NEF from N_CAS and N_CON.
+    cSumstats$NEF_est<-4/(1/cSumstats$N_CAS+1/cSumstats$N_CON)
+    
+    N_sd <- sd(cSumstats$NEF_est)
+    N_median <- median(cSumstats$NEF_est)
+    
+    cSumstats$N_outlier<-cSumstats$NEF_est > N_median+(3*N_sd) | cSumstats$NEF < N_median-(3*N_sd)
+    
+    cat(sum(cSumstats$N_outlier, na.rm=T), "SNPs have estimated NEF outside median(N) ± 3SD(N).\n", sep='')
+    sumstats_meta[cCode,c("n_outlier_n")] <- sum(cSumstats$N_outlier, na.rm=T)
+
+  } else {
+    # NEF nor N_CAS/N_CON columns are present. We will therefore filter by N
+    if(length(unique(cSumstats$N)) > 1){
+      # There is variation in the N column
+      N_sd <- sd(cSumstats$N)
+      N_median <- median(cSumstats$N)
+      
+      cSumstats$N_outlier<-cSumstats$N > N_median+(3*N_sd) | cSumstats$N < N_median-(3*N_sd)
+      
+      cat(sum(cSumstats$N_outlier, na.rm=T), "SNPs have N outside median(N) ± 3SD(N).\n", sep='')
+      sumstats_meta[cCode,c("n_outlier_n")] <- sum(cSumstats$N_outlier, na.rm=T)
+    } else {
+      # Per variant sample size information is not available. Set column indicating outliers to NA
+      cSumstats$N_outlier<-NA
+      cat("Per variant sample size is not avialable.\n", sep='')
+      sumstats_meta[cCode,c("n_outlier_n")] <- NA
+
+    }
+  }
 }
+
 ```
 
 # SE filter
@@ -811,32 +821,6 @@ if(
   cat("SE column is not present, genomic control cannot be detected.")
  
 }
-```
- 
-Need to add from Helenas (below):
-Helena: /mnt/lustre/groups/ukbiobank/sumstats/scripts/computeLambdaAndCorrect.r
-+++ATK: is there anything we want to add from Helena's below?
-+++OP: I have noticed gzfile sometimes truncates the output. 
-The fwrite function now automatically gzips files if the file name ends with a 'gz'
-
-```{r genomic control Helena's script}
-#arg <- commandArgs(TRUE)
-#output <- arg[2]
-#
-#
-#gres <- read.table(arg[1],header=T,sep="\t")
-#
-#chisq <- qchisq(1-gres$P,1) #check chisq
-#
-#lambda<-median(chisq)/qchisq(0.5,1) #check lambda
-#
-#gres$P <- pnorm(-abs((qnorm(gres$P/2)/sqrt(lambda))))*2 #check p 
-#
-#gres[,"N"]<-floor(gres[,"N"])
-#
-#gz1 <- gzfile(paste(output,".gz",sep=""),"w")
-#write.table(gres,gz1,quote=F,row.names=F,col.names=T,sep="\t")
-#close(gz1)
 ```
 
 # Genomic Control calculation: Lambda
@@ -1143,10 +1127,14 @@ if('FRQ' %in% names(cSumstats) & !is.na(super_pop)){
 # Save cleaned file and log output
 +++JZ: When converted to a function we would want to provide this as an argument (with the possibility of a default value).
 ```{r save cleaned file as .gz file in cleaned folder}
-cSumstats %>%
-  gzfile(
-    file = paste0("../cleaned/", cCode, ".gz", sep="\t")
-    )
+#cSumstats %>%
+#  gzfile(
+#    file = paste0("../cleaned/", cCode, ".gz", sep="\t")
+#    )
+
+# Changed to fwrite for compression as have had experience where gzfile truncates the output.
+fwrite(cSumstats, paste0("../cleaned/", cCode, ".gz"), sep='\t', na='NA', quote=F)
+
 ```
 
 # Update overview spreadsheet
@@ -1185,7 +1173,7 @@ if(!is.na(mhc.filter)){
         cSumstats <- cSumstats[!rm, ]
     } else if (mhc.filter==38) {
         rm <- (!is.na(cSumstats$CHR) & !is.na(cSumstats$BP) & cSumstats$CHR=="6" & cSumstats$BP>=28510120 & cSumstats$BP<=33480577)
-        cSumstats <- cSumstats[!rm, ]
+        cSumstats_nomhc <- cSumstats[!rm, ]
         cat("Removing ", sum(rm), " SNPs in the GRCh",mhc.filter," MHC; ", nrow(cSumstats), " remain")
     } else {
         cat("Warning: Invalid assembly version provided - no filtering of the MHC was done!")
@@ -1195,6 +1183,18 @@ if(!is.na(mhc.filter)){
   }
 }
 ```
+
++++ATK: i think the above chunk that removes mhc region needs to be moved to after munging takes place? And takes the munged file as input? I have put cSumstats_nomhc as a place holder for now, please change if the above chunk changes. 
+```{r save mhc munged file as .gz file in no_mhc folder}
+fwrite(cSumstats_nomhc,
+       paste0("../munged_noMHC/",
+              cCode,
+              ".gz"),
+       sep='\t',
+       na='NA',
+       quote=F)
+```
+
 
 # Munge sumstats
 ```{r}
@@ -1228,24 +1228,6 @@ python ${ldscdir}/munge_sumstats.py --out ${output_path}/${file} --merge-alleles
 ```
 
 
-# Supermunge
-```{r Supermunge}
-if(doSupermunge){
-  supermungeTraitCode<-paste0(traitCodes[1],"_supermunge")
-  supermunge(
-    list_df = list(cSumstats),
-    refFilePath = "/scratch/groups/ukbiobank/Edinburgh_Data/Software/ldscore/w_hm3.snplist",
-    traitNames = paste0(traitCodes[1],"_supermunge"),
-    pathDirOutput = "/scratch/groups/ukbiobank/sumstats/munged/",
-    N = cN,
-    keepIndel = keepIndel
-      )
-  
-  Sys.setenv(supermunge_trait_code=supermungeTraitCode)
-}
-```
-
-
 # LD score
 ```{bash}
 #!/bin/bash
@@ -1264,28 +1246,6 @@ ldscdir="/scratch/groups/ukbiobank/KCL_Data/Software/ldsc/"
 
 #run ldsc 
 python ${ldscdir}/ldsc.py --h2 ${output_path}/${file}.gz --ref-ld-chr ${ldscdir}/eur_w_ld_chr/ --w-ld-chr ${ldscdir}/eur_w_ld_chr/ --out ${output_path}/${file}_herit
-
-```
-
-# LD score 2
-```{bash}
-#!/bin/bash
-#SBATCH -n 8
-#SBATCH --mem-per-cpu=9G
-#SBATCH -t 72:00:00
-if [[ -v supermunge_trait_code ]]; then
-###
-module add devtools/anaconda/2019.3-python2.7.16
-
-#parameters
-input_path="/scratch/groups/ukbiobank/sumstats/cleaned/"
-output_path="/scratch/groups/ukbiobank/sumstats/munged/"
-ldscdir="/scratch/groups/ukbiobank/KCL_Data/Software/ldsc/"
-
-#run ldsc 
-python ${ldscdir}/ldsc.py --h2 ${output_path}/${supermunge_trait_code}.gz --ref-ld-chr ${ldscdir}/eur_w_ld_chr/ --w-ld-chr ${ldscdir}/eur_w_ld_chr/ --out ${output_path}/${supermunge_trait_code}_herit
-
-fi
 
 ```
 
