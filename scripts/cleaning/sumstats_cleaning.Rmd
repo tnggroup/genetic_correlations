@@ -185,7 +185,7 @@ plink chromosome numbering: https://zzz.bwh.harvard.edu/plink/data.shtml
 
 This chunk reads in the functions "parse_SNP_column_as_rs_number" and "parse_CHR_column" which parses the SNP and CHR columns respectively. It means that it can read different formats of data in those and convert it to rs-id and chromosome number which we expect/save to be in the SNP and CHR columns.
 ```{r Chromosome numbering}
-source(file = "../functions/parse_SNP_column_as_rs_number.R")
+source(file = "../functions/column_parsing_functions.R")
 ```
 
 
@@ -266,12 +266,14 @@ cSumstats$A2 <- toupper(as.character(cSumstats$A2))
 str(cSumstats$A2)
 ```
 
-Parse SNP (if needed)
+Parse SNP (if needed), convert to lc
+Parse CHR, convert to numeric - will crash if parsing rules do not detect all character cases
+BP to integer
 ```{r Parse SNP}
 cSumstats$SNP <- tolower(parse_SNP_column_as_rs_number(cSumstats$SNP))
 
 if(any(colnames(cSumstats)=="CHR")) {
-  cSumstats$CHR <- toupper(as.character(cSumstats$CHR))
+  cSumstats$CHR <- as.integer(parse_CHR_column(as.character(cSumstats$CHR)))
   cSumstats.keys <- c(cSumstats.keys,'CHR')
   str(cSumstats$CHR)
 }
