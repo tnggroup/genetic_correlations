@@ -193,9 +193,8 @@ source(file = "../functions/column_parsing_functions.R")
 We use the data.table package, because it is much faster than the basic R functions to read in data.
 https://cran.r-project.org/web/packages/data.table/vignettes/datatable-intro.html
 
-_Future_
-+++JZ: TODO replace commas with field separators as in Helena's script
-+++CH: Has this happened? Do we need to include a loop are will we run the script for each sum stats separately?
+Defaults to use commas as field separators (as per fread default) if commas are more credible, as in Helena's script.
+
 ```{r Read in sumstats}
 cCode <- traitCodes[1]
 
