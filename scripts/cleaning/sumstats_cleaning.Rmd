@@ -750,6 +750,64 @@ if(
     }
 ```
 
+# SE check
+z = sign(beta) * abs(qnorm(p/2))
+se = beta/z
+```{r}
+#if a Zscore already exists, use this to calculate SE from the BETA
+if(
+  any(colnames(cSumstats)=="Z")
+  ){
+  
+  cSumstats_se_check <- cSumstats %>%
+    mutate(
+      se_check = 
+        BETA / Z
+    )
+  
+  #if there is only SE column, calculate the Zscore first and then the SE from the BETA
+} else if(
+  any(colnames(cSumstats)=="SE")
+  ){
+  
+  cSumstats_se_check <- cSumstats %>%
+    mutate(
+      z_check =
+        sign(BETA) * abs(qnorm(P/2))
+    )
+  
+  cSumstats_se_check <- cSumstats %>%
+    mutate(
+      se_check = 
+        BETA / z_check
+    )
+}
+
+#calculate the relative difference between the two SE
+mean_rel_diff <- all.equal(target = cSumstats_se_check$se_check, 
+                           current = cSumstats$SE)
+
+#print output message
+if(
+    mean_rel_diff > 0.1
+    ){
+    
+    cat("Mean relative difference in SE is greater than 0.1, please investigate")
+      
+      } else if(
+        mean_rel_diff < 0.1
+      ){
+        
+        cat("Mean relative difference in SE is smaller than 0.1 - passed check")
+        
+        #remove the dataframe used in the checking process
+        rm(cSumstats_se_check)
+        
+      }
+
+```
+
+
 # Indels
 This is not part of the light cleaning. The standard is TRUE
 If it is set to FALSE, this chunk will remove indels
