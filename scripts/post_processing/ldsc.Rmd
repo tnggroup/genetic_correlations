@@ -1,0 +1,100 @@
+---
+title: "ldsc"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## MHC removal (separate from cleaning script)
+This should happen after the LDSC munging; some people will want to use the MHC variants for their analyses
+
+remove MHC region based on position - probably better to do after merge/harmonisation with reference
+references:
+https://www.ncbi.nlm.nih.gov/grc/human/regions/MHC?asm=GRCh37
+https://www.ncbi.nlm.nih.gov/grc/human/regions/MHC
+```{r MHC removal}
+if(!is.na(mhc.filter)){
+  if(any(colnames(cSumstats)=="CHR") & any(colnames(cSumstats)=="BP")){
+    if(mhc.filter==37) {
+        rm <- (!is.na(cSumstats$CHR) & !is.na(cSumstats$BP) & cSumstats$CHR=="6" & cSumstats$BP>=28477797 & cSumstats$BP<=33448354)
+        cSumstats <- cSumstats[!rm, ]
+    } else if (mhc.filter==38) {
+        rm <- (!is.na(cSumstats$CHR) & !is.na(cSumstats$BP) & cSumstats$CHR=="6" & cSumstats$BP>=28510120 & cSumstats$BP<=33480577)
+        cSumstats_nomhc <- cSumstats[!rm, ]
+        cat("Removing ", sum(rm), " SNPs in the GRCh",mhc.filter," MHC; ", nrow(cSumstats), " remain")
+    } else {
+        cat("Warning: Invalid assembly version provided - no filtering of the MHC was done!")
+      }
+  } else {
+    cat("Warning: No chromosome or base-pair position information available - no filtering of the MHC was done!")
+  }
+}
+```
+
++++ATK: i think the above chunk that removes mhc region needs to be moved to after munging takes place? And takes the munged file as input? I have put cSumstats_nomhc as a place holder for now, please change if the above chunk changes. 
+```{r save mhc munged file as .gz file in no_mhc folder}
+fwrite(cSumstats_nomhc,
+       paste0("../munged_noMHC/",
+              cCode,
+              ".gz"),
+       sep='\t',
+       na='NA',
+       quote=F)
+```
+
+
+# Munge sumstats
+```{r}
+
+#Write the trait code into a text file 
+c(traitCodes) %>% write_lines( "GWAS_name.txt")
+
+```
+
+```{bash}
+#!/bin/bash
+#SBATCH -n 8
+#SBATCH --mem-per-cpu=9G
+#SBATCH -t 72:00:00
+
+###
+module add devtools/anaconda/2019.3-python2.7.16
+
+#parameters
+input_path="/scratch/groups/ukbiobank/sumstats/cleaned/"
+file=`cat GWAS_name.txt`
+output_path="/scratch/groups/ukbiobank/sumstats/munged/"
+ldscdir="/scratch/groups/ukbiobank/Edinburgh_Data/Software/ldscore/"
+#optional parameters to compute h2 liability scale
+#Nca=$3
+#Nco=$4
+
+#####munge with w_hm3
+python ${ldscdir}/munge_sumstats.py --out ${output_path}/${file} --merge-alleles ${ldscdir}/w_hm3.snplist --N-cas-col Ncas --N-con-col Ncon --N-col N --sumstats /scratch/groups/ukbiobank/sumstats/cleaned/${input_path}/${file}.gz --info-min 0.6
+
+```
+
+
+# LD score
+```{bash}
+#!/bin/bash
+#SBATCH -n 8
+#SBATCH --mem-per-cpu=9G
+#SBATCH -t 72:00:00
+
+###
+module add devtools/anaconda/2019.3-python2.7.16
+
+#parameters
+input_path="/scratch/groups/ukbiobank/sumstats/cleaned/"
+file=`cat GWAS_name.txt`
+output_path="/scratch/groups/ukbiobank/sumstats/munged/"
+ldscdir="/scratch/groups/ukbiobank/KCL_Data/Software/ldsc/"
+
+#run ldsc 
+python ${ldscdir}/ldsc.py --h2 ${output_path}/${file}.gz --ref-ld-chr ${ldscdir}/eur_w_ld_chr/ --w-ld-chr ${ldscdir}/eur_w_ld_chr/ --out ${output_path}/${file}_herit
+
+```
+

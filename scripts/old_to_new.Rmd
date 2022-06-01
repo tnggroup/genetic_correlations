@@ -1,0 +1,45 @@
+---
+title: "Merging google sheet with sql"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Source credentials files
+This file includes the file path to the King's College London Microsoft Teams channel to store the raw data files of the GWAS summary statistics (intermediate solution before we move the final version to the rosalind cluster). However, we probably will save all summary statistics raw files on SharePoint/Teams to save space on rosalind.
+
+sumstats_path
+
+The file also contains the login details for your google work account: google_account_details
+
+```{r Credentials file}
+source(file = "../credentials/credentials.R")
+```
+
+
+## GWAS summary statistics overview sheet
+
+Login to googlesheets
+```{r Login to google sheets}
+gs4_auth(email = google_account_details)
+```
+
++++JZ: We need to discuss which data to use here - the existing (outdated?) content of the Google spreadsheet or the content of the database extract which we have in a file. Update the spreadsheet to the content fo the file?
+Import google spreadsheet that contains the information of the GWAS
+```{r Google spreadsheet of GWAS dictionary}
+gwas_sheet <- read_sheet(
+  ss = "https://docs.google.com/spreadsheets/d/1Wmj4Qzumkzks6541vQJqxaUBxjfL4KLQo7_K_oquacI/edit#gid=0",
+  sheet = "SGDP_GWASLIST_EDITTHIS",
+  col_names = TRUE,
+  trim_ws = TRUE, # Trims whitespace,
+  guess_max = 600,
+  na = c("", "NULL", "NA")
+  )
+
+colnames(gwas_sheet)
+
+gwas_sheet
+```
