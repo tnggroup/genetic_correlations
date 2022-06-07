@@ -91,7 +91,7 @@ column_options <- parse_args(column_parser)
 #/scratch/groups/gwas_sumstats/original/alcdep_afr_all.jul2017.min_n.gz
 #/scratch/groups/gwas_sumstats/original/daner_PGC_BIP32b_mds7a.gz
 
-column_options$file<-'/scratch/groups/gwas_sumstats/original/daner_PGC_BIP32b_mds7a.gz'
+column_options$file<-'/scratch/groups/gwas_sumstats/original/longevity_gwas.gz'
 column_options$label<-'Test run'
 column_options$code<-'TEST_XXXX'
 column_options$`sample-size`<-'100000'
@@ -147,6 +147,7 @@ sumstats_meta
 
 ### Sample size
 Explicitly set total N (e.g., a vector of sample sizes)
+Note: later in the script this will be overwritten if an N column exists in the original GWAS 
 ```{r Sample size}
 cN <- column_options$`sample-size`
 ```
@@ -216,6 +217,8 @@ sumstats_meta$n_snp_raw
 ## Interpret columns
 Checks the existence of columns based on list of column names in chunk above (Standardise GWAS column names). Renames columns to standardised names.
 It also deletes duplicated columns.
+
+*** Add Effective_N to a list of column names to be interpreted by standardise_GWAS_column_names + add a function which reads in the total N if only the Effective_N is present 
 ```{r interpret columns}
 newNames <- standardise_GWAS_column_names(
   column_names = colnames(cSumstats)
@@ -356,21 +359,24 @@ if(
   any(colnames(cSumstats)=="N_CAS") 
   && any(colnames(cSumstats)=="N_CON"))
   {
-  
+
   # Calculate total N from number of cases and number of controls if they are present. Overwrite any specific total N.
   cSumstats$N <- cSumstats$N_CAS + cSumstats$N_CON
-  
+  head(cSumstats)
   } else if(!is.null(cN)) {
     
+    cSumstats$N <- NA
+    
   cSumstats$N[which(is.na(cSumstats$N))] <- cN #default behaviour: add explicit N only to missing values.
-  
+  head(cSumstats)
   } else if(!any(colnames(cSumstats)=="N")) {
   
     warning("\nNo N column detected!\n")
     
     sumstats_meta[cCode,c("noN")]<-T
-    
-    }
+    head(cSumstats)
+  }
+
 ```
 
 ## Add BETA column if missing
@@ -405,7 +411,9 @@ if(
     
     sumstats_meta[cCode,c("Effect")]<-"BETA"
     
-    }
+  }
+
+head(cSumstats)
 ```
 
 
@@ -441,7 +449,9 @@ if(
     cat("Z column inserted based on BETA value and SE")
     
     sumstats_meta[cCode,c("Z")]<-"BETA,SE"
-}
+  }
+
+head(cSumstats)
 ```
 
 
@@ -469,7 +479,9 @@ if(
   
   sumstats_meta[cCode, c("SE")] <- "BETA,Z"
   
-  }
+}
+
+head(cSumstats)
 ```
 
 
@@ -496,9 +508,7 @@ sumstats_meta
 
 
 # Cleaning
-
 ## Missing data
-
 Remove variants with missing P values and missing effect columns
 Clean if missing P column
 ```{r clean missing p}
@@ -672,7 +682,7 @@ if(
   
   } else {
     
-    cat("Warning: The dataset does not contain an INFO column to apply the specified filter on.")
+    cat("Warning: The dataset does not contain an OR column to apply the specified filter on.")
     
     }
 ```
@@ -783,10 +793,12 @@ if(
     )
 }
 
+cSumstats_se_check <- as.data.frame(cSumstats_se_check)
 #calculate the relative difference between the two SE
-mean_rel_diff <- all.equal(target = cSumstats_se_check$se_check, 
-                           current = cSumstats$SE)
+mean_rel_diff <- mean(cSumstats_se_check$se_check - cSumstats$SE, na.rm = TRUE)
+  
 
+print(mean_rel_diff)
 #print output message
 if(
     mean_rel_diff > 0.1
@@ -1151,7 +1163,7 @@ if(chr_bp_avail){
 ```
 
 # Remove rows with impossible FRQ reported in GWAS
-
+If there are no impossible FRQs the script will run with no warning. If there is a warning please investigate 
 ```{r allele Frequency columns}
 # Check FRQ column is valid
 if('FRQ' %in% names(cSumstats_harm)){
@@ -1177,9 +1189,14 @@ if('FRQ' %in% names(cSumstats_harm) & !is.na(super_pop)){
 }
 
 ```
+#TO-DO
+```{r}
+
+#Delete any unnecessary columns before exporting 
+
+```
 
 # Save cleaned file and log output
-
 ```{r save cleaned file as .gz file in cleaned folder}
 
 fwrite(cSumstats_harm, paste0(column_options$output,"/cleaned/", cCode, ".gz"), sep='\t', na='NA', quote=F)
@@ -1193,6 +1210,3 @@ sumstats_meta %>%
     col_names = TRUE
     )
 ```
-
-
-
