@@ -29,16 +29,20 @@ library(tidyverse)
 ```
 
 ## Command line set up
+
+To run as an R script in the command line: e.g.
+
+sumstats_cleaning.R
+--file file_name.gz
+--code SUMS01
+--label Phenotype Label
+--N 20000
+--population EUR
+--output /scratch/groups/gwas_sumstats
+
+**NOTE: for testing the script as an Rmarkdown, please run this chunk below and then specify the input in the next chunk called 'for testing'**
 ```{r command line setup}
 column_parser <- OptionParser()
-
-column_parser <- add_option(
-  object = column_parser,
-  opt_str = c("-t", "--task"),
-  type = "character",
-  default ="clean",
-  help = "The explicit task to run:\nclean: Clean GWAS sumstat [default %default]"
-  )
 
 column_parser <- add_option(
   object = column_parser,
@@ -84,18 +88,23 @@ column_parser <- add_option(
 
 column_options <- parse_args(column_parser)
 
-# For testing
-#/scratch/groups/gwas_sumstats/original/alcdep_afr_all.jul2017.min_n.gz
-#/scratch/groups/gwas_sumstats/original/daner_PGC_BIP32b_mds7a.gz
+```
 
-column_options$file<-'/scratch/groups/gwas_sumstats/original/longevity_gwas.gz'
+# For testing
+for testing the script in Rmarkdown, please run the below chunk with the file path to the raw GWAS sumstats you want to test.
+e.g. file path for raw sumstats in repository: /scratch/groups/gwas_sumstats/original/
+```{r testing chunk}
+
+column_options$file<-'/scratch/groups/gwas_sumstats/original/glad_coping/regenie_GWASv2_mh_affected_MDQ_items_allchr_mdq.sum_score.12.txt.gz'
 column_options$label<-'Test run'
 column_options$code<-'TEST_XXXX'
 column_options$`sample-size`<-'100000'
 column_options$population<-'EUR'
 column_options$output<-'/scratch/groups/gwas_sumstats'
 
+
 ```
+
 
 Retrieve the recent date
 We use this to save files with a time stemp.
@@ -184,6 +193,7 @@ https://cran.r-project.org/web/packages/data.table/vignettes/datatable-intro.htm
 
 The fread function automatically detects the field seperator and handles a range of commonly use seperators. fread fill parameter is set to F to avoid unexpected truncations leading to column mispecification. 
 
+**NOTE: for testing we have specified below to just read in first 10k rows of SNPs to run tests faster. Please hash out if you want to test the full GWAS summary statistics file**
 ```{r Read in sumstats}
 cCode <- traitCodes[1]
 
