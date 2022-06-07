@@ -1,1550 +1,998 @@
-## ----setup, include=FALSE-------------------------------------------------------------------------
+## ----setup, include=FALSE---------------------------------------------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE,
                       comment=NA,
                       prompt=FALSE,
                       cache=FALSE)
 
 
-## ----Clear global environment---------------------------------------------------------------------
+## ----Clear global environment-----------------------------------------------------------------------------------
 remove(list = ls())
 
 
-## ----Packages-------------------------------------------------------------------------------------
+## ----Packages---------------------------------------------------------------------------------------------------
+#devtools::install_github("johanzvrskovec/shru")
+# library(shru)
+# library(googlesheets4)
+
 library(optparse)
 library(data.table)
-library(summarytools)
 library(tidyverse)
 
 
-## ----command line setup---------------------------------------------------------------------------
-clParser <- OptionParser()
-clParser <- add_option(clParser, c("-t", "--task"), type="character", default="clean",
-                help="The explicit task to run:\nclean: Clean GWAS sumstat [default %default]")
-clParser <- add_option(clParser, c("-f", "--file"), type="character",
-                help="The file to process")
-clParser <- add_option(clParser, c("-c", "--code"), type="character",
-                help="The code to use for the dataset from the specified file.")
-clParser <- add_option(clParser, c("-n", "--sample-size"), type="numeric",
-                help="Number of individuals in the sample.")
+## ----command line setup-----------------------------------------------------------------------------------------
+column_parser <- OptionParser()
 
-clOptions<-parse_args(clParser)
+column_parser <- add_option(
+  object = column_parser,
+  opt_str = c("-t", "--task"),
+  type = "character",
+  default ="clean",
+  help = "The explicit task to run:\nclean: Clean GWAS sumstat [default %default]"
+  )
+
+column_parser <- add_option(
+  object = column_parser,
+  opt_str = c("-f", "--file"),
+  type = "character",
+  help = "The file to process"
+  )
+
+column_parser <- add_option(
+  object = column_parser,
+  opt_str = c("-c", "--code"),
+  type = "character",
+  help = "The code to use for the dataset from the specified file."
+  )
+
+column_parser <- add_option(
+  object = column_parser,
+  opt_str = c("-l", "--label"),
+  type = "character",
+  help = "Label describing GWAS phenotype/sample"
+  )
+
+column_parser <- add_option(
+  object = column_parser,
+  opt_str = c("-n", "--sample-size"),
+  type = "numeric",
+  help = "Number of individuals in the sample."
+  )
+
+column_parser <- add_option(
+  object = column_parser,
+  opt_str = c("-p", "--population"),
+  type = "character",
+  help = "GWAS sample super population."
+  )
+
+column_parser <- add_option(
+  object = column_parser,
+  opt_str = c("-o", "--output"),
+  type = "character",
+  help = "Path to gwas_sumstats group folder."
+  )
+
+column_options <- parse_args(column_parser)
+
+# For testing
+#/scratch/groups/gwas_sumstats/original/alcdep_afr_all.jul2017.min_n.gz
+#/scratch/groups/gwas_sumstats/original/daner_PGC_BIP32b_mds7a.gz
+
+column_options$file<-'/scratch/groups/gwas_sumstats/original/daner_PGC_BIP32b_mds7a.gz'
+column_options$label<-'Test run'
+column_options$code<-'TEST_XXXX'
+column_options$`sample-size`<-'100000'
+column_options$population<-'EUR'
+column_options$output<-'/scratch/groups/gwas_sumstats'
 
 
 
-## ----Script setting-------------------------------------------------------------------------------
-
-filename.rmd<-"sumstats_cleaning.Rmd"
-
-#explicitly set total N
-cN <- clOptions$`sample-size`
-#setting for keeping or removing indels
-keepIndel<-F
-mhc.filter<-37
-
-
-
-
-
-
-## ----Recent date----------------------------------------------------------------------------------
+## ----Recent date------------------------------------------------------------------------------------------------
 date = Sys.Date()
 date
 
 
-## ----functions------------------------------------------------------------------------------------
-
-stdGwasColumnNames <- function(columnNames, stopOnMissingEssential=T,
-     c.SNP = c("SNP","PREDICTOR","SNPID","MARKERNAME","MARKER_NAME","SNPTESTID","ID_DBSNP49","RSID","ID","RS_NUMBER","MARKER", "RS", "RSNUMBER", "RS_NUMBERS", "SNP.NAME","SNP ID", "SNP_ID","LOCATIONALID","ASSAY_NAME"),
-     c.A1 = c("A1","ALLELE1","ALLELE_1","INC_ALLELE","EA","A1_EFFECT","REF","EFFECT_ALLELE","RISK_ALLELE","EFFECTALLELE","EFFECT_ALL","REFERENCE_ALLELE","REF_ALLELE","REFERENCEALLELE","EA","ALLELE_1","INC_ALLELE","ALLELE1","A","A_1","CODED_ALLELE","TESTED_ALLELE"),
-     c.A2 = c("A2","ALLELE2","ALLELE_2","OTHER_ALLELE","NON_EFFECT_ALLELE","DEC_ALLELE","OA","NEA","ALT","A2_OTHER","NONREF_ALLELE","NEFFECT_ALLELE","NEFFECTALLELE","NONEFFECT_ALLELE","OTHER_ALL","OTHERALLELE","NONEFFECTALLELE","ALLELE0","ALLELE_0","ALT_ALLELE","A_0","NONCODED_ALLELE"),
-     #c.EFFECT = c("EFFECT","OR","B","BETA","LOG_ODDS","EFFECTS","SIGNED_SUMSTAT","EST"),
-     c.BETA = c("BETA","B","EFFECT_BETA","EFFECT","EFFECTS","SIGNED_SUMSTAT","EST","GWAS_BETA","EFFECT_A1","EFFECTA1","EFFECT_NW"),
-     c.OR = c("OR","LOG_ODDS","OR","ODDS-RATIO","ODDS_RATIO","ODDSRATIO","OR(MINALLELE)","OR.LOGISTIC","OR_RAN","OR(A1)"),
-     c.SE = c("SE","STDER","STDERR","STD","STANDARD_ERROR","OR_SE","STANDARDERROR", "STDERR_NW","META.SE","SE_DGC","SE.2GC"),
-     c.Z = c("Z","ZSCORE","Z-SCORE","ZSTAT","ZSTATISTIC","GC_ZSCORE","BETAZSCALE"),
-     c.INFO = c("INFO","IMPINFO","IMPQUALITY", "INFO.PLINK", "INFO_UKBB"),
-     c.P = c("P","PVALUE","PVAL","P_VALUE","GC_PVALUE","WALD_P","P.VAL","GWAS_P","P-VALUE","P-VAL","FREQUENTIST_ADD_PVALUE","P.VALUE","P_VAL","SCAN-P","P.LMM","META.PVAL","P_RAN","P.ADD","P_BOLT_LMM"),
-     c.N = c("N","WEIGHT","NCOMPLETESAMPLES","TOTALSAMPLESIZE","TOTALN","TOTAL_N","N_COMPLETE_SAMPLES","N_TOTAL","N_SAMPLES","N_ANALYZED","NSAMPLES","SAMPLESIZE","SAMPLE_SIZE","TOTAL_SAMPLE_SIZE","TOTALSAMPLESIZE"),
-     c.N_CAS = c("N_CAS","NCASE","N_CASE","N_CASES","NCAS","NCA","NCASES","CASES","CASES_N","FRQ_A"),
-     c.N_CON = c("N_CON","NCONTROL","N_CONTROL","N_CONTROLS","NCON","NCO","N_CON","NCONTROLS","CONTROLS","CONTROLS_N","FRQ_U"),
-     c.NEF = c("NEF","NEFF","NEFFECTIVE","NE"),
-     #include FRQ_A?
-     c.FRQ = c("FRQ","MAF","AF","CEUAF","FREQ","FREQ1","EAF","FREQ1.HAPMAP","FREQALLELE1HAPMAPCEU", "FREQ.ALLELE1.HAPMAPCEU","EFFECT_ALLELE_FREQ","FREQ.A1","F_A","F_U","FREQ_A","FREQ_U","MA_FREQ","MAF_NW","FREQ_A1","A1FREQ","CODED_ALLELE_FREQUENCY","FREQ_TESTED_ALLELE_IN_HRS","EAF_HRC"),
-     c.CHR = c("CHR","CH","CHROMOSOME","CHROM","CHR_BUILD38","CHR_BUILD37","CHR_BUILD36","CHR_B38","CHR_B37","CHR_B36","CHR_ID","SCAFFOLD","HG19CHR","CHR.HG19","CHR_HG19","HG18CHR","CHR.HG18","CHR_HG18","CHR_BP_HG19B37","HG19CHRC"),
-     c.BP = c("BP","ORIGBP","POS","POSITION","LOCATION","PHYSPOS","GENPOS","CHR_POSITION","POS_B38","POS_BUILD38","POS_B37","POS_BUILD37","BP_HG19B37","POS_B36","POS_BUILD36","POS.HG19","POS.HG18","POS_HG19","POS_HG18","BP_HG19","BP_HG18","BP.GRCH38","BP.GRCH37","POSITION(HG19)","POSITION(HG18)","POS(B38)","POS(B37)")
-                                       ){
-  #test
-  #columnNames<-cSumstats.names
-  
-  columnNames.upper<-toupper(columnNames)
-  #names(columnNames)<-columnNames
-  columnNames.orig<-columnNames
-  
-  columnNames[columnNames.upper %in% c.SNP] <- c.SNP[1]
-  columnNames[columnNames.upper %in% c.A1] <- c.A1[1]
-  columnNames[columnNames.upper %in% c.A2] <- c.A2[1]
-  #columnNames[columnNames.upper %in% c.EFFECT] <- c.EFFECT[1]
-  #if(any(columnNames==c.EFFECT[1])) columnNames[columnNames.upper %in% c.Z] <- c.Z[1] else columnNames[columnNames.upper %in% c.Z] <- c.EFFECT[1]
-  columnNames[columnNames.upper %in% c.BETA] <- c.BETA[1]
-  columnNames[columnNames.upper %in% c.OR] <- c.OR[1] 
-  columnNames[columnNames.upper %in% c.Z] <- c.Z[1] 
-  columnNames[columnNames.upper %in% c.SE] <- c.SE[1]
-  columnNames[columnNames.upper %in% c.INFO] <- c.INFO[1]
-  columnNames[columnNames.upper %in% c.P] <- c.P[1]
-  columnNames[columnNames.upper %in% c.N] <- c.N[1]
-  columnNames[columnNames.upper %in% c.N_CAS] <- c.N_CAS[1]
-  columnNames[columnNames.upper %in% c.N_CON] <- c.N_CON[1]
-  columnNames[columnNames.upper %in% c.NEF] <- c.NEF[1]
-  columnNames[columnNames.upper %in% c.FRQ] <- c.FRQ[1]
-  columnNames[columnNames.upper %in% c.CHR] <- c.CHR[1]
-  columnNames[columnNames.upper %in% c.BP] <- c.BP[1]
-  
-  if(stopOnMissingEssential){
-    # Stop if any of these columns are not found
-    if(!any(columnNames=="SNP")) stop("\nCould not find the 'SNP' column.\n")
-    if(!any(columnNames=="A1")) stop("\nCould not find the 'A1' column.\n")
-    if(!any(columnNames=="A2")) stop("\nCould not find the 'A2' column.\n")
-  }
-  
-  if(!any(columnNames=="P")) warning("\nCould not find the P-value column. Standard is 'P'.\n")
-  if(!any(columnNames=="BETA") & !any(columnNames=="OR" & !any(columnNames=="Z"))) warning("Could not find any effect column.\n")
-  if(!any(columnNames=="SNP")) warning("\nCould not find the 'SNP' column.\n")
-  if(!any(columnNames=="A1")) warning("\nCould not find the 'A1' column.\n")
-  if(!any(columnNames=="A2")) warning("\nCould not find the 'A2' column.\n")
-  if(!any(columnNames=="FRQ")) warning("\nCould not find the 'FRQ' column.\n")
-  
-  # Warn if multiple of these columns are found
-  if(sum(columnNames=="SNP")>1) warning("\nMultiple 'SNP' columns found!\n")
-  if(sum(columnNames=="P")>1) warning("\nMultiple 'P' columns found!\n")
-  if(sum(columnNames=="A1")>1) warning("\nMultiple 'A1' columns found!\n")
-  if(sum(columnNames=="A2")>1) warning("\nMultiple 'A2' columns found!\n")
-  if(sum(columnNames=="BETA")>1) warning("\nMultiple 'BETA' columns found!\n")
-  if(sum(columnNames=="OR")>1) warning("\nMultiple 'OR' columns found!\n")
-  if(sum(columnNames=="Z")>1) warning("\nMultiple 'Z' columns found!\n")
-  if(sum(columnNames=="FRQ")>1) warning("\nMultiple 'FRQ' columns found!\n")
-  
-  return(data.frame(std=columnNames,orig=columnNames.orig))
-}
-
-#ref, plink chromosome numbering: https://zzz.bwh.harvard.edu/plink/data.shtml
-parseSNPColumnAsRSNumber <- function(text){
-  #decide if BGENIE SNP format using top 100,000 SNPs
-  #TODO this condition may be improved to not rely on the number of variants being >100,000
-  #test
-  #text<-files[[i]]$SNP
-  if(sum(grepl(pattern = "^\\d+:\\w+_\\w+_\\w+", x= head(x = text, n=100000)))>90000){
-    #extract and format rs-no
-    indexesLengths<-regexec(pattern = "^\\d+:(\\w+)_\\w+_\\w+", text=text)
-    matches<-regmatches(text,indexesLengths)
-    return(lapply(X = matches, FUN = function(x)paste0("rs",x[2])))
-  }
-  
-  text<-sub(pattern = "^XY:",replacement = "25:",x = text)
-  text<-sub(pattern = "^X:",replacement = "23:",x = text)
-  text<-sub(pattern = "^Y:",replacement = "24:",x = text)
-  text<-sub(pattern = "^MT:",replacement = "26:",x = text)
-  text<-sub(pattern = "^chr",replacement = "",x = text)
-  text<-sub(pattern = "_",replacement = ":",x = text)
-  
-  return(text)
-}
-
-parseCHRColumn <- function(text){
-  text<-sub(pattern = "^XY",replacement = "25",x = text)
-  text<-sub(pattern = "^X",replacement = "23",x = text)
-  text<-sub(pattern = "^Y",replacement = "24",x = text)
-  text<-sub(pattern = "^MT",replacement = "26",x = text)
-  text<-sub(pattern = "^chr",replacement = "",x = text)
-  return(text)
-}
+## ----Paths------------------------------------------------------------------------------------------------------
+filePaths <- column_options$file
+filePaths
 
 
-
-## -------------------------------------------------------------------------------------------------
-
-filePaths <- clOptions$file
-traitNames <- clOptions$code
-traitCodes <- clOptions$code
-#test or temporary placeholders
-filePaths<-c("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/cleaned/ADHD05.gz")
-traitNames<-c("ADHD 1")
-traitCodes<-c("ADHD05")
-sumstats.meta<-data.frame(name=traitNames)
-row.names(sumstats.meta)<-traitCodes
+## ----Trait names------------------------------------------------------------------------------------------------
+traitNames <- column_options$label
+traitNames
 
 
-## ----read in sumstats-----------------------------------------------------------------------------
+## ----Code-------------------------------------------------------------------------------------------------------
+traitCodes <- column_options$code
+traitCodes
 
-#TODO replace commas with field separators as in Helena's script
 
-filePaths <- clOptions$file
-#test
-filePaths<-c("/Users/alishpalmos/Downloads/Revezetal2020_25OHD.gz")
+## ----Creating the sumstats_meta object--------------------------------------------------------------------------
+sumstats_meta <- data.frame(
+  name = traitNames
+  )
 
+row.names(sumstats_meta) <- traitCodes
+sumstats_meta
+
+
+## ----Sample size------------------------------------------------------------------------------------------------
+cN <- column_options$`sample-size`
+
+
+## ----Indels-----------------------------------------------------------------------------------------------------
+keep_indel <- TRUE # or change to FALSE
+
+
+## ----Standardise GWAS column names------------------------------------------------------------------------------
+source(file = "../functions/standardise_GWAS_column_names.R")
+
+
+## ----Chromosome numbering---------------------------------------------------------------------------------------
+source(file = "../functions/parse_SNP_column_as_rs_number.R")
+
+
+## ----Read in sumstats-------------------------------------------------------------------------------------------
 cCode <- traitCodes[1]
 
-cFilePath <- filePaths[1] #we will probably want to have a loop over the provided files
-cSumstats <- read.table(cFilePath,header=T, quote="\"",fill=T,na.string=c(".",NA,"NA",""))
+cFilePath <- filePaths[1]
 
-#number of rows before touching the data
+cSumstats <- data.table::fread(
+  file = cFilePath,
+  header = T,
+  quote = "\"",
+  na.strings = c(
+    ".",
+    NA,
+    "NA",
+    ""
+    ),
+  # For testing read in first 10k rows
+  nrows=10000
+  )
+
+# Number of rows before touching the data
 nRowsRaw <- nrow(cSumstats)
-sumstats.meta[cCode,c("n_snp_raw")]<-nRowsRaw
+sumstats_meta[cCode,c("n_snp_raw")]<-nRowsRaw #add number of SNPs raw to sumstats_meta (meta data file)
+
+sumstats_meta$n_snp_raw
 
 
+## ----interpret columns------------------------------------------------------------------------------------------
+newNames <- standardise_GWAS_column_names(
+  column_names = colnames(cSumstats)
+  )
 
-## ----interpret columns----------------------------------------------------------------------------
-
-newNames <- stdGwasColumnNames(columnNames = colnames(cSumstats))
 print(newNames)
-colnames(cSumstats) <- newNames$std
+
+colnames(cSumstats) <- as.character(newNames$std)
 
 
-
-## ----re-format columns----------------------------------------------------------------------------
-#convert to data frame
+## ----Transform to data table------------------------------------------------------------------------------------
 cSumstats <- setDT(cSumstats)
+str(cSumstats)
 
-# Column harmonisation
+
+## ----Fix SNP column---------------------------------------------------------------------------------------------
 cSumstats.keys <- c('SNP')
-cSumstats$SNP <- as.character(cSumstats$SNP)
-cSumstats$A1 <- toupper(as.character(cSumstats$A1))
-cSumstats$A2 <- toupper(as.character(cSumstats$A2))
+cSumstats.keys
 
-#parse SNP if needed
-cSumstats$SNP <- tolower(parseSNPColumnAsRSNumber(cSumstats$SNP))
+cSumstats$SNP <- as.character(cSumstats$SNP)
+str(cSumstats$SNP)
+
+
+## ----Format A1 and A2 to upper case-----------------------------------------------------------------------------
+cSumstats$A1 <- toupper(as.character(cSumstats$A1))
+str(cSumstats$A1)
+
+cSumstats$A2 <- toupper(as.character(cSumstats$A2))
+str(cSumstats$A2)
+
+
+## ----Parse SNP--------------------------------------------------------------------------------------------------
+cSumstats$SNP <- tolower(parse_SNP_column_as_rs_number(cSumstats$SNP))
 
 if(any(colnames(cSumstats)=="CHR")) {
-  cSumstats$CHR <- toupper(as.character(cSumstats$CHR))
+  cSumstats$CHR <- as.integer(parse_CHR_column(as.character(cSumstats$CHR)))
   cSumstats.keys <- c(cSumstats.keys,'CHR')
+  str(cSumstats$CHR)
 }
 
 if(any(colnames(cSumstats)=="BP")) {
   cSumstats$BP <- as.integer(cSumstats$BP)
   cSumstats.keys <- c(cSumstats.keys,'BP')
+  str(cSumstats$BP)
 }
 
-#set data table index on selected keys
-setkeyv(cSumstats,cols = cSumstats.keys)
+cSumstats.keys
 
 
-#check if daner like columns present
-# ref: https://docs.google.com/document/d/1TWIhr8-qpCXB13WCXcU1_HDio8lC_MeWoAg2jlggrtU/edit
-if(!any(colnames(cSumstats)=="FRQ") & !any(colnames(cSumstats)=="N_CAS") & !any(colnames(cSumstats)=="N_CON")){
-  danerNcas<-colnames(cSumstats)[startsWith(colnames(cSumstats),prefix = "FRQ_A_")][1]
-  danerNcon<-colnames(cSumstats)[startsWith(colnames(cSumstats),prefix = "FRQ_U_")][1]
-  if(!is.na(danerNcas) & !is.na(danerNcon)){
-    #add number of cases and number of controls
-    cSumstats$N_CAS <- danerNcas
-    cSumstats$N_CON <- danerNcon
-    #add case and control specific effect allele frequencies
-    colnames(cSumstats)[danerNcas] <- "FRQ_CASES"
-    colnames(cSumstats)[danerNcon] <- "FRQ_CONTROLS"
+## ----Set data table index on selected keys----------------------------------------------------------------------
+setkeyv(
+  x = cSumstats,
+  cols = cSumstats.keys,
+  verbose = TRUE
+  )
+
+
+## ----Interpret BGENIE SNP format--------------------------------------------------------------------------------
+
+# Future development
+
+
+
+## ----Interpret daner like format--------------------------------------------------------------------------------
+if(!any(colnames(cSumstats)=="FRQ") & 
+   !any(colnames(cSumstats)=="N_CAS") & 
+   !any(colnames(cSumstats)=="N_CON"))
+  {
+  danerNcas <- colnames(cSumstats)[
+    startsWith(colnames(cSumstats),
+               prefix = "FRQ_A_")
+    ][1]
+  
+  danerNcon <- colnames(cSumstats)[
+    startsWith(colnames(cSumstats),
+               prefix = "FRQ_U_")
+    ][1]
+  
+  if(
+    !is.na(danerNcas)
+    & !is.na(danerNcon))
+    {
+    
+    # Add number of cases and number of controls
+    cSumstats$N_CAS <- as.numeric(gsub('FRQ_A_','',danerNcas))
+    cSumstats$N_CON <- as.numeric(gsub('FRQ_U_','',danerNcon))
+    
+    # Add case and control specific effect allele frequencies
+    colnames(cSumstats)[colnames(cSumstats) == danerNcas] <- "FRQ_CASES"
+    colnames(cSumstats)[colnames(cSumstats) == danerNcon] <- "FRQ_CONTROLS"
+    
+    # Add total FRQ column
+    cSumstats$FRQ<-((cSumstats$FRQ_CASES * cSumstats$N_CAS) + (cSumstats$FRQ_CONTROLS * cSumstats$N_CON))/(cSumstats$N_CAS + cSumstats$N_CON)
+    
+    colnames(cSumstats)
   }
+  }
+
+
+## ----Convert to numeric columns---------------------------------------------------------------------------------
+
+cSumstats$CHR<-as.numeric(cSumstats$CHR)
+
+
+
+## ----add missing N columns--------------------------------------------------------------------------------------
+if(
+  any(colnames(cSumstats)=="N_CAS") 
+  && any(colnames(cSumstats)=="N_CON"))
+  {
+  
+  # Calculate total N from number of cases and number of controls if they are present. Overwrite any specific total N.
+  cSumstats$N <- cSumstats$N_CAS + cSumstats$N_CON
+  
+  } else if(!is.null(cN)) {
+    
+  cSumstats$N[which(is.na(cSumstats$N))] <- cN #default behaviour: add explicit N only to missing values.
+  
+  } else if(!any(colnames(cSumstats)=="N")) {
+  
+    warning("\nNo N column detected!\n")
+    
+    sumstats_meta[cCode,c("noN")]<-T
+    
+    }
+
+
+## ----add BETA column if missing---------------------------------------------------------------------------------
+# If no BETA column, but OR column detected
+if(
+  any(colnames(cSumstats) == "BETA") == 0 
+  & any(colnames(cSumstats) == "OR"))
+  {
+  
+  # Calculate BETA from log of OR
+  cSumstats$BETA <- log(cSumstats$OR) 
+  
+  cat("BETA column inserted based on log OR value")
+  
+  sumstats_meta[cCode,c("Effect")]<-"OR"
+  
+  } else if(
+    any(colnames(cSumstats) == "BETA")
+    ) {
+    
+    cat("BETA column detected")
+    
+    sumstats_meta[cCode,c("Effect")]<-"BETA"
+    
+    }
+
+
+## ----insert Z column if missing---------------------------------------------------------------------------------
+# if no Z column
+if(
+  any(colnames(cSumstats) == "Z") == 0 
+  & any(colnames(cSumstats)=="BETA")
+  )
+  {
+  
+  # Calculate Z value using qchisq
+  cSumstats$Z <- sign(cSumstats$BETA)*sqrt(qchisq(cSumstats$P,1,lower=F))
+  
+  cat("Z column inserted based on P value and sign(BETA)")
+  
+  sumstats_meta[cCode,c("Z")]<-"P,sign(BETA)"
+  } else if(
+    any(colnames(cSumstats)=="SE") 
+    & any(colnames(cSumstats)=="BETA")
+    ) {
+    
+    cSumstats$Z <- cSumstats$BETA/cSumstats$SE
+    
+    cat("Z column inserted based on BETA value and SE")
+    
+    sumstats_meta[cCode,c("Z")]<-"BETA,SE"
+}
+
+
+## ----insert SE column if missing--------------------------------------------------------------------------------
+# if no SE column
+if(
+  any(colnames(cSumstats) == "SE") == 0
+  )
+  {
+  
+  # Take BETA if BETA column exists
+  if(any(colnames(cSumstats) == "BETA") == 1)
+    
+    {
+    
+    # Calculate SE from BETA and Z
+    cSumstats$SE <- abs(cSumstats$BETA/cSumstats$Z)
+    
+  }
+  
+  cat("SE column inserted based on BETA/OR and P")
+  
+  sumstats_meta[cCode, c("SE")] <- "BETA,Z"
+  
+  }
+
+
+## ----add meta data for PRS & pathway analysis-------------------------------------------------------------------
+# Sufficient columns for PRS
+sumstats_meta[cCode, c("enough_columns_PRS")] <-
+  any(colnames(cSumstats) == "SNP") &
+  any(colnames(cSumstats) == "P") &
+  (any(colnames(cSumstats) == "BETA") |
+     any(colnames(cSumstats) == "OR") |
+     any(colnames(cSumstats) == "Z") ) &
+  any(colnames(cSumstats) == "A1") &
+  any(colnames(cSumstats) == "A2")
+
+# Sufficient columns for pathway analysis
+sumstats_meta[cCode,c("enough_columns_pathway_analysis")] <-
+  any(colnames(cSumstats)=="SNP") &
+  any(colnames(cSumstats)=="P")
+
+sumstats_meta
+
+
+## ----clean missing p--------------------------------------------------------------------------------------------
+if(
+  any(colnames(cSumstats)=="P")
+  )
+  {
+  # If P is na
+  cond <- is.na(cSumstats$P)
+  
+  # Create column n_removed_missing_p in meta file
+  sumstats_meta[cCode, c("n_removed_missing_p")] <- sum(cond)
+  
+  # Subsets sum stats that are not na in the P column
+  cSumstats <- cSumstats[which(!cond),]
+}
+
+sumstats_meta$n_removed_missing_p
+
+
+## ----clean missing effect---------------------------------------------------------------------------------------
+if(
+  any(colnames(cSumstats)=="BETA") # if BETA present
+  ){
+  
+  # If NA for BETA value, remove variant
+  cond <- is.na(cSumstats$BETA) 
+  sumstats_meta[cCode,c("n_removed_missing_effect")] <- sum(cond)
+  cSumstats<-cSumstats[which(!cond),]
+  
+} else if(
+  any(colnames(cSumstats)=="OR")
+  ) {
+  
+  #If NA for OR value, remove variant
+  cond <- is.na(cSumstats$OR) 
+  sumstats_meta[cCode,c("n_removed_missing_effect")] <- sum(cond)
+  cSumstats<-cSumstats[which(!cond),]
+  
+} else if(
+  any(colnames(cSumstats)=="Z")
+  ) {
+  
+  cond <- is.na(cSumstats$Z) #if NA for Z value remove variant
+  sumstats_meta[cCode,c("n_removed_missing_effect")] <- sum(cond)
+  cSumstats<-cSumstats[which(!cond),]
   
 }
 
-#deal with duplicate columns - use the first occurrence
-##SNP
-iDup<-grep(pattern = "^SNP$",colnames(cSumstats))
-if(length(iDup)>1){
-  iDup<-iDup[2:length(iDup)]
-  colnames(cSumstats)[iDup]<-"XSNP"
-}
-
-##BP
-if('BP' %in% names(cSumstats)){
-  iDup<-grep(pattern = "^BP$",colnames(cSumstats))
-  if(length(iDup)>1){
-    iDup<-iDup[2:length(iDup)]
-    colnames(cSumstats)[iDup]<-"XBP"
-  }
-}
-
-##FRQ
-if('FRQ' %in% names(cSumstats)){
-  iDup<-grep(pattern = "^FRQ$",colnames(cSumstats))
-  if(length(iDup)>1){
-    iDup<-iDup[2:length(iDup)]
-    colnames(cSumstats)[iDup]<-"XFRQ"
-  }
-}
+sumstats_meta$n_removed_missing_effect
 
 
-
-
-
-## ----add missing columns--------------------------------------------------------------------------
-
-# Add total N depending on columns and input
-if(any(colnames(cSumstats)=="N_CAS") && any(colnames(cSumstats)=="N_CON")) {
-  ### Calculate total N from number of cases and number of controls if they are present. Overwrite any specific total N.
-  cSumstats$N <- cSumstats$N_CAS + cSumstats$N_CON
-} else if(!is.null(cN)) {
-  cSumstats$N[which(is.na(cSumstats$N))]<-cN #default behaviour - add explicit N only to missing values.
-} else if(!any(colnames(cSumstats)=="N")) {
-  warning("\nNo N column detected!\n")
-  sumstats.meta[cCode,c("noN")]<-T
-}
-
-#Add metadata about enough for PRS and pathway analysis
-sumstats.meta[cCode,c("enough_PRS")]<-any(colnames(cSumstats)=="SNP") & any(colnames(cSumstats)=="P") & (any(colnames(cSumstats)=="BETA") | any(colnames(cSumstats)=="OR") | any(colnames(cSumstats)=="Z") ) & any(colnames(cSumstats)=="A1") & any(colnames(cSumstats)=="A2")
-sumstats.meta[cCode,c("enough_pathwayanalysis")]<-any(colnames(cSumstats)=="SNP") & any(colnames(cSumstats)=="P")
-
-
-
-## ----clean missing data---------------------------------------------------------------------------
-
-#clean missing P
-if(any(colnames(cSumstats)=="P")){
-  cond <- is.na(cSumstats$P)
-  sumstats.meta[cCode,c("n_removed_missing_p")]<-sum(cond)
-  cSumstats<-cSumstats[which(!cond),]
-}
-
-#clean missing effect
-if(any(colnames(cSumstats)=="BETA")){
-  cond <- is.na(cSumstats$BETA)
-  sumstats.meta[cCode,c("n_removed_missing_effect")]<-sum(cond)
-  cSumstats<-cSumstats[which(!cond),]
-} else if(any(colnames(cSumstats)=="OR")) {
-  cond <- is.na(cSumstats$OR)
-  sumstats.meta[cCode,c("n_removed_missing_effect")]<-sum(cond)
-  cSumstats<-cSumstats[which(!cond),]
-} else if(any(colnames(cSumstats)=="Z")) {
-  cond <- is.na(cSumstats$Z)
-  sumstats.meta[cCode,c("n_removed_missing_effect")]<-sum(cond)
-  cSumstats<-cSumstats[which(!cond),]
-}
-
-
-
-
-## ----clean duplicate data-------------------------------------------------------------------------
-# Remove duplicated variants across SNP, A1 and A2
-if(any(colnames(cSumstats)=="SNP") & any(colnames(cSumstats)=="A1") & any(colnames(cSumstats)=="A2")) {
+## ----clean duplicate data---------------------------------------------------------------------------------------
+if(
+  any(colnames(cSumstats)=="SNP") 
+  & any(colnames(cSumstats)=="A1") 
+  & any(colnames(cSumstats)=="A2")
+  ) {
+  
   cSumstats.n <- nrow(cSumstats)
-  cSumstats <- unique(cSumstats,by = c("SNP","A1","A2"))
-  sumstats.meta[cCode,c("n_removed_duplicates")]<-cSumstats.n-nrow(cSumstats)
+  
+  cSumstats <- unique(cSumstats, by = c("SNP","A1","A2"))
+  
+  sumstats_meta[cCode,c("n_removed_duplicates")] <- cSumstats.n-nrow(cSumstats)
+  
 }
 
+sumstats_meta$n_removed_duplicates
 
-## ----clean based on values------------------------------------------------------------------------
 
-# P filter
-if(any(colnames(cSumstats)=="P")){
-  rm <- (!is.na(cSumstats$P) & (cSumstats$P>1 | cSumstats$P<0))
+## ----P filter---------------------------------------------------------------------------------------------------
+if(
+  any(colnames(cSumstats)=="P")
+  ){
+  
+  rm <- (!is.na(cSumstats$P) & (cSumstats$P > 1 | cSumstats$P < 0))
+  
   cSumstats <- cSumstats[!rm, ]
-  cat("Removing ", sum(rm), " SNPs with P < 0 or P > 1; ", nrow(cSumstats), " remain")
-  sumstats.meta[cCode,c("n_removed_p")]<-sum(rm)
-} else {
-  cat("Warning: The dataset does not contain a P column to apply the specified filter on.")
-}
+  
+  cat("Removing", sum(rm), "SNPs with P < 0 or P > 1;", nrow(cSumstats), "remain")
+  
+  sumstats_meta[cCode,c("n_removed_p")]<-sum(rm)
+  
+  } else {
+    
+    cat("Warning: The dataset does not contain a P column to apply the specified filter on.")
+    
+    }
 
-# FRQ filter
-if(any(colnames(cSumstats)=="FRQ")){
-  rm <- (!is.na(cSumstats$FRQ) & (cSumstats$FRQ<0.005 | cSumstats$FRQ>0.995))
+
+## ----FRQ filter-------------------------------------------------------------------------------------------------
+if(
+  any(colnames(cSumstats)=="FRQ")
+  ){
+  
+  frq.filter<-0.005
+  
+  # If outside of bounds 
+  rm <- (!is.na(cSumstats$FRQ) 
+         & (cSumstats$FRQ<frq.filter | cSumstats$FRQ>(1-frq.filter)))
+  
   cSumstats <- cSumstats[!rm, ]
-  cat("Removing ", sum(rm), " SNPs with FRQ <", frq.filter, "; ", nrow(cSumstats), " remain")
-  sumstats.meta[cCode,c("n_removed_frq")]<-sum(rm)
-} else {
-  cat("Warning: The dataset does not contain a FRQ or MAF column to apply the specified filter on.")
-}
+  
+  cat("Removing", sum(rm), "SNPs with MAF <", frq.filter, ";", nrow(cSumstats), "remain")
+  
+  sumstats_meta[cCode,c("n_removed_frq")] <- sum(rm)
+  
+  } else {
+  
+    cat("Warning: The dataset does not contain a FRQ or MAF column to apply the specified filter on.")
+    
+    }
 
-# INFO filter
-if(any(colnames(cSumstats)=="INFO")){
+
+## ----INFO filter------------------------------------------------------------------------------------------------
+if(
+  any(colnames(cSumstats)=="INFO")
+  ){
+  
   rm <- (!is.na(cSumstats$INFO) & cSumstats$INFO<0.6)
+  
   cSumstats <- cSumstats[!rm, ]
-  cat("Removing ", sum(rm), " SNPs with INFO < 0.6; ", nrow(cSumstats), " remain")
-  sumstats.meta[cCode,c("n_removed_info")]<-sum(rm)
-} else {
-  cat("Warning: The dataset does not contain an INFO column to apply the specified filter on.")
+  
+  cat("Removing", sum(rm), "SNPs with INFO <0.6;", nrow(cSumstats), "remain")
+  
+  sumstats_meta[cCode,c("n_removed_info")] <- sum(rm)
+  
+  } else {
+    
+    cat("Warning: The dataset does not contain an INFO column to apply the specified filter on.")
 }
 
-# OR filter
-if(any(colnames(cSumstats)=="OR")){
+
+## ----OR filter--------------------------------------------------------------------------------------------------
+if(
+  any(colnames(cSumstats)=="OR")
+  ){
+  
   rm <- (!is.na(cSumstats$OR) & cSumstats$OR>10000)
+  
   cSumstats <- cSumstats[!rm, ]
-  cat("Removing ", sum(rm), " SNPs with OR > 10000; ", nrow(cSumstats), " remain")
-  sumstats.meta[cCode,c("n_removed_or")]<-sum(rm)
+  
+  cat("Removing", sum(rm), "SNPs with OR > 10000;", nrow(cSumstats), "remain")
+  
+  sumstats_meta[cCode,c("n_removed_or")] <- sum(rm)
+  
+  } else {
+    
+    cat("Warning: The dataset does not contain an INFO column to apply the specified filter on.")
+    
+    }
+
+
+## ----N filter---------------------------------------------------------------------------------------------------
+if(any(names(cSumstats) == 'NEF')){
+  # NEF is present in sumstats so variants will be filtered by provided NEF
+  N_sd <- sd(cSumstats$NEF)
+  N_median <- median(cSumstats$NEF)
+  
+  cSumstats$N_outlier<-cSumstats$NEF > N_median+(3*N_sd) | cSumstats$NEF < N_median-(3*N_sd)
+  
+  cat(sum(cSumstats$N_outlier, na.rm=T), "SNPs have reported NEF outside median(N) ± 3SD(N).\n", sep='')
+  sumstats_meta[cCode,c("n_outlier_n")] <- sum(cSumstats$N_outlier, na.rm=T)
+
 } else {
-  cat("Warning: The dataset does not contain an INFO column to apply the specified filter on.")
+  if(any(names(cSumstats) == 'N_CAS') & any(names(cSumstats) == 'N_CON')){
+    # NEF isn't present, but N_CAS and N_CON are present, so we will calculate NEF from N_CAS and N_CON.
+    cSumstats$NEF_est<-4/(1/cSumstats$N_CAS+1/cSumstats$N_CON)
+    
+    N_sd <- sd(cSumstats$NEF_est)
+    N_median <- median(cSumstats$NEF_est)
+    
+    cSumstats$N_outlier<-cSumstats$NEF_est > N_median+(3*N_sd) | cSumstats$NEF < N_median-(3*N_sd)
+    
+    cat(sum(cSumstats$N_outlier, na.rm=T), "SNPs have estimated NEF outside median(N) ± 3SD(N).\n", sep='')
+    sumstats_meta[cCode,c("n_outlier_n")] <- sum(cSumstats$N_outlier, na.rm=T)
+
+  } else {
+    # NEF nor N_CAS/N_CON columns are present. We will therefore filter by N
+    if(length(unique(cSumstats$N)) > 1){
+      # There is variation in the N column
+      N_sd <- sd(cSumstats$N)
+      N_median <- median(cSumstats$N)
+      
+      cSumstats$N_outlier<-cSumstats$N > N_median+(3*N_sd) | cSumstats$N < N_median-(3*N_sd)
+      
+      cat(sum(cSumstats$N_outlier, na.rm=T), "SNPs have N outside median(N) ± 3SD(N).\n", sep='')
+      sumstats_meta[cCode,c("n_outlier_n")] <- sum(cSumstats$N_outlier, na.rm=T)
+    } else {
+      # Per variant sample size information is not available. Set column indicating outliers to NA
+      cSumstats$N_outlier<-NA
+      cat("Per variant sample size is not avialable.\n", sep='')
+      sumstats_meta[cCode,c("n_outlier_n")] <- NA
+
+    }
+  }
 }
 
-# N filter - from Ollies script
-if(any(colnames(cSumstats)=="N")){
-  N_sd<-sd(cSumstats$N)
-  N_median<-median(cSumstats$N)
-  rm <- (!is.na(cSumstats$N) & (cSumstats$N > N_median+(3*N_sd) | cSumstats$N < N_median-(3*N_sd)))
-  cSumstats <- cSumstats[!rm, ]
-  cat("Removing ", sum(rm), " SNPs with N outside median(N) +- 3SD(N); ", nrow(cSumstats), " remain")
-  sumstats.meta[cCode,c("n_removed_n")]<-sum(rm)
-}
 
-# SE filter - from Ollies script
-if(any(colnames(cSumstats)=="SE")){
+
+## ----SE filter--------------------------------------------------------------------------------------------------
+if(
+  any(colnames(cSumstats)=="SE")
+  ){
+  
+  # If SE is 0 or NA, SNP gets removed
   rm <- (!is.na(cSumstats$SE) & cSumstats$SE == 0)
+  
   cSumstats <- cSumstats[!rm, ]
-  cat("Removing ", sum(rm), " SNPs with SE = 0; ", nrow(cSumstats), " remain")
-  sumstats.meta[cCode,c("n_removed_se")]<-sum(rm)
+  
+  cat("Removing", sum(rm), "SNPs with SE = 0 or NA;", nrow(cSumstats), "remain")
+  
+  sumstats_meta[cCode,c("n_removed_se")] <- sum(rm)
+  
+  } else {
+    
+    cat("Warning: The dataset does not contain an SE column to apply the specified filter on.")
+    
+    }
+
+
+## ---------------------------------------------------------------------------------------------------------------
+#if a Zscore already exists, use this to calculate SE from the BETA
+if(
+  any(colnames(cSumstats)=="Z")
+  ){
+  
+  cSumstats_se_check <- cSumstats %>%
+    mutate(
+      se_check = 
+        BETA / Z
+    )
+  
+  #if there is only SE column, calculate the Zscore first and then the SE from the BETA
+} else if(
+  any(colnames(cSumstats)=="SE")
+  ){
+  
+  cSumstats_se_check <- cSumstats %>%
+    mutate(
+      z_check =
+        sign(BETA) * abs(qnorm(P/2))
+    )
+  
+  cSumstats_se_check <- cSumstats %>%
+    mutate(
+      se_check = 
+        BETA / z_check
+    )
 }
 
-#indels
-if(keepIndel == T){
-  cSumstats$A1 <- as.character(toupper(cSumstats$A1))
-  cSumstats$A2 <- as.character(toupper(cSumstats$A2))
-} else if(keepIndel == F){
+#calculate the relative difference between the two SE
+mean_rel_diff <- all.equal(target = cSumstats_se_check$se_check, 
+                           current = cSumstats$SE)
+
+#print output message
+if(
+    mean_rel_diff > 0.1
+    ){
+    
+    cat("Mean relative difference in SE is greater than 0.1, please investigate")
+      
+      } else if(
+        mean_rel_diff < 0.1
+      ){
+        
+        cat("Mean relative difference in SE is smaller than 0.1 - passed check")
+        
+        #remove the dataframe used in the checking process
+        rm(cSumstats_se_check)
+        
+      }
+
+
+
+## ----indels filter----------------------------------------------------------------------------------------------
+if(keep_indel == FALSE)
+  { 
   cSumstats$A1 <- as.character(toupper(cSumstats$A1), c("A", "C", "G", "T"))
+  
   cSumstats$A2 <- as.character(toupper(cSumstats$A2), c("A", "C", "G", "T"))
+  
   rm <- (is.na(cSumstats$A1) | is.na(cSumstats$A2))
-  sumstats.meta[cCode,c("n_removed_indels")]<-sum(cond)
+  
+  sumstats_meta[cCode,c("n_removed_indels")] <- sum(cond)
+  
   cSumstats<-cSumstats[!rm,]
 }
 
-
-##remove MHC region based on position - probably better to do after merge/harmonisation with reference
-#references
-#https://www.ncbi.nlm.nih.gov/grc/human/regions/MHC?asm=GRCh37
-#https://www.ncbi.nlm.nih.gov/grc/human/regions/MHC
-if(!is.na(mhc.filter)){
-  if(any(colnames(cSumstats)=="CHR") & any(colnames(cSumstats)=="BP")){
-    if(mhc.filter==37) {
-        rm <- (!is.na(cSumstats$CHR) & !is.na(cSumstats$BP) & cSumstats$CHR=="6" & cSumstats$BP>=28477797 & cSumstats$BP<=33448354)
-        cSumstats <- cSumstats[!rm, ]
-    } else if (mhc.filter==38) {
-        rm <- (!is.na(cSumstats$CHR) & !is.na(cSumstats$BP) & cSumstats$CHR=="6" & cSumstats$BP>=28510120 & cSumstats$BP<=33480577)
-        cSumstats <- cSumstats[!rm, ]
-        cat("Removing ", sum(rm), " SNPs in the GRCh",mhc.filter," MHC; ", nrow(cSumstats), " remain")
-    } else {
-        cat("Warning: Invalid assembly version provided - no filtering of the MHC was done!")
-      }
-  } else {
-    cat("Warning: No chromosome or base-pair position information available - no filtering of the MHC was done!")
-  }
-}
-    
+sumstats_meta$n_removed_indels
 
 
+## ----Check and correct for genomic control----------------------------------------------------------------------
+if(
+  any(colnames(cSumstats) == "SE") == 1)
+  {
+  if(
+    any(colnames(cSumstats) == "BETA") == 1
+    )
+    {
 
-## ----read in reference----------------------------------------------------------------------------
-
-
-
-## ----read in full GWAS info all traits------------------------------------------------------------
-
-
-
-## -------------------------------------------------------------------------------------------------
-
-munge.mod <- function(files,hm3,trait.names=NULL,N,info.filter = .9,maf.filter=0.01,path.dir.output="",doChrSplit=FALSE, doStatistics=TRUE){
-  
-  # for testing
-  #library(data.table)
-  #library(R.utils)
-  #files<-c("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/cleaned/ALCD03.gz")
-  #files<-c("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/reference.1000G.maf.0.005.txt")
-  #hm3<-"/Users/jakz/Documents/local_db/JZ_GED_PHD_C1/data/w_hm3.snplist.flaskapp2018"
-  #trait.names=c("REF1KG")
-  #info.filter=0.6
-  #maf.filter=0.05
-  #path.dir.output="/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/munged"
-  
-  length <- length(files)
-  filenames <- as.vector(files)
-  
-  log2<-paste(trait.names,collapse="_")
-  if(object.size(log2) > 200){
-    log2<-substr(log2,1,100)
-    }
-  log.file <- file(file.path(path.dir.output,paste0(log2, "_munge.mod.log")),open="wt")
-  
-  begin.time <- Sys.time()
-  
-  cat(print(paste0("The munging of ", length(trait.names), " summary statistics started at ",begin.time), sep = ""),file=log.file,sep="\n",append=TRUE)
-  
-  cat(print(paste("Reading summary statistics for", paste(files,collapse=" "), ". Please note that this step usually takes a few minutes due to the size of summary statistic files.")),file=log.file,sep="\n",append=TRUE)
-  
-  ##note that fread is not used here due to formatting differences across summary statistic files
-  files = lapply(files, read.table,header=T, quote="\"",fill=T,na.string=c(".",NA,"NA",""))
-  cat(print("Reading in reference file"),file=log.file,sep="\n",append=TRUE)
-  ref <- fread(hm3,header=T,data.table=F)
-  cat(print("All files loaded into R!"),file=log.file,sep="\n",append=TRUE)
-  
-  for(i in 1:length){
-    #for testing!
-    #i=1
+    cSumstats$P_check <- 2*pnorm(-abs(cSumstats$Z))
     
-    cat(paste("     "),file=log.file,sep="\n",append=TRUE)
-    cat(paste("     "),file=log.file,sep="\n",append=TRUE)
-    
-    cat(print(paste("Munging file:", filenames[i])),file=log.file,sep="\n",append=TRUE)
-    hold_names <- toupper(names(files[[i]]))
-    
-    names1<-hold_names
-    if("SNP" %in% hold_names) cat(print(paste("Interpreting the SNP column as the SNP column.")),file=log.file,sep="\n",append=TRUE)
-    hold_names[hold_names %in% c("SNP","SNPID","RSID","RS_NUMBER","RS_NUMBERS", "MARKERNAME", "ID","PREDICTOR")] <- "SNP"
-    if(length(base::setdiff(names1,hold_names)) > 0) cat(print(paste("Interpreting the", setdiff(names1, hold_names), "column as the SNP column.")),file=log.file,sep="\n",append=TRUE)
-    
-    names1<-hold_names
-    if("A1" %in% hold_names) cat(print(paste("Interpreting the A1 column as the A1 column.")),file=log.file,sep="\n",append=TRUE)
-    hold_names[hold_names %in%c("A1", "ALLELE1","EFFECT_ALLELE","INC_ALLELE","REFERENCE_ALLELE","EA","REF")] <- "A1"
-    if(length(base::setdiff(names1,hold_names)) > 0) cat(print(paste("Interpreting the", setdiff(names1, hold_names), "column as the A1 column.")),file=log.file,sep="\n",append=TRUE)
-    
-    names1<-hold_names
-    if("A2" %in% hold_names) cat(print(paste("Interpreting the A2 column as the A2 column.")),file=log.file,sep="\n",append=TRUE)
-    hold_names[hold_names %in%c("A2","ALLELE2","ALLELE0","OTHER_ALLELE","REF","NON_EFFECT_ALLELE","DEC_ALLELE","OA","NEA", "ALT")]  <- "A2"
-    if(length(base::setdiff(names1,hold_names)) > 0) cat(print(paste("Interpreting the", setdiff(names1, hold_names), "column as the A2 column.")),file=log.file,sep="\n",append=TRUE)
-    
-    names1<-hold_names
-    if("EFFECT" %in% hold_names) cat(print(paste("Interpreting the effect column as the effect column.")),file=log.file,sep="\n",append=TRUE)
-    hold_names[hold_names %in%c("OR","B","BETA","LOG_ODDS","EFFECTS","EFFECT","SIGNED_SUMSTAT", "Z","ZSCORE","EST","ZSTAT","ZSTATISTIC")] <- "effect"
-    if(length(base::setdiff(names1,hold_names)) > 0) cat(print(paste("Interpreting the", setdiff(names1, hold_names), "column as the effect column.")),file=log.file,sep="\n",append=TRUE)
-    
-    names1<-hold_names
-    if("INFO" %in% hold_names) cat(print(paste("Interpreting the INFO column as the INFO column.")),file=log.file,sep="\n",append=TRUE)
-    hold_names[hold_names %in%c("INFO")] <- "INFO"
-    if(length(base::setdiff(names1,hold_names)) > 0) cat(print(paste("Interpreting the", setdiff(names1, hold_names), "column as the INFO column.")),file=log.file,sep="\n",append=TRUE)
-    
-    names1<-hold_names
-    if("P" %in% hold_names) cat(print(paste("Interpreting the P column as the P column.")),file=log.file,sep="\n",append=TRUE)
-    hold_names[hold_names %in%c("P","PVALUE","PVAL","P_VALUE","P-VALUE","P.VALUE","P_VAL","GC_PVALUE","WALD_P")] <- "P"
-    if(length(base::setdiff(names1,hold_names)) > 0) cat(print(paste("Interpreting the", setdiff(names1, hold_names), "column as the P column.")),file=log.file,sep="\n",append=TRUE)
-    
-    names1<-hold_names
-    if("N" %in% hold_names) cat(print(paste("Interpreting the N column as the N (sample size) column.")),file=log.file,sep="\n",append=TRUE)
-    hold_names[hold_names %in%c("N","WEIGHT","NCOMPLETESAMPLES", "TOTALSAMPLESIZE", "TOTALN", "TOTAL_N","N_COMPLETE_SAMPLES" )] <- "N"
-    if(length(base::setdiff(names1,hold_names)) > 0) cat(print(paste("Interpreting the ", setdiff(names1, hold_names), " column as the N (sample size) column.")),file=log.file,sep="\n",append=TRUE)
-    
-    names1<-hold_names
-    if("N_CAS" %in% hold_names) cat(print(paste("Interpreting the N_CAS column as the N_CAS (sample size for cases) column.")),file=log.file,sep="\n",append=TRUE)
-    hold_names[hold_names %in%c("NCASE","N_CASE","N_CASES","N_CAS", "NCAS", "NCA")] <- "N_CAS"
-    if(length(base::setdiff(names1,hold_names)) > 0) cat(print(paste("Interpreting the ", setdiff(names1, hold_names), " column as the N_CAS (sample size for cases) column.")),file=log.file,sep="\n",append=TRUE)
-    
-    names1<-hold_names
-    if("N_CON" %in% hold_names) cat(print(paste("Interpreting the N_CON column as the N_CON (sample size for controls) column.")),file=log.file,sep="\n",append=TRUE)
-    hold_names[hold_names %in%c("NCONTROL","N_CONTROL","N_CONTROLS","N_CON","CONTROLS_N", "NCON", "NCO")] <- "N_CON"
-    if(length(base::setdiff(names1,hold_names)) > 0) cat(print(paste("Interpreting the ", setdiff(names1, hold_names), " column as the N_CON (sample size for controls) column.")),file=log.file,sep="\n",append=TRUE)
-    
-    # Print a message for misisng P value, rs, effect or allele columns
-    if(sum(hold_names %in% "P") == 0) cat(print(paste0('Cannot find P-value column, try renaming it to P in the summary statistics file for:',filenames[i])),file=log.file,sep="\n",append=TRUE)
-    if(sum(hold_names %in% "A1") == 0) cat(print(paste0('Cannot find effect allele column, try renaming it to A1 in the summary statistics file for:',filenames[i])),file=log.file,sep="\n",append=TRUE)
-    if(sum(hold_names %in% "A2") == 0) cat(print(paste0('Cannot find other allele column, try renaming it to A2 in the summary statistics file for:',filenames[i])),file=log.file,sep="\n",append=TRUE)
-    if(sum(hold_names %in% "effect") == 0) cat(print(paste0('Cannot find beta or effect column, try renaming it to effect in the summary statistics file for:',filenames[i])),file=log.file,sep="\n",append=TRUE)
-    if(sum(hold_names %in% "SNP") == 0) cat(print(paste0('Cannot find rs-id column, try renaming it to SNP in the summary statistics file for:',filenames[i])),file=log.file,sep="\n",append=TRUE)
-    
-    # Print a warning message when multiple columns interprets as P value, rs, effect or allele columns
-    if(sum(hold_names %in% "P") > 1) cat(print(paste0('Multiple columns are being interpreted as the P-value column. Try renaming the column you dont want interpreted as P to P2 for:',filenames[i])),file=log.file,sep="\n",append=TRUE)
-    if(sum(hold_names %in% "A1") > 1) cat(print(paste0('Multiple columns are being interpreted as the effect allele column. Try renaming the column you dont want interpreted as effect allele column to A1_2 for:',filenames[i])),file=log.file,sep="\n",append=TRUE)
-    if(sum(hold_names %in% "A2") > 1) cat(print(paste0('Multiple columns are being interpreted as the other allele column. Try renaming the column you dont want interpreted as the other allele column to A2_2 for:',filenames[i])),file=log.file,sep="\n",append=TRUE)
-    if(sum(hold_names %in% "effect") > 1) cat(print(paste0('Multiple columns are being interpreted as the beta or effect column. Try renaming the column you dont want interpreted as the beta or effect column to effect2 for:',filenames[i])),file=log.file,sep="\n",append=TRUE)
-    if(sum(hold_names %in% "SNP") > 1) cat(print(paste0('Multiple columns are being interpreted as the rs-id column. Try renaming the column you dont want interpreted as rs-id to SNP2 for:',filenames[i])),file=log.file,sep="\n",append=TRUE)
-    
-    # Throw warnings for misisng P valuue, rs, effect or allele columns
-    if(sum(hold_names %in% "P") == 0) warning(paste0('Cannot find P-value column, try renaming it P in the summary statistics file for:',filenames[i]))
-    if(sum(hold_names %in% "A1") == 0) warning(paste0('Cannot find effect allele column, try renaming it A1 in the summary statistics file for:',filenames[i]))
-    if(sum(hold_names %in% "A2") == 0) warning(paste0('Cannot find other allele column, try renaming it A2 in the summary statistics file for:',filenames[i]))
-    if(sum(hold_names %in% "effect") == 0) warning(paste0('Cannot find beta or effect column, try renaming it effect in the summary statistics file for:',filenames[i]))
-    if(sum(hold_names %in% "SNP") == 0) warning(paste0('Cannot rs-id column, try renaming it SNP in the summary statistics file for:',filenames[i]))
-    
-    ##rename common MAF labels
-    names1<-hold_names
-    if("MAF" %in% hold_names) cat(print(paste("Interpreting the MAF column as the MAF (minor allele frequency) column.")),file=log.file,sep="\n",append=TRUE)
-    hold_names[hold_names %in% toupper(c("MAF", "CEUaf", "Freq1", "EAF", "Freq1.Hapmap", "FreqAllele1HapMapCEU", "Freq.Allele1.HapMapCEU", "EFFECT_ALLELE_FREQ", "Freq.A1"))] <- "MAF"
-    if(length(setdiff(names1,hold_names)) > 0) cat(print(paste("Interpreting the ", setdiff(names1, hold_names), " column as the MAF (minor allele frequency) column.")),file=log.file,sep="\n",append=TRUE)
-    
-    #storing the original names
-    names1<-names(files[[i]])
-    #Replace the origonal names
-    names(files[[i]]) <- hold_names
-    
-    if("MAF" %in% colnames(files[[i]])) {
-      ##make sure MAF is actually MAF (i.e., max value is .5 or less)
-      if(any(files[[i]]$MAF>1)){
-        warning(paste0('Discovered MAF values above 1. This could indicate that the MAF column is not interpreted correctly.',filenames[i]))
-      }else if(any(files[[i]]$MAF>1)){
-        warning(paste0('Discovered MAF values above .5. Converting these to 1-VALUE.',filenames[i]))
-        files[[i]]$MAF<-ifelse(files[[i]]$MAF <= .5, files[[i]]$MAF, (1-files[[i]]$MAF))
-      }
-    } else {
-      #Add MAF here to not misinterpret any additional MAF column as the GWAS MAF
-      files[[i]]$MAF<-NA_real_
-    }
-    
-    # Compute N is N cases and N control is reported:
-    if("N_CAS" %in% colnames(files[[i]])) {
-      files[[i]]$N <- files[[i]]$N_CAS + files[[i]]$N_CON
-      cat(print(paste("As the file includes both N_CAS and N_CON columns, the summation of these two columns will be used as the total sample size")),file=log.file,sep="\n",append=TRUE)
-    }
-    
-    ##make sure all alleles are upper case for matching to reference file
-    files[[i]]$A1 <- factor(toupper(files[[i]]$A1), c("A", "C", "G", "T"))
-    files[[i]]$A2 <- factor(toupper(files[[i]]$A2), c("A", "C", "G", "T"))
-    
-    ##merge with ref file
-    cat(print(paste("Merging file:", filenames[i], "with the reference file:", hm3)),file=log.file,sep="\n",append=TRUE)
-    b<-nrow(files[[i]])
-    cat(print(paste(b, "rows present in the full", filenames[i], "summary statistics file.")),file=log.file,sep="\n",append=TRUE)
-    
-    
-    ##Addition: produce statistics on non-overlapping SNPs with reference
-    if(doStatistics) {
-      gwas.snps.not.in.ref_filepath<-file.path(path.dir.output,paste0(trait.names[i],".snps.not.in.ref.txt"))
-      gwas.snps.not.in.ref<-merge(ref,files[[i]],by="SNP",all.x=F,all.y=T)
-      gwas.snps.not.in.ref<-gwas.snps.not.in.ref[which(is.na(gwas.snps.not.in.ref$A1.x)),c("SNP")]
-      write.table(x = gwas.snps.not.in.ref,file = gwas.snps.not.in.ref_filepath,sep="\t", quote = FALSE, col.names=F, row.names = F)
-      ref.snps.not.in.gwas_filepath<-file.path(path.dir.output,paste0("ref.snps.not.in.",trait.names[i],".txt"))
-      ref.snps.not.in.gwas<-merge(ref,files[[i]],by="SNP",all.x=T,all.y=F)
-      ref.snps.not.in.gwas<-ref.snps.not.in.gwas[which(is.na(ref.snps.not.in.gwas$A1.y)),c("SNP")]
-      write.table(x = ref.snps.not.in.gwas,file = ref.snps.not.in.gwas_filepath,sep="\t", quote = FALSE, col.names=F, row.names = F)
-    }
-    
-    files[[i]] <- merge(ref,files[[i]],by="SNP",all.x=F,all.y=F)
-    cat(print(paste((b-nrow(files[[i]])), "rows were removed from the", filenames[i], "summary statistics file as the rs-ids for these rows were not present in the reference file.")),file=log.file,sep="\n",append=TRUE)
-    
-    #immediate rename intruding columns from ref
-    colnames(files[[i]])[colnames(files[[i]])=="MAF.x"]<-"MAF"
-    
-    ##remove any rows with missing p-values
-    b<-nrow(files[[i]])
-    if("P" %in% colnames(files[[i]])) {
-      files[[i]]<-subset(files[[i]], !(is.na(files[[i]]$P)))
-    }
-    if(b-nrow(files[[i]]) > 0) cat(print(paste(b-nrow(files[[i]]), "rows were removed from the", filenames[i], "summary statistics file due to missing values in the P-value column")),file=log.file,sep="\n",append=TRUE)
-    
-    ##remove any rows with missing effects
-    b<-nrow(files[[i]])
-    if("effect" %in% colnames(files[[i]])) {
-      files[[i]]<-subset(files[[i]], !(is.na(files[[i]]$effect)))
-    }
-    if(b-nrow(files[[i]]) > 0) cat(print(paste(b-nrow(files[[i]]), "rows were removed from the", filenames[i], "summary statistics file due to missing values in the effect column")),file=log.file,sep="\n",append=TRUE)
-    
-    ##determine whether it is OR or logistic/continuous effect based on median effect size 
-    if("effect" %in% colnames(files[[i]])) {
-      a1<-files[[i]]$effect[[1]]
-      files[[i]]$effect<-ifelse(rep(round(median(files[[i]]$effect,na.rm=T)) == 1,nrow(files[[i]])), log(files[[i]]$effect),files[[i]]$effect)
-      a2<-files[[i]]$effect[[1]]
-      if(a1 != a2) cat(print(paste("The effect column was determined to be coded as an odds ratio (OR) for the", filenames[i], "summary statistics file. Please ensure this is correct.")),file=log.file,sep="\n",append=TRUE)
+    if(
+      abs(mean(cSumstats$P[!is.na(cSumstats$P_check)]) - mean(cSumstats$P_check[!is.na(cSumstats$P_check)])) > 0.01)
+      {
       
-      # Flip effect to match ordering in ref file
-      files[[i]]$effect<-ifelse(files[[i]]$A1.x != (files[[i]]$A1.y) & files[[i]]$A1.x == (files[[i]]$A2.y),files[[i]]$effect*-1,files[[i]]$effect)
+      cSumstats$P <- cSumstats$P_check
+      
+      cSumstats$P_check <- NULL
+      
+      cat("Genomic control detected. P-value recomputed using BETA and SE.")
+      
+      sumstats_meta[cCode,c("GC")] <- TRUE
+     
+    } else {
+     
+      cat("Genomic control was not detected.")
+      
+      sumstats_meta[cCode,c("GC")] <- FALSE
+    
+      cSumstats$P_check <- NULL
     }
-    
-    ##remove SNPs that don't match A1 OR A2 in reference file.
-    b<-nrow(files[[i]])
-    files[[i]]<-subset(files[[i]], !(files[[i]]$A1.x != (files[[i]]$A1.y)  & files[[i]]$A1.x != (files[[i]]$A2.y)))
-    if(b-nrow(files[[i]]) > 0) cat(print(paste(b-nrow(files[[i]]), "row(s) were removed from the", filenames[i], "summary statistics file due to the effect allele (A1) column not matching A1 or A2 in the reference file.")),file=log.file,sep="\n",append=TRUE)
-    
-    b<-nrow(files[[i]])
-    files[[i]]<-subset(files[[i]], !(files[[i]]$A2.x != (files[[i]]$A2.y)  & files[[i]]$A2.x !=  (files[[i]]$A1.y)))
-    if(b-nrow(files[[i]]) > 0) cat(print(paste(b-nrow(files[[i]]), "row(s) were removed from the", filenames[i], "summary statistics file due to the other allele (A2) column not matching A1 or A2 in the reference file.")),file=log.file,sep="\n",append=TRUE)
-    
-    ####VALIDITY CHECKS#####
-    
-    #Check that p-value column does not contain an excess of 1s/0s
-    if((sum(files[[i]]$P > 1) + sum(files[[i]]$P < 0)) > 100){
-      cat(print("In excess of 100 SNPs have P val above 1 or below 0. The P column may be mislabled!"),file=log.file,sep="\n",append=TRUE)
-    }
-    
-    #Compute Z score
-    if("effect" %in% colnames(files[[i]])) {
-      files[[i]]$Z <- sign(files[[i]]$effect) * sqrt(qchisq(files[[i]]$P,1,lower=F))
-    }
-    
-    ##filter on INFO column at designated threshold provided for the info.filter argument (default = 0.9)
-    if("INFO" %in% colnames(files[[i]])) {
-      b<-nrow(files[[i]])
-      files[[i]] <- files[[i]][files[[i]]$INFO >= info.filter,]
-      cat(print(paste(b-nrow(files[[i]]), "rows were removed from the", filenames[i], "summary statistics file due to INFO values below the designated threshold of", info.filter)),file=log.file,sep="\n",append=TRUE)
-    }else{cat(print("No INFO column, cannot filter on INFO, which may influence results"),file=log.file,sep="\n",append=TRUE)}
-    
-    ##filter on MAF filter at designated threshold provided for the maf.filter argument (default = 0.01)
-    if("MAF" %in% colnames(files[[i]])) {
-      files[[i]]$MAF<-as.numeric(as.character(files[[i]]$MAF))
-      b<-nrow(files[[i]])
-      files[[i]] <- files[[i]][files[[i]]$MAF >= maf.filter,]
-      files[[i]]<-subset(files[[i]], !(is.na(files[[i]]$MAF)))
-      cat(print(paste(b-nrow(files[[i]]), "rows were removed from the", filenames[i], "summary statistics file due to missing MAF information or MAFs below the designated threshold of", maf.filter)),file=log.file,sep="\n",append=TRUE)
-    }else{cat(print("No MAF column, cannot filter on MAF, which may influence results"),file=log.file,sep="\n",append=TRUE)}
-    
-    if(!("N" %in% colnames(files[[i]]))) {
-      files[[i]]$N<-N[i]
-    }
-    
-    #final rename columns
-    colnames(files[[i]])[colnames(files[[i]])=="A1.x"]<-"A1"
-    colnames(files[[i]])[colnames(files[[i]])=="A2.x"]<-"A2"
-    
-    colnames(files[[i]])[colnames(files[[i]])=="CHR.x"]<-"CHR"
-    
-    #final remove columns
-    files[[i]] <- files[[i]][,!(colnames(files[[i]]) %in% c("effect","A1.y","A2.y","CHR.y","MAF.y"))]
-    
-    #output.colnames<- c("SNP","N","Z","A1","A2")
-    output.colnames<- c("SNP")
-    if("N" %in% colnames(files[[i]])) {
-      output.colnames<- c(output.colnames,"N")
-    }
-    if("Z" %in% colnames(files[[i]])) {
-      output.colnames<- c(output.colnames,"Z")
-    }
-    output.colnames<- c(output.colnames,c("A1","A2"))
-    output.colnames.more<-colnames(files[[i]])[!(colnames(files[[i]]) %in% output.colnames)]
-    
-    
-    output<-files[[i]][,c(output.colnames,output.colnames.more)]
-    #original output
-    #output <- cbind.data.frame(files[[i]]$SNP,files[[i]]$N,files[[i]]$Z,files[[i]]$A1.x,files[[i]]$A2.x)
-    
-    if(!("N" %in% names(files[[i]])) & (exists("N") == FALSE)) cat(warning(paste0('Cannot find sample size column for',filenames[i], " and a sample size was not provided for the N argument. Please either provide a total sample size to the N argument or try changing the name of the sample size column to N.")),file=log.file,sep="\n",append=TRUE)
-    
-    cat(print(paste(nrow(output), "SNPs are left in the summary statistics file", filenames[i], "after QC.")),file=log.file,sep="\n",append=TRUE)
-    
-    #remove spaces in trait.names file to avoid errors with fread functionality used for s_ldsc
-    trait.names[i]<-str_replace_all(trait.names[i], fixed(" "), "") 
-    
-    nfilepath<-file.path(path.dir.output,trait.names[i])
-    if(!doChrSplit){
-    write.table(x = output,file = nfilepath,sep="\t", quote = FALSE, row.names = F)
-    nfilepath.gzip<-gzip(nfilepath)
-    cat(print(paste("The file is saved as", nfilepath.gzip, "in the specified outoput directory.")),file=log.file,sep="\n",append=TRUE)
-    }
-    
-    #addition: producing per-chromosome files in a folder, as RAISS columns
-    if(doChrSplit) {
-      if("CHR" %in% colnames(files[[i]])){
-        dir.create(paste0(nfilepath,".chr"), showWarnings = FALSE)
-        validChromosomes<-c(1:22,"X","Y","XY","MT") #as per Plink standard
-        for(chr in validChromosomes){
-          output.chr<-output[which(output$CHR==chr),c("SNP","ORIGBP","A1","A2","Z")]
-          colnames(output.chr)<-c("rsID","pos","A0","A1","Z")
-          write.table(x = output.chr,file = file.path(paste0(nfilepath,".chr"), paste0("z_",trait.names[i],"_",chr,".txt")),sep="\t", quote = FALSE, row.names = F)
-        }
-      }
-      cat(print(paste("One file per chromosome have been saved under", paste0(nfilepath,".chr"), "in the specified outoput directory.")),file=log.file,sep="\n",append=TRUE)
-    }
-    
-    cat(print(paste("I am done munging file:", filenames[i])),file=log.file,sep="\n",append=TRUE)
     
   }
+} else {
   
-  end.time <- Sys.time()
-  
-  total.time <- difftime(time1=end.time,time2=begin.time,units="sec")
-  mins <- floor(floor(total.time)/60)
-  secs <- total.time-mins*60
-  
-  cat(paste("     "),file=log.file,sep="\n",append=TRUE)
-  cat(print(paste0("Munging was completed at ",end.time), sep = ""),file=log.file,sep="\n",append=TRUE)
-  
-  cat(print(paste0("The munging of all files took ",mins," minutes and ",secs," seconds"), sep = ""),file=log.file,sep="\n",append=TRUE)
-  cat(print(paste("Please check the log file", paste0(log2, "_munge.log"), "to ensure that all columns were interpreted correctly and no warnings were issued for any of the summary statistics files")),file=log.file,sep="\n",append=TRUE)
-  
-  flush(log.file)
-  close(log.file)
-  
-}
-
-
-
-## -------------------------------------------------------------------------------------------------
-
-munged <- munge(files = to_munge, hm3 = "/Users/alishpalmos/Downloads/w_hm3.snplist.bz2", trait.names = NULL, info.filter = .9, maf.filter = 0.01)
-
-
-
-## -------------------------------------------------------------------------------------------------
-
-ldsc.mod <- function(traits, sample.prev, population.prev, ld, wld,
-                trait.names = NULL,
-                sep_weights = FALSE,
-                chr = 22,
-                n.blocks = 600,
-                ldsc.log = NULL,
-                select=FALSE,
-                chisq.max = NA,
-                info.filter = .6,
-                frq.filter=0.01,
-                mhc.filter=NA_integer_, #can be either 37 or 38 for filtering the MHC region according to either grch37 or grch38
-                N=NULL,
-                forceN=FALSE,
-                limited=FALSE) {
-  
-  # selection <- c(4,8)
-  # traits = project$sumstats.sel$mungedpath[selection]
-  # sample.prev =  project$sumstats.sel$samplePrevalence[selection]
-  # population.prev = project$sumstats.sel$populationPrevalence[selection]
-  # trait.names = project$sumstats.sel$code[selection]
-  # ld = project$folderpath.data.mvLDSC.ld.1kg
-  # wld = project$folderpath.data.mvLDSC.ld.1kg
-  # n.blocks = 200
-  # info.filter = 0.6
-  # frq.filter = 0.01
-  # ldsc.log = project$setup.code.date
-  # select=FALSE
-  # chisq.max = NA
-  # chr = 22
-  # sep_weights = FALSE
-  # N = project$sumstats.sel$n_total[selection]
-  # forceN=FALSE
-  
-  
-  LOG <- function(..., print = TRUE) {
-    msg <- paste0(...)
-    if (print) print(msg)
-    cat(msg, file = log.file, sep = "\n", append = TRUE)
-  }
-  
-  time <- proc.time()
-  
-  begin.time <- Sys.time()
-  
-  if(is.null(ldsc.log)){
-    logtraits<-gsub(".*/","",traits)
-    log2<-paste(logtraits,collapse="_")
-    if(object.size(log2) > 200){
-      log2<-substr(log2,1,100)
-    }
-    log.file <- file(paste0(log2, "_ldsc.log"),open="wt")
-  }else{log.file<-file(paste0(ldsc.log, "_ldsc.log"),open="wt")}
-  
-  LOG("Multivariate ld-score regression of ", length(traits), " traits ",
-      "(", paste(traits, collapse = " "), ")", " began at: ", begin.time)
-  
-  
-  if(select == "ODD" | select == "EVEN"){
-  odd<-seq(1,chr,2)
-  even<-seq(2,chr,2)
-  }
-  
-  # Dimensions
-  n.traits <- length(traits)
-  n.V <- n.traits * (n.traits + 1) / 2
-  
-  if(!(is.null(trait.names))){
-    check_names<-str_detect(trait.names, "-")
-    if(any(check_names))
-      warning("Your trait names specified include mathematical arguments (e.g., + or -) that will be misread by lavaan. Please rename the traits using the trait.names argument.")
-  }
-  
-   if(length(traits)==1)
-    warning("Our version of ldsc requires 2 or more traits. Please include an additional trait.")
-  
-  
-  # Storage:
-  cov <- matrix(NA,nrow=n.traits,ncol=n.traits)
-  V.hold <- matrix(NA,nrow=n.blocks,ncol=n.V)
-  N.vec <- matrix(NA,nrow=1,ncol=n.V)
-  Liab.S <- rep(1, n.traits)
-  I <- matrix(NA,nrow=n.traits,ncol=n.traits)
-  
-  
-  #########  READ LD SCORES:
-  LOG("Reading in LD scores")
+  cat("SE column is not present, genomic control cannot be detected.")
  
-  if(select == FALSE){
-  x <- do.call("rbind", lapply(1:chr, function(i) {
-    suppressMessages(read_delim(
-      file.path(ld, paste0(i, ".l2.ldscore.gz")),
-      delim = "\t", escape_double = FALSE, trim_ws = TRUE, progress = FALSE))
-  }))
-  }
-  
-  if(select == "ODD"){
-    x <- do.call("rbind", lapply(odd, function(i) {
-      suppressMessages(read_delim(
-        file.path(ld, paste0(i, ".l2.ldscore.gz")),
-        delim = "\t", escape_double = FALSE, trim_ws = TRUE, progress = FALSE))
-    }))
-  }
-  
-  if(select == "EVEN"){
-    x <- do.call("rbind", lapply(even, function(i) {
-      suppressMessages(read_delim(
-        file.path(ld, paste0(i, ".l2.ldscore.gz")),
-        delim = "\t", escape_double = FALSE, trim_ws = TRUE, progress = FALSE))
-    }))
-  }
+}
 
-  if(is.numeric(select)){
-    x <- do.call("rbind", lapply(select, function(i) {
-      suppressMessages(read_delim(
-        file.path(ld, paste0(i, ".l2.ldscore.gz")),
-        delim = "\t", escape_double = FALSE, trim_ws = TRUE, progress = FALSE))
-    }))
-  }
-  
-  #mod addition, correct SNP to lower case in case it is upper case
-  x$SNP<-tolower(x$SNP)
-  x$CM <- NULL
-  x$MAF <- NULL
-  
-  
-  ######### READ weights:
-  if(sep_weights){
-    if(select == FALSE){
-    w <- do.call("rbind", lapply(1:chr, function(i) {
-      suppressMessages(read_delim(
-        file.path(wld, paste0(i, ".l2.ldscore.gz")),
-        delim = "\t", escape_double = FALSE, trim_ws = TRUE, progress = FALSE))
-    }))
-    }
-    if(select == "EVEN"){
-      w <- do.call("rbind", lapply(even, function(i) {
-        suppressMessages(read_delim(
-          file.path(wld, paste0(i, ".l2.ldscore.gz")),
-          delim = "\t", escape_double = FALSE, trim_ws = TRUE, progress = FALSE))
-      }))
-    }
-    if(select == "ODD"){
-      w <- do.call("rbind", lapply(even, function(i) {
-        suppressMessages(read_delim(
-          file.path(wld, paste0(i, ".l2.ldscore.gz")),
-          delim = "\t", escape_double = FALSE, trim_ws = TRUE, progress = FALSE))
-      }))
-    }
-      if(is.numeric(select)){
-        w <- do.call("rbind", lapply(select, function(i) {
-          suppressMessages(read_delim(
-            file.path(wld, paste0(i, ".l2.ldscore.gz")),
-            delim = "\t", escape_double = FALSE, trim_ws = TRUE, progress = FALSE))
-        }))
-    }
-  }else{w<-x}
-  
-  #mod addition, correct SNP to lower case in case it is upper case
-  w$SNP<-tolower(w$SNP)
-  w$CM <- NULL
-  w$MAF <- NULL
-  
-  colnames(w)[ncol(w)] <- "wLD"
-  
-  ### READ M
-  
-  if(select == FALSE){
-  m <- do.call("rbind", lapply(1:chr, function(i) {
-    suppressMessages(read_csv(file.path(ld, paste0(i, ".l2.M_5_50")), col_names = FALSE))
-  }))
-  }
-  
-  if(select == "EVEN"){
-    m <- do.call("rbind", lapply(even, function(i) {
-      suppressMessages(read_csv(file.path(ld, paste0(i, ".l2.M_5_50")), col_names = FALSE))
-    }))
-  }
-  
-  if(select == "ODD"){
-    m <- do.call("rbind", lapply(odd, function(i) {
-      suppressMessages(read_csv(file.path(ld, paste0(i, ".l2.M_5_50")), col_names = FALSE))
-    }))
-  }
-  
-  if(is.numeric(select)){
-    m <- do.call("rbind", lapply(select, function(i) {
-      suppressMessages(read_csv(file.path(ld, paste0(i, ".l2.M_5_50")), col_names = FALSE))
-    }))
-  }
-  
-  M.tot <- sum(m)
-  m <- M.tot
-  
-  ### READ ALL CHI2 + MERGE WITH LDSC FILES
-  s <- 0
-  
-  all_y <- lapply(traits, function(chi1) {
-    #chi1<-traits[1]
-    ## READ chi2
-    ## mod change - use read.table
-    y1 <- suppressMessages(read.table(
-      chi1, header=T, quote="\"",fill=T,na.string=c(".",NA,"NA","")))
-    #mod addition, harmonise character case
-    y1$SNP<-tolower(as.character(y1$SNP))
-    y1$A1<-toupper(as.character(y1$A1))
-    y1$Z<-as.numeric(y1$Z)
-    #mod addition - use FRQ - frequency of A1 rather than MAF. use MAF as FRQ in case there is no FRQ.
-    if('FRQ' %in% names(y1)) y1$FRQ<-as.numeric(y1$FRQ)
-    if('MAF' %in% names(y1)) y1$MAF<-as.numeric(y1$MAF)
-    if('INFO' %in% names(y1)) y1$INFO<-as.numeric(y1$INFO)
-    #mod addition - use explicit new N value
-    if(!is.null(N) & length(N)>=length(traits)) {
-      if(forceN) { 
-        y1$N<-as.integer(N[s])
-        LOG("Added explicit N=",N[s])
-      } else {
-        cond<-is.na(y1$N)
-        y1$N<-ifelse(cond,N[s],y1$N)
-        if(sum(cond)>0) LOG("Added explicit N=",N[s], " to ",sum(cond)," SNPs where it was missing.")
-        }
-    }
-    
-    LOG("Read in summary statistics [", s <<- s + 1, "/", n.traits, "] from: ", chi1)
-    
-    ##mod addition, check existence of FRQ, otherwise, use MAF
-    if(!any(colnames(y1)=="FRQ") & any(colnames(y1)=="MAF")){
-      y1$FRQ<-y1$MAF
-    }
-    
-    ##mod addition - remove MHC region based on position
-    #references
-    #https://www.ncbi.nlm.nih.gov/grc/human/regions/MHC?asm=GRCh37
-    #https://www.ncbi.nlm.nih.gov/grc/human/regions/MHC
-    if(!is.na(mhc.filter)){
-      if(any(colnames(y1)=="CHR") & any(colnames(y1)=="BP")){
-        if(mhc.filter==37) {
-            rm <- (!is.na(y1$CHR) & !is.na(y1$BP) & y1$CHR=="6" & y1$BP>=28477797 & y1$BP<=33448354)
-            y1 <- y1[!rm, ]
-        } else if (mhc.filter==38) {
-            rm <- (!is.na(y1$CHR) & !is.na(y1$BP) & y1$CHR=="6" & y1$BP>=28510120 & y1$BP<=33480577)
-            y1 <- y1[!rm, ]
-            LOG("Removing ", sum(rm), " SNPs in the GRCh",mhc.filter," MHC; ", nrow(y1), " remain")
-        } else {
-            LOG("Warning: Invalid assembly version provided - no filtering of the MHC was done!")
-          }
-      } else {
-        LOG("Warning: No chromosome or base-pair position information available - no filtering of the MHC was done!")
-      }
-    }
-    
-    ##mod addition
-    ## REMOVE SNPs FRQ<frq.filter and INFO<info.filter
-    if(!is.na(frq.filter)){
-      if("FRQ" %in% names(y1)){
-        rm <- (!is.na(y1$FRQ) & (y1$FRQ<frq.filter))
-        y1 <- y1[!rm, ]
-        LOG("Removing ", sum(rm), " SNPs with FRQ <", frq.filter, "; ", nrow(y1), " remain")
-      } else {
-        LOG("Warning: The dataset does not contain a FRQ or MAF column to apply the specified filter on.")
-      }
-    }
-    ##mod addition
-    if(!is.na(info.filter)){
-      if("INFO" %in% names(y1)){
-        rm <- (!is.na(y1$INFO) & y1$INFO<info.filter)
-        y1 <- y1[!rm, ]
-        LOG("Removing ", sum(rm), " SNPs with INFO <", info.filter, "; ", nrow(y1), " remain")
-      } else {
-        LOG("Warning: The dataset does not contain an INFO column to apply the specified filter on.")
-      }
-    }
-    
-    ## Merge files
-    y1.columns.orig<-c("SNP", "N", "Z", "A1")
-    y1.columns<-y1.columns.orig
-    ##mod addition
-    if('FRQ' %in% names(y1)) y1.columns<-c(y1.columns.orig,'FRQ')
-    if('MAF' %in% names(y1)) y1.columns<-c(y1.columns.orig,'MAF')
-    if('INFO' %in% names(y1)) y1.columns<-c(y1.columns.orig,'INFO')
-    y1<-as_tibble(y1)
-    
-    merged <- merge(y1[, y1.columns.orig], w[, c("SNP", "wLD")], by = "SNP", sort = FALSE)
-    merged <- merge(merged, x, by = "SNP", sort = FALSE)
-    merged <- merged[with(merged, order(CHR, BP)), ]
-    
-    LOG("Out of ", nrow(y1), " SNPs, ", nrow(merged), " remain after merging with LD-score files")
-    LOG("Columns after merge: ", paste(colnames(merged),collapse = " ")) ##mod addition
-    if(all(is.na(merged$N))) LOG("Warning: The data has no N values!!") ##mod addition
-    
-    
-    ## REMOVE SNPS with excess chi-square:
-    
-    if(is.na(chisq.max)){
-    chisq.max <- max(0.001 * max(merged$N), 80)
-    }
-    rm <- (merged$Z^2 > chisq.max)
-    merged <- merged[!rm, ]
-    
-    LOG("Removing ", sum(rm), " SNPs with Chi^2 > ", chisq.max, "; ", nrow(merged), " remain")
-    
-    ##mod addition - remove any rows with na values as was originally performed earlier before merge
-    if(any(is.na(merged))){
-      nBefore <- nrow(merged)
-      merged <- na.omit(merged)
-      LOG("Removing ", nBefore-nrow(merged), " SNPs with NA-values present; ", nrow(merged), " remain")
-    }
-    
-    merged
-  })
-  
-  # count the total nummer of runs, both loops
-  s <- 1
-  
-  for(j in 1:n.traits){
-    #j<-1
-    chi1 <- traits[j]
-    
-    y1 <- all_y[[j]]
-    y1$chi1 <- y1$Z^2
-    
-    for(k in j:length(traits)){
-      #k<-1
-      ##### HERITABILITY code
-      
-      if(j == k){
-        
-        LOG("     ", "     ", print = FALSE)
-        LOG("Estimating heritability [", s, "/", n.V, "] for: ", chi1)
-        
-        samp.prev <- sample.prev[j]
-        pop.prev <- population.prev[j]
-        
-        merged <- y1
-        n.snps <- nrow(merged)
-        
-        ## ADD INTERCEPT:
-        merged$intercept <- 1
-        merged$x.tot <- merged$L2
-        merged$x.tot.intercept <- 1
-        
-        
-        #### MAKE WEIGHTS:
-        
-        tot.agg <- (M.tot*(mean(merged$chi1)-1))/mean(merged$L2*merged$N)
-        tot.agg <- max(tot.agg,0)
-        tot.agg <- min(tot.agg,1)
-        merged$ld <- pmax(merged$L2, 1)
-        merged$w.ld <- pmax(merged$wLD, 1)
-        merged$c <- tot.agg*merged$N/M.tot
-        merged$het.w <- 1/(2*(1+(merged$c*merged$ld))^2)
-        merged$oc.w <- 1/merged$w.ld
-        merged$w <- merged$het.w*merged$oc.w
-        merged$initial.w <- sqrt(merged$w)
-        merged$weights <- merged$initial.w/sum(merged$initial.w)
-        
-        N.bar <- mean(merged$N)
-        
-        
-        ## preweight LD and chi:
-        
-        weighted.LD <- as.matrix(cbind(merged$L2,merged$intercept)*merged$weights)
-        weighted.chi <- as.matrix(merged$chi1*merged$weights)
-        
-        
-        ## Perfrom analysis:
-        
-        n.annot <- 1
-        
-        
-        select.from <- floor(seq(from=1,to=n.snps,length.out =(n.blocks+1)))
-        select.to <- c(select.from[2:n.blocks]-1,n.snps)
-        
-        xty.block.values <- matrix(data=NA,nrow=n.blocks,ncol =(n.annot+1))
-        xtx.block.values <- matrix(data=NA,nrow =((n.annot+1)* n.blocks),ncol =(n.annot+1))
-        colnames(xty.block.values)<- colnames(xtx.block.values)<- colnames(weighted.LD)
-        replace.from <- seq(from=1,to=nrow(xtx.block.values),by =(n.annot+1))
-        replace.to <- seq(from =(n.annot+1),to=nrow(xtx.block.values),by =(n.annot+1))
-        for(i in 1:n.blocks){
-          xty.block.values[i,] <- t(t(weighted.LD[select.from[i]:select.to[i],])%*% weighted.chi[select.from[i]:select.to[i],])
-          xtx.block.values[replace.from[i]:replace.to[i],] <- as.matrix(t(weighted.LD[select.from[i]:select.to[i],])%*% weighted.LD[select.from[i]:select.to[i],])
-        }
-        xty <- as.matrix(colSums(xty.block.values))
-        xtx <- matrix(data=NA,nrow =(n.annot+1),ncol =(n.annot+1))
-        colnames(xtx)<- colnames(weighted.LD)
-        for(i in 1:nrow(xtx)){xtx[i,] <- t(colSums(xtx.block.values[seq(from=i,to=nrow(xtx.block.values),by=ncol(weighted.LD)),]))}
-        
-        reg <- solve(xtx, xty)
-        intercept <- reg[2]
-        coefs <- reg[1]/N.bar
-        reg.tot <- coefs*m
-        
-        delete.from <- seq(from=1,to=nrow(xtx.block.values),by=ncol(xtx.block.values))
-        delete.to <- seq(from=ncol(xtx.block.values),to=nrow(xtx.block.values),by=ncol(xtx.block.values))
-        delete.values <- matrix(data=NA,nrow=n.blocks,ncol =(n.annot+1))
-        colnames(delete.values)<- colnames(weighted.LD)
-        for(i in 1:n.blocks){
-          xty.delete <- xty-xty.block.values[i,]
-          xtx.delete <- xtx-xtx.block.values[delete.from[i]:delete.to[i],]
-          delete.values[i,] <- solve(xtx.delete, xty.delete)
-        }
-        
-        tot.delete.values <- delete.values[,1:n.annot]
-        pseudo.values <- matrix(data=NA,nrow=n.blocks,ncol=length(reg))
-        colnames(pseudo.values)<- colnames(weighted.LD)
-        for(i in 1:n.blocks){pseudo.values[i,] <- (n.blocks*reg)-((n.blocks-1)* delete.values[i,])}
-        
-        jackknife.cov <- cov(pseudo.values)/n.blocks
-        jackknife.se <- sqrt(diag(jackknife.cov))
-        intercept.se <- jackknife.se[length(jackknife.se)]
-        coef.cov <- jackknife.cov[1:n.annot,1:n.annot]/(N.bar^2)
-        
-        cat.cov <- coef.cov*(m %*% t(m))
-        tot.cov <- sum(cat.cov)
-        tot.se <- sqrt(tot.cov)
-        
-        V.hold[,s] <- pseudo.values[,1]
-        N.vec[1,s] <- N.bar
-        
-        if(is.na(pop.prev)==F & is.na(samp.prev)==F){
-          conversion.factor <- (pop.prev^2*(1-pop.prev)^2)/(samp.prev*(1-samp.prev)* dnorm(qnorm(1-pop.prev))^2)
-          Liab.S[j] <- conversion.factor
-          LOG("     ", print = FALSE)
-          LOG("Please note that the results initially printed to the screen and log file reflect the NON-liability h2 and cov_g. However, a liability conversion is being used for trait ",
-              chi1, " when creating the genetic covariance matrix used as input for Genomic SEM and liability scale results are printed at the end of the log file.")
-          LOG("     ", print = FALSE)
-        }
-        
-        cov[j,j] <- reg.tot
-        I[j,j] <- intercept
-        
-        lambda.gc <- median(merged$chi1) / qchisq(0.5, df = 1)
-        mean.Chi <- mean(merged$chi1)
-        ratio <- (intercept - 1) / (mean.Chi - 1)
-        ratio.se <- intercept.se / (mean.Chi - 1)
-        
-        LOG("Heritability Results for trait: ", chi1)
-        LOG("Mean Chi^2 across remaining SNPs: ", round(mean.Chi, 4))
-        LOG("Lambda GC: ", round(lambda.gc, 4))
-        LOG("Intercept: ", round(intercept, 4), " (", round(intercept.se, 4), ")")
-        LOG("Ratio: ", round(ratio, 4), " (", round(ratio.se, 4), ")")
-        LOG("Total Observed Scale h2: ", round(reg.tot, 4), " (", round(tot.se, 4), ")")
-        LOG("h2 Z: ", format(reg.tot / tot.se), digits = 3)
-      }
-      
-      
-      ##### GENETIC COVARIANCE code
-      
-      if(j != k){
-        
-        LOG("     ", print = FALSE)
-        
-        chi2 <- traits[k]
-        LOG("Calculating genetic covariance [", s, "/", n.V, "] for traits: ", chi1, " and ", chi2)
-        
-        # Reuse the data read in for heritability
-        y2 <- all_y[[k]]
-        y <- merge(y1, y2[, c("SNP", "N", "Z", "A1")], by = "SNP", sort = FALSE)
-        
-        y$Z.x <- ifelse(y$A1.y == y$A1.x, y$Z.x, -y$Z.x)
-        y$ZZ <- y$Z.y * y$Z.x
-        y$chi2 <- y$Z.y^2
-        merged <- na.omit(y)
-        n.snps <- nrow(merged)
-        
-        LOG(n.snps, " SNPs remain after merging ", chi1, " and ", chi2, " summary statistics")
-        
-        ## ADD INTERCEPT:
-        merged$intercept <- 1
-        merged$x.tot <- merged$L2
-        merged$x.tot.intercept <- 1
-        
-        
-        #### MAKE WEIGHTS:
-        
-        tot.agg <- (M.tot*(mean(merged$chi1)-1))/mean(merged$L2*merged$N.x)
-        tot.agg <- max(tot.agg,0)
-        tot.agg <- min(tot.agg,1)
-        merged$ld <- pmax(merged$L2, 1)
-        merged$w.ld <- pmax(merged$wLD, 1)
-        merged$c <- tot.agg*merged$N.x/M.tot
-        merged$het.w <- 1/(2*(1+(merged$c*merged$ld))^2)
-        merged$oc.w <- 1/merged$w.ld
-        merged$w <- merged$het.w*merged$oc.w
-        merged$initial.w <- sqrt(merged$w)
-        
-        tot.agg2 <- (M.tot*(mean(merged$chi2)-1))/mean(merged$L2*merged$N.y)
-        tot.agg2 <- max(tot.agg2,0)
-        tot.agg2 <- min(tot.agg2,1)
-        merged$ld2 <- pmax(merged$L2, 1)
-        merged$w.ld2 <- pmax(merged$wLD, 1)
-        merged$c2 <- tot.agg2*merged$N.y/M.tot
-        merged$het.w2 <- 1/(2*(1+(merged$c2*merged$ld))^2)
-        merged$oc.w2 <- 1/merged$w.ld2
-        merged$w2 <- merged$het.w2*merged$oc.w2
-        merged$initial.w2 <- sqrt(merged$w2)
-        
-        
-        merged$weights_cov <- (merged$initial.w + merged$initial.w2)/sum(merged$initial.w + merged$initial.w2 )
-        
-        N.bar <- sqrt(mean(merged$N.x)*mean(merged$N.y))
-        
-        ## preweight LD and chi:
-        
-        weighted.LD <- as.matrix(cbind(merged$L2,merged$intercept)*merged$weights)
-        weighted.chi <- as.matrix(merged$ZZ *merged$weights_cov)
-        
-        ## Perfrom analysis:
-        
-        
-        n.annot <- 1
-        
-        
-        select.from <- floor(seq(from=1,to=n.snps,length.out =(n.blocks+1)))
-        select.to <- c(select.from[2:n.blocks]-1,n.snps)
-        
-        xty.block.values <- matrix(data=NA,nrow=n.blocks,ncol =(n.annot+1))
-        xtx.block.values <- matrix(data=NA,nrow =((n.annot+1)* n.blocks),ncol =(n.annot+1))
-        colnames(xty.block.values)<- colnames(xtx.block.values)<- colnames(weighted.LD)
-        replace.from <- seq(from=1,to=nrow(xtx.block.values),by =(n.annot+1))
-        replace.to <- seq(from =(n.annot+1),to=nrow(xtx.block.values),by =(n.annot+1))
-        for(i in 1:n.blocks){
-          xty.block.values[i,] <- t(t(weighted.LD[select.from[i]:select.to[i],])%*% weighted.chi[select.from[i]:select.to[i],])
-          xtx.block.values[replace.from[i]:replace.to[i],] <- as.matrix(t(weighted.LD[select.from[i]:select.to[i],])%*% weighted.LD[select.from[i]:select.to[i],])
-        }
-        xty <- as.matrix(colSums(xty.block.values))
-        xtx <- matrix(data=NA,nrow =(n.annot+1),ncol =(n.annot+1))
-        colnames(xtx)<- colnames(weighted.LD)
-        for(i in 1:nrow(xtx)){xtx[i,] <- t(colSums(xtx.block.values[seq(from=i,to=nrow(xtx.block.values),by=ncol(weighted.LD)),]))}
-        
-        reg <- solve(xtx, xty)
-        intercept <- reg[2]
-        coefs <- reg[1]/N.bar
-        reg.tot <- coefs*m
-        
-        delete.from <- seq(from=1,to=nrow(xtx.block.values),by=ncol(xtx.block.values))
-        delete.to <- seq(from=ncol(xtx.block.values),to=nrow(xtx.block.values),by=ncol(xtx.block.values))
-        delete.values <- matrix(data=NA,nrow=n.blocks,ncol =(n.annot+1))
-        colnames(delete.values)<- colnames(weighted.LD)
-        for(i in 1:n.blocks){
-          xty.delete <- xty-xty.block.values[i,]
-          xtx.delete <- xtx-xtx.block.values[delete.from[i]:delete.to[i],]
-          delete.values[i,] <- solve(xtx.delete, xty.delete)
-        }
-        
-        tot.delete.values <- delete.values[,1:n.annot]
-        pseudo.values <- matrix(data=NA,nrow=n.blocks,ncol=length(reg))
-        colnames(pseudo.values)<- colnames(weighted.LD)
-        for(i in 1:n.blocks){pseudo.values[i,] <- (n.blocks*reg)-((n.blocks-1)* delete.values[i,])}
-        
-        jackknife.cov <- cov(pseudo.values)/n.blocks
-        jackknife.se <- sqrt(diag(jackknife.cov))
-        intercept.se <- jackknife.se[length(jackknife.se)]
-        coef.cov <- jackknife.cov[1:n.annot,1:n.annot]/(N.bar^2)
-        cat.cov <- coef.cov*(m %*% t(m))
-        tot.cov <- sum(cat.cov)
-        tot.se <- sqrt(tot.cov)
-        
-        V.hold[, s] <- pseudo.values[, 1]
-        N.vec[1, s] <- N.bar
-        
-        cov[k, j] <- cov[j, k] <- reg.tot
-        I[k, j] <- I[j, k] <- intercept
-        
-        LOG("Results for genetic covariance between: ", chi1, " and ", chi2)
-        LOG("Mean Z*Z: ", round(mean(merged$ZZ), 4))
-        LOG("Cross trait Intercept: ", round(intercept, 4), " (", round(intercept.se, 4), ")")
-        LOG("Total Observed Scale Genetic Covariance (g_cov): ", round(reg.tot, 4), " (", round(tot.se, 4), ")")
-        LOG("g_cov Z: ", format(reg.tot / tot.se), digits = 3)
-        LOG("g_cov P-value: ", format(2 * pnorm(abs(reg.tot / tot.se), lower.tail = FALSE), digits = 5))
-      }
-      
-      ### Total count
-      s <- s + 1
-    }
-    
-    #mod addition
-    gc() #do garbage collect if this can help with out of memory issues.
-    
-    if(limited) break
-  }
-  
-  
-  ## Scale V to N per study (assume m constant)
-  # /!\ crossprod instead of tcrossprod because N.vec is a one-row matrix
-  v.out <- cov(V.hold) / crossprod(N.vec * (sqrt(n.blocks) / m))
-  
-  ### Scale S and V to liability:
-  ratio <- tcrossprod(sqrt(Liab.S))
-  S <- cov * ratio
-  
-  #calculate the ratio of the rescaled and original S matrices
-  scaleO <- gdata::lowerTriangle(ratio, diag = TRUE)
-  
-  #rescale the sampling correlation matrix by the appropriate diagonals
-  V <- v.out * tcrossprod(scaleO)
-  
-  
-  #name traits according to trait.names argument
-  #use general format of V1-VX if no names provided
-  colnames(S) <- if (is.null(trait.names)) paste0("V", 1:ncol(S)) else trait.names
-  
-  if(mean(Liab.S)!=1){
-    r<-nrow(S)
-    SE<-matrix(0, r, r)
-    SE[lower.tri(SE,diag=TRUE)] <-sqrt(diag(V))
-    
-    LOG(c("     ", "     "), print = FALSE)
-    LOG("Liability Scale Results")
-    
-    for(j in 1:n.traits){
-      if(is.null(trait.names)){
-        chi1<-traits[j]
-      }else{chi1 <- trait.names[j]}
-      for(k in j:length(traits)){
-        if(j == k){
-          LOG("     ", print = FALSE)
-          LOG("Liability scale results for: ", chi1)
-          LOG("Total Liability Scale h2: ", round(S[j, j], 4), " (", round(SE[j, j], 4), ")")
-        }
-        
-        if(j != k){
-          if(is.null(trait.names)){
-            chi2<-traits[k]
-          }else{chi2 <- trait.names[k]}
-          LOG("Total Liability Scale Genetic Covariance between ", chi1, " and ",
-              chi2, ": ", round(S[k, j], 4), " (", round(SE[k, j], 4), ")")
-          LOG("     ", print = FALSE)
-        }
-      }
-    }
-  }
-  
-  #mod additions - initialise S_Stand, set all NA element in S to 0 so not to have NA values
-  S_Stand<-matrix(NA, nrow(S), nrow(S))
-  V_Stand<-matrix(NA, nrow(V), nrow(V))
-  S[is.na(S)]<-0
-  if(all(diag(S) > 0)) {
-  
-    ##calculate standardized results to print genetic correlations to log and screen
-    ratio <- tcrossprod(1 / sqrt(diag(S)))
-    S_Stand <- S * ratio
-    
-    #calculate the ratio of the rescaled and original S matrices
-    scaleO <- gdata::lowerTriangle(ratio, diag = TRUE)
-    
-    ## MAke sure that if ratio in NaN (devision by zero) we put the zero back in
-    # -> not possible because of 'all(diag(S) > 0)'
-    # scaleO[is.nan(scaleO)] <- 0
-    
-    #rescale the sampling correlation matrix by the appropriate diagonals
-    V_Stand <- V * tcrossprod(scaleO)
-    
-    #enter SEs from diagonal of standardized V
-    r<-nrow(S)
-    SE_Stand<-matrix(0, r, r)
-    SE_Stand[lower.tri(SE_Stand,diag=TRUE)] <-sqrt(diag(V_Stand))
-    
-    
-    LOG(c("     ", "     "), print = FALSE)
-    LOG("Genetic Correlation Results")
-    
-    for(j in 1:n.traits){
-      if(is.null(trait.names)){
-        chi1<-traits[j]
-      }else{chi1 <- trait.names[j]}
-      for(k in j:length(traits)){
-        if(j != k){
-          if(is.null(trait.names)){
-            chi2<-traits[k]
-          }else{chi2 <- trait.names[k]}
-          LOG("Genetic Correlation between ", chi1, " and ", chi2, ": ",
-              round(S_Stand[k, j], 4), " (", round(SE_Stand[k, j], 4), ")")
-          LOG("     ", print = FALSE)
-        }
-      }
-    }
-  
-  } else {
-    warning("Your genetic covariance matrix includes traits estimated to have a negative heritability.")
-    LOG("Your genetic covariance matrix includes traits estimated to have a negative heritability.", print = FALSE)
-    LOG("Genetic correlation results could not be computed due to negative heritability estimates.")
-  }
-  
-  end.time <- Sys.time()
-  
-  total.time <- difftime(time1=end.time,time2=begin.time,units="sec")
-  mins <- floor(floor(total.time)/60)
-  secs <- floor(total.time-mins*60)
-  
-  LOG("     ", print = FALSE)
-  LOG("LDSC finished running at ", end.time)
-  LOG("Running LDSC for all files took ", mins, " minutes and ", secs, " seconds")
-  LOG("     ", print = FALSE)
-  
-  flush(log.file)
-  close(log.file)
-  
-  # mod additions - added the suggested computations of standard error matrices from the website
-  rownames(S)<-colnames(S)
-  S.SE<-matrix(0, nrow(S), nrow(S))
-  colnames(S.SE)<-colnames(S)
-  rownames(S.SE)<-colnames(S)
-  S.SE[lower.tri(S.SE,diag=TRUE)] <-sqrt(diag(V))
-  S.SE[upper.tri(S.SE)]<-t(S.SE)[upper.tri(S.SE)]
-  colnames(S_Stand)<-colnames(S)
-  rownames(S_Stand)<-colnames(S)
-  S_Stand.SE<-matrix(0, nrow(S_Stand), nrow(S_Stand))
-  colnames(S_Stand.SE)<-colnames(S)
-  rownames(S_Stand.SE)<-colnames(S)
-  S_Stand.SE[lower.tri(S_Stand.SE,diag=TRUE)] <-sqrt(diag(V_Stand))
-  S_Stand.SE[upper.tri(S_Stand.SE)]<-t(S_Stand.SE)[upper.tri(S_Stand.SE)]
 
-  
-  list(V=V,S=S,S.SE=S.SE,I=I,N=N.vec,m=m,V_Stand=V_Stand,S_Stand=S_Stand,S_Stand.SE=S_Stand.SE)
+## ----Calculate lambda GC----------------------------------------------------------------------------------------
+sumstats_meta[cCode,c("lambdaGC")] <- median(cSumstats$Z^2)/qchisq(0.5,1)
 
+cat(
+  "\nThe genomic inflation factor (lambda GC) was calculated as:",
+  round(sumstats_meta[cCode,c("lambdaGC")],
+        digits = 2)
+  )
+
+
+## ----Read in functions for manipulating allele codes------------------------------------------------------------
+source(file = "../functions/snp_allele.R")
+
+
+## ----insert IUPAC codes-----------------------------------------------------------------------------------------
+# Insert IUPAC codes into target
+cSumstats$IUPAC<-snp_iupac(cSumstats$A1, cSumstats$A2)
+
+
+
+## ----define super population of GWAS sample---------------------------------------------------------------------
+# Define super population
+super_pop <- column_options$population
+
+
+
+## ----check presence of CHR, BP and RSID information-------------------------------------------------------------
+# Initially target should be merged with the reference based on CHR, BP and IUPAC. RSIDs will be inserted for all SNPs, and reference MAF will be inserted for all non-ambiguous SNPs if the super population is specified.
+# If CHR and BP are unavailable, but RSID is present, target will be merged with the reference by RSID and IUPAC. CHR and BP will be inserted for all SNPs, and reference MAF will be inserted for all non-ambiguous SNPs if the super population is specified.
+
+# Check whether chromosome and base pair position information is present
+chr_bp_avail<-sum(c('CHR','ORIGBP') %in% names(cSumstats)) == 2 
+
+# Check whether RSIDs are available for majority of SNPs in GWAS
+rsid_avail<-(sum(grepl('rs', cSumstats$SNP)) > 0.9*length(cSumstats$SNP))
+
+
+
+## ----merge with reference---------------------------------------------------------------------------------------
+if(chr_bp_avail){
+  ###
+  # Determine build
+  ###
+  # Read in random chromosome of reference data present in GWAS
+  i<-unique(cSumstats$CHR)[1]
+  
+  ref<-readRDS(file = paste0('/scratch/groups/gwas_sumstats/1kg_ref/1kg_ref_chr',i,'.rds'))
+  
+  # Check target-ref condordance of BP across builds
+  ref$CHR<-as.numeric(ref$CHR)
+  matched<-list()
+  matched[['GRCh37']]<-merge(cSumstats, ref, by.x=c('CHR','ORIGBP','IUPAC'), by.y=c('CHR','BP_GRCh37','IUPAC'))
+  matched[['GRCh38']]<-merge(cSumstats, ref, by.x=c('CHR','ORIGBP','IUPAC'), by.y=c('CHR','BP_GRCh38','IUPAC'))
+  
+  cat('GRCh37 match: ',round(nrow(matched[['GRCh37']])/sum(cSumstats$CHR == i)*100, 2),'%\n',sep='')
+  cat('GRCh38 match: ',round(nrow(matched[['GRCh38']])/sum(cSumstats$CHR == i)*100, 2),'%\n',sep='')
+
+  target_build<-NA
+  if((nrow(matched[['GRCh37']])/sum(cSumstats$CHR == i)) > 0.7 & (nrow(matched[['GRCh37']])/sum(cSumstats$CHR == i)) > (nrow(matched[['GRCh38']])/sum(cSumstats$CHR == i))){
+    target_build<-'GRCh37'
+  }
+  
+  if((nrow(matched[['GRCh38']])/sum(cSumstats$CHR == i)) > 0.7 & (nrow(matched[['GRCh38']])/sum(cSumstats$CHR == i)) > (nrow(matched[['GRCh37']])/sum(cSumstats$CHR == i))){
+    target_build<-'GRCh38'
+  }
+  
+  rm(matched,ref)
+  
+  if(!is.na(target_build)){
+    # Build detected, so can continue reference harmonisation
+    # Run per chromosome to reduce memory requirements
+    chrs<-unique(cSumstats$CHR)
+
+    cSumstats_matched<-NULL
+    cSumstats_unmatched<-NULL
+    for(i in chrs){
+      print(i)
+      
+      # Read reference data
+      tmp<-readRDS(file = paste0('/scratch/groups/gwas_sumstats/1kg_ref/1kg_ref_chr',i,'.rds'))
+      
+      # Subset relevent data
+      if(super_pop %in% c('AFR','AMR','EAS','EUR','SAS')){
+        tmp<-tmp[,c("CHR","SNP","BP_GRCh37","BP_GRCh38","A1","A2","IUPAC",paste0('FREQ_',super_pop)),with=F]
+        names(tmp)[names(tmp) == 'BP_GRCh37']<-'REF.BP_GRCh37'
+        names(tmp)[names(tmp) == 'BP_GRCh38']<-'REF.BP_GRCh38'
+        names(tmp)[names(tmp) == paste0('FREQ_',super_pop)]<-'REF.FRQ'
+      } else {
+        tmp<-tmp[,c("CHR","SNP","BP_GRCh37","BP_GRCh38","A1","A2","IUPAC"),with=F]
+      }
+
+      tmp<-tmp[nchar(tmp$A1) == 1 & nchar(tmp$A2) == 1,]
+      tmp$CHR<-NULL
+      
+      names(tmp)[names(tmp) == 'SNP']<-'REF.SNP'
+
+      # Merge target and reference by BP
+      cSumstats_chr<-cSumstats[cSumstats$CHR == i,]
+      ref_target<-merge(cSumstats_chr, tmp, by.x='ORIGBP', by.y=paste0('REF.BP_',target_build))
+
+      
+      # Identify SNPs that are opposite strands
+      flipped<-ref_target[(ref_target$IUPAC.x == 'R' & ref_target$IUPAC.y == 'Y') | 
+                            (ref_target$IUPAC.x == 'Y' & ref_target$IUPAC.y == 'R') | 
+                            (ref_target$IUPAC.x == 'K' & ref_target$IUPAC.y == 'M') |
+                            (ref_target$IUPAC.x == 'M' & ref_target$IUPAC.y == 'K'),]
+      
+
+      # Change target alleles to compliment for flipped variants
+      flipped$A1.x<-snp_allele_comp(flipped$A1.x)
+      flipped$A2.x<-snp_allele_comp(flipped$A2.x)
+      
+      # Update IUPAC codes
+      flipped$IUPAC.x<-snp_iupac(flipped$A1.x, flipped$A2.x)
+
+      
+      # Identify SNPs that have matched alleles
+      matched<-ref_target[ref_target$IUPAC.x == ref_target$IUPAC.y,]
+      matched<-rbind(matched, flipped)
+      
+      # Flip REF.FRQ if alleles are swapped
+      matched$REF.FRQ[matched$A1.x != matched$A1.y]<-1-matched$REF.FRQ[matched$A1.x != matched$A1.y]
+      
+      # Remove REF.FRQ for ambiguous SNPs
+      if(!is.na(super_pop)){
+        matched$REF.FRQ[matched$IUPAC.x %in% c('W','S')]<-NA
+      } else {
+        matched$REF.FRQ<-NA
+      }
+      
+      # Retain reference CHR, BP, but target A1, and A2 information
+      matched$A1<-matched$A1.x
+      matched$A1.y<-NULL
+      matched$A1.x<-NULL
+      matched$A2<-matched$A2.x
+      matched$A2.y<-NULL
+      matched$A2.x<-NULL
+      matched$IUPAC<-matched$IUPAC.x
+      matched$IUPAC.y<-NULL
+      matched$REF.CHR<-matched$CHR
+      matched[[paste0('REF.BP_',target_build)]]<-matched$ORIGBP
+
+      # Identify SNPs that are unmatched
+      unmatched_chr<-cSumstats_chr[!(paste0(cSumstats_chr$ORIGBP,':',cSumstats_chr$IUPAC) %in% paste0(matched$ORIGBP,':',matched$IUPAC.x)),]
+      matched$IUPAC.x<-NULL
+
+      cSumstats_matched<-rbind(cSumstats_matched, matched)
+      cSumstats_unmatched<-rbind(cSumstats_unmatched, unmatched_chr)
+    }
+    
+    # Reinsert variants in GWAS that could not be matched to the reference
+    # These unmatched variants include those with CHR:BP:IUPAC not in the reference, and INDELS.
+    cSumstats_unmatched$REF.CHR<-NA
+    cSumstats_unmatched$REF.BP_GRCh37<-NA
+    cSumstats_unmatched$REF.BP_GRCh38<-NA
+    cSumstats_unmatched$REF.SNP<-NA
+    cSumstats_unmatched$REF.FRQ<-NA
+
+    cSumstats_harm<-rbind(cSumstats_matched, cSumstats_unmatched)
+  }
+} else {
+  if(rsid_avail){
+    # Run per chromosome to reduce memory requirements
+    chrs<-c(1:22,'X','Y','MT')
+  
+    cSumstats_matched<-NULL
+    for(i in chrs){
+      print(i)
+      
+      # Read reference data
+      tmp<-readRDS(file = paste0('/scratch/groups/gwas_sumstats/1kg_ref/1kg_ref_chr',i,'.rds'))
+      
+      # Subset relevent data
+      if(super_pop %in% c('AFR','AMR','EAS','EUR','SAS')){
+        tmp<-tmp[,c("CHR","SNP","BP_GRCh37","BP_GRCh38","A1","A2","IUPAC",paste0('FREQ_',super_pop)),with=F]
+        names(tmp)[names(tmp) == 'BP_GRCh37']<-'REF.BP_GRCh37'
+        names(tmp)[names(tmp) == 'BP_GRCh38']<-'REF.BP_GRCh38'
+        names(tmp)[names(tmp) == paste0('FREQ_',super_pop)]<-'REF.FRQ'
+      } else {
+        tmp<-tmp[,c("CHR","SNP","BP_GRCh37","BP_GRCh38","A1","A2","IUPAC"),with=F]
+      }
+
+      tmp<-tmp[nchar(tmp$A1) == 1 & nchar(tmp$A2) == 1,]
+      tmp$CHR<-NULL
+      
+      # Merge target and reference by SNP ID
+      ref_target<-merge(cSumstats, tmp, by='SNP')
+      
+            # Identify SNPs that are opposite strands
+      flipped<-ref_target[(ref_target$IUPAC.x == 'R' & ref_target$IUPAC.y == 'Y') | 
+                            (ref_target$IUPAC.x == 'Y' & ref_target$IUPAC.y == 'R') | 
+                            (ref_target$IUPAC.x == 'K' & ref_target$IUPAC.y == 'M') |
+                            (ref_target$IUPAC.x == 'M' & ref_target$IUPAC.y == 'K'),]
+      
+      # Change target alleles to compliment for flipped variants
+      flipped$A1.x<-snp_allele_comp(flipped$A1.x)
+      flipped$A2.x<-snp_allele_comp(flipped$A2.x)
+      
+      # Update IUPAC codes
+      flipped$IUPAC.x<-snp_iupac(flipped$A1.x, flipped$A2.x)
+      
+      # Identify SNPs that have matched alleles
+      matched<-ref_target[ref_target$IUPAC.x == ref_target$IUPAC.y,]
+      matched<-rbind(matched, flipped)
+      
+      # Flip REF.FRQ if alleles are swapped
+      matched$REF.FRQ[matched$A1.x != matched$A1.y]<-1-matched$REF.FRQ[matched$A1.x != matched$A1.y]
+      
+      # Remove REF.FRQ for ambiguous SNPs
+      if(!is.na(super_pop)){
+        matched$REF.FRQ[matched$IUPAC.x %in% c('W','S')]<-NA
+      } else {
+        matched$REF.FRQ<-NA
+      }
+
+      # Retain reference CHR, BP, but target A1, and A2 information
+      matched$A1<-matched$A1.x
+      matched$A1.y<-NULL
+      matched$A1.x<-NULL
+      matched$A2<-matched$A2.x
+      matched$A2.y<-NULL
+      matched$A2.x<-NULL
+      matched$IUPAC<-matched$IUPAC.x
+      matched$IUPAC.y<-NULL
+      matched$IUPAC.x<-NULL
+      matched$REF.SNP<-matched$SNP
+  
+      cSumstats_matched_chr<-rbind(matched)
+      cSumstats_matched<-rbind(cSumstats_matched, cSumstats_matched_chr)
+    }
+    
+    # Identify SNPs that are unmatched
+    unmatched<-cSumstats[!(cSumstats$SNP %in% cSumstats_matched$SNP),]
+    
+    # Reinsert variants in GWAS that could not be matched to the reference
+    # These unmatched variants include those with RSIDs not in the reference, any ambiguous SNPs, and INDELS.
+    unmatched$REF.SNP<-NA
+    unmatched$REF.FRQ<-NA
+    unmatched$REF.CHR<-NA
+    unmatched$REF.BP_GRCh37<-NA
+    unmatched$REF.BP_GRCh38<-NA
+  
+    cSumstats_harm<-rbind(cSumstats_matched, unmatched)
+
+  }
 }
 
 
 
-## ----check mhc removed----------------------------------------------------------------------------
+## ----allele Frequency columns-----------------------------------------------------------------------------------
+# Check FRQ column is valid
+if('FRQ' %in% names(cSumstats_harm)){
+  if(any(cSumstats_harm$FRQ>1) || any(cSumstats_harm$FRQ<0)) {
+    
+    stop(
+        paste0('\nThere are FRQ values larger than 1 (',sum(cSumstats_harm$FRQ>1),') or less than 0 (',sum(cSumstats_harm$FRQ<0),') which is outside of the possible FRQ range.')
+    )
+  }
+}
 
 
 
-
-## ----check traits significantly h2----------------------------------------------------------------
-
-
-
-## ----read in rg results---------------------------------------------------------------------------
-
-
-
-## ----select rg results from log out put files-----------------------------------------------------
+## ----allele Frequency comparison with reference-----------------------------------------------------------------
+# Check FRQ column is valid
+if('FRQ' %in% names(cSumstats_harm) & !is.na(super_pop)){
+  cSumstats_harm$diff<-abs(cSumstats_harm$FRQ-cSumstats_harm$REF.FRQ)
+  cSumstats_harm$FRQ_bad<-F
+  cSumstats_harm$FRQ_bad[is.na(cSumstats_harm$diff) | cSumstats_harm$diff > 0.2]<-T
+  cSumstats_harm$diff<-NULL
+}
 
 
 
-## ----join info GWAS sheet with rg results---------------------------------------------------------
+## ----save cleaned file as .gz file in cleaned folder------------------------------------------------------------
+
+fwrite(cSumstats_harm, paste0(column_options$output,"/cleaned/", cCode, ".gz"), sep='\t', na='NA', quote=F)
 
 
 
-## ----filter based on permissions------------------------------------------------------------------
-
-
-
-## ----by trait cateogry----------------------------------------------------------------------------
-
-
-
-## ----create bonferonni column---------------------------------------------------------------------
-
-
-
-## ----create FDR column----------------------------------------------------------------------------
-
-
-
-## ----convert table to matrix for matrix decomposition---------------------------------------------
-
-
-
-## ----matrix decomposition for bonferonni threshold------------------------------------------------
-
-
-
-## ----create dataframe for supplementary tables----------------------------------------------------
-
-
-
-## ----save supplementary table---------------------------------------------------------------------
-
-
-
-## ----vector of signficant traits for plotting-----------------------------------------------------
-# i.e. the researcher may only want to show specific GWAS for each phenotype e.g. most powerful, or certain cohorts, selected based on type of phenotyping. A
-
-
-## ----filter based on vector of traits-------------------------------------------------------------
-
-
-
-## ----create dataframe for plotting----------------------------------------------------------------
-#filtering: 1) matrix decomposition 2) vector of selected traits for plotting
-
-
-## ----plot rg results------------------------------------------------------------------------------
-
-
-
-## ----dataframe for publication table of significant rg traits-------------------------------------
-
-
-
-## ----save publication table-----------------------------------------------------------------------
-
+## ----create log file and save in log file folder----------------------------------------------------------------
+sumstats_meta %>%
+  write_tsv(
+    path = paste0(column_options$output,"/cleaned_logs/", cCode, "_log.txt"),
+    col_names = TRUE
+    )
 

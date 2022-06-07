@@ -176,7 +176,7 @@ plink chromosome numbering: https://zzz.bwh.harvard.edu/plink/data.shtml
 
 This chunk reads in the functions "parse_SNP_column_as_rs_number" and "parse_CHR_column" which parses the SNP and CHR columns respectively. It means that it can read different formats of data in those and convert it to rs-id and chromosome number which we expect/save to be in the SNP and CHR columns.
 ```{r Chromosome numbering}
-source(file = "../functions/parse_SNP_column_as_rs_number.R")
+source(file = "../functions/column_parsing_functions.R")
 ```
 
 
@@ -1167,7 +1167,7 @@ if('FRQ' %in% names(cSumstats_harm)){
 
 # Identify SNPs with FRQ discordant from REF
 
-```{r allele Frequency columns}
+```{r allele Frequency comparison with reference}
 # Check FRQ column is valid
 if('FRQ' %in% names(cSumstats_harm) & !is.na(super_pop)){
   cSumstats_harm$diff<-abs(cSumstats_harm$FRQ-cSumstats_harm$REF.FRQ)
