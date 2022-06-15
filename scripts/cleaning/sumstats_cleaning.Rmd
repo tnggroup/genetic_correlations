@@ -22,11 +22,8 @@ remove(list = ls())
 
 Package setup
 ```{r Packages}
-#devtools::install_github("johanzvrskovec/shru")
-# library(shru)
-# library(googlesheets4)
-
 library(optparse)
+library(googlesheets4)
 library(data.table)
 library(tidyverse)
 ```
@@ -1199,6 +1196,7 @@ if('FRQ' %in% names(cSumstats_harm) & !is.na(super_pop)){
 }
 
 ```
+
 #TO-DO
 ```{r}
 
@@ -1220,3 +1218,48 @@ sumstats_meta %>%
     col_names = TRUE
     )
 ```
+
+
+```{r update Google spreadsheet}
+#update this to the real location!!!
+sheetLink <- "https://docs.google.com/spreadsheets/d/1KwmSUZvw2xoiFFKyw18YYHKdcV9R_3RRrcMBiJOJNXs/edit?usp=sharing"
+
+currentSheet <- as.data.frame(read_sheet(ss = sheetLink, col_names = T))
+if(nrow(currentSheet)>0) currentSheet$x_row<-1:nrow(currentSheet)
+setDT(currentSheet)
+setkeyv(currentSheet,cols = c("code"))
+
+# sumstats_meta_dummy <- data.frame(
+#   code=c("ANXI04","DEPR05","NEUR02"),
+#   name=c("Generalised anxiety symptoms","MDD, narrow","Neuroticism"),
+#   ancestry=c("EUR","EUR","EUR"),
+#   n_ca=c(19012,58113,449484),
+#   n_co=c(58113,25632,NA_integer_)
+#   )
+# sumstats_meta_dummy$n_tot<-sumstats_meta_dummy$n_ca + ifelse(is.na(sumstats_meta_dummy$n_co),0,sumstats_meta_dummy$n_co)
+
+dfToInsert<-as.data.frame(matrix(data=NA,nrow = 0, ncol = length(colnames(currentSheet))))
+colnames(dfToInsert)<-colnames(currentSheet)
+
+dfToInsert<-rbindlist(list(
+  dfToInsert,
+  sumstats_meta
+), fill = T)
+
+cols<-colnames(currentSheet)
+dfToInsert <- dfToInsert[,..cols]
+
+for(iRec in 1:nrow(dfToInsert)){
+  #iRec<-1
+  cRec <- dfToInsert[iRec,]
+  
+  if(any(currentSheet$code==cRec$code)){
+    toUpdate<-currentSheet[currentSheet$code==cRec$code,]$x_row
+    range_write(ss = sheetLink,data = cRec,cell_rows(toUpdate[[1]]:toUpdate[[1]]))
+  } else {
+    sheet_append(ss = sheetLink,data = cRec)
+  }
+}
+  
+```
+
