@@ -102,14 +102,14 @@ column_options$`sample-size`<-'100000'
 column_options$population<-'EUR'
 column_options$output<-'/scratch/groups/gwas_sumstats'
 
-#JZ
-column_options$file<-'/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/sumstats_neuroticism_ctg_format.txt.gz'
-column_options$label<-"Neuroticism" #This is the nice trait name
-column_options$code<-'NEUR02'
-column_options$`sample-size`<-449484
-column_options$population<-'EUR'
-column_options$output<-'/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/cleaned_shpipeline'
-column_options$reference_doi="https://doi.org/10.1038/s41588-018-0151-7"
+# #JZ
+# column_options$file<-'/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/sumstats_neuroticism_ctg_format.txt.gz'
+# column_options$label<-"Neuroticism" #This is the nice trait name
+# column_options$code<-'NEUR02'
+# column_options$`sample-size`<-449484
+# column_options$population<-'EUR'
+# column_options$output<-'/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/cleaned_shpipeline'
+# column_options$reference_doi="https://doi.org/10.1038/s41588-018-0151-7"
 
 
 ```
