@@ -1,6 +1,6 @@
 ---
 title: "Cleaning script for GWAS summary statistics repository pipeline"
-author: "Abigail ter Kuile, Christopher Huebel, Alish Palmos, Johan Zrvskovec, Oliver Pain"
+author: "Abigail ter Kuile, Christopher Huebel, Alish Palmos, Johan Zvrskovec, Oliver Pain"
 date: "28/08/2021"
 output: html_document
 ---
@@ -102,6 +102,15 @@ column_options$`sample-size`<-'100000'
 column_options$population<-'EUR'
 column_options$output<-'/scratch/groups/gwas_sumstats'
 
+#JZ
+column_options$file<-'/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/sumstats_neuroticism_ctg_format.txt.gz'
+column_options$label<-"Neuroticism" #This is the nice trait name
+column_options$code<-'NEUR02'
+column_options$`sample-size`<-449484
+column_options$population<-'EUR'
+column_options$output<-'/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/cleaned_shpipeline'
+column_options$reference_doi="https://doi.org/10.1038/s41588-018-0151-7"
+
 
 ```
 
@@ -193,7 +202,7 @@ https://cran.r-project.org/web/packages/data.table/vignettes/datatable-intro.htm
 
 The fread function automatically detects the field seperator and handles a range of commonly use seperators. fread fill parameter is set to F to avoid unexpected truncations leading to column mispecification. 
 
-**NOTE: for testing we have specified below to just read in first 10k rows of SNPs to run tests faster. Please hash out if you want to test the full GWAS summary statistics file**
+**NOTE: for testing you can specify below to just read in first 10k rows of SNPs to run tests faster - uncomment the command**
 ```{r Read in sumstats}
 cCode <- traitCodes[1]
 
@@ -209,8 +218,13 @@ cSumstats <- data.table::fread(
     "NA",
     ""
     ),
+  #check.names = T, #JZ: do we want this? - checks duplicates and variable naming syntax
+  fill = T,
+  blank.lines.skip = T,
+  data.table = T,
+  nThread = 3
   # For testing read in first 10k rows
-  nrows=10000
+  # nrows=10000
   )
 
 # Number of rows before touching the data
@@ -243,7 +257,7 @@ Set correct R data formats
 
 Transform to data table
 ```{r Transform to data table}
-cSumstats <- setDT(cSumstats)
+cSumstats <- setDT(cSumstats) #JZ: Slightly redundant as DT is set by fread above now - remove?
 str(cSumstats)
 ```
 
@@ -270,13 +284,15 @@ str(cSumstats$A2)
 Parse SNP (if needed), convert to lc
 Parse CHR, convert to numeric - will crash if parsing rules do not detect all character cases
 BP to integer
-```{r Parse SNP}
+```{r Parse SNP and CHR}
 cSumstats$SNP <- tolower(parse_SNP_column_as_rs_number(cSumstats$SNP))
 
 if(any(colnames(cSumstats)=="CHR")) {
   cSumstats$CHR <- as.integer(parse_CHR_column(as.character(cSumstats$CHR)))
   cSumstats.keys <- c(cSumstats.keys,'CHR')
-  str(cSumstats$CHR)
+  #list chromosomes
+  cat("\nChromosomes:\n")
+  sort(unique(cSumstats$CHR))
 }
 
 if(any(colnames(cSumstats)=="BP")) {
@@ -286,6 +302,7 @@ if(any(colnames(cSumstats)=="BP")) {
 }
 
 cSumstats.keys
+
 ```
 
 Set data table index on selected keys
@@ -300,13 +317,7 @@ setkeyv(
   )
 ```
 
-Interpret BGENIE SNP format
-
-```{r Interpret BGENIE SNP format}
-
-# Future development
-
-```
+**JZ: BGENIE FILE FORMAT SHOULD BE TAKEN CARE OF BY THE COLUMN PARSING FUNCTION - IF NOT -> CORRECT IN THE FUNCTION**
 
 Check if daner like columns present
 ref: https://docs.google.com/document/d/1TWIhr8-qpCXB13WCXcU1_HDio8lC_MeWoAg2jlggrtU/edit
@@ -346,11 +357,8 @@ if(!any(colnames(cSumstats)=="FRQ") &
   }
 ```
 
-```{r Convert to numeric columns}
 
-cSumstats$CHR<-as.numeric(cSumstats$CHR)
-
-```
+**JZ: We already have CHR columns as integers from chunks above**
 
 
 # Add missing columns
@@ -418,9 +426,16 @@ if(
     
     sumstats_meta[cCode,c("Effect")]<-"BETA"
     
+  } else if(any(colnames(cSumstats) == "Z")){
+    sumstats_meta[cCode,c("Effect")]<-"Z"
+  } else if(any(colnames(cSumstats) == "P")){
+    sumstats_meta[cCode,c("Effect")]<-"P"
+  } else {
+    sumstats_meta[cCode,c("Effect")]<-NA_character_
   }
 
 head(cSumstats)
+sumstats_meta
 ```
 
 
@@ -465,6 +480,7 @@ head(cSumstats)
 ## Add missing effect standard errors column 
 If missing, add standard errors from beta & z.
 (We always have BETA now if any effect provided previously.)
+**JZ: We don't have BETA if the effect was only porvided in Z**
 ```{r insert SE column if missing}
 # if no SE column
 if(
@@ -479,13 +495,12 @@ if(
     
     # Calculate SE from BETA and Z
     cSumstats$SE <- abs(cSumstats$BETA/cSumstats$Z)
+    cat("SE column inserted based on BETA/OR and P")
+  
+    sumstats_meta[cCode, c("SE")] <- "BETA,Z"
     
   }
-  
-  cat("SE column inserted based on BETA/OR and P")
-  
-  sumstats_meta[cCode, c("SE")] <- "BETA,Z"
-  
+
 }
 
 head(cSumstats)
@@ -637,7 +652,7 @@ if(
   
   cSumstats <- cSumstats[!rm, ]
   
-  cat("Removing", sum(rm), "SNPs with MAF <", frq.filter, ";", nrow(cSumstats), "remain")
+  cat("Removing", sum(rm), "SNPs with FRQ <", frq.filter, " or (1-",frq.filter,");", nrow(cSumstats), "remain")
   
   sumstats_meta[cCode,c("n_removed_frq")] <- sum(rm)
   
@@ -772,57 +787,59 @@ z = sign(beta) * abs(qnorm(p/2))
 se = beta/z
 ```{r}
 #if a Zscore already exists, use this to calculate SE from the BETA
-if(
-  any(colnames(cSumstats)=="Z")
-  ){
-  
-  cSumstats_se_check <- cSumstats %>%
-    mutate(
-      se_check = 
-        BETA / Z
-    )
-  
-  #if there is only SE column, calculate the Zscore first and then the SE from the BETA
-} else if(
-  any(colnames(cSumstats)=="SE")
-  ){
-  
-  cSumstats_se_check <- cSumstats %>%
-    mutate(
-      z_check =
-        sign(BETA) * abs(qnorm(P/2))
-    )
-  
-  cSumstats_se_check <- cSumstats %>%
-    mutate(
-      se_check = 
-        BETA / z_check
-    )
-}
-
-cSumstats_se_check <- as.data.frame(cSumstats_se_check)
-#calculate the relative difference between the two SE
-mean_rel_diff <- mean(cSumstats_se_check$se_check - cSumstats$SE, na.rm = TRUE)
-  
-
-print(mean_rel_diff)
-#print output message
-if(
-    mean_rel_diff > 0.1
+if(any(colnames(cSumstats)=="BETA")){
+  if(
+    any(colnames(cSumstats)=="Z")
     ){
     
-    cat("Mean relative difference in SE is greater than 0.1, please investigate")
-      
-      } else if(
-        mean_rel_diff < 0.1
+    cSumstats_se_check <- cSumstats %>%
+      mutate(
+        se_check = 
+          BETA / Z
+      )
+    
+    #if there is only SE column, calculate the Zscore first and then the SE from the BETA
+  } else if(
+    any(colnames(cSumstats)=="SE")
+    ){
+    
+    cSumstats_se_check <- cSumstats %>%
+      mutate(
+        z_check =
+          sign(BETA) * abs(qnorm(P/2))
+      )
+    
+    cSumstats_se_check <- cSumstats %>%
+      mutate(
+        se_check = 
+          BETA / z_check
+      )
+  }
+  
+  cSumstats_se_check <- as.data.frame(cSumstats_se_check)
+  #calculate the relative difference between the two SE
+  mean_rel_diff <- mean(cSumstats_se_check$se_check - cSumstats$SE, na.rm = TRUE)
+    
+  
+  print(mean_rel_diff)
+  #print output message
+  if(
+      mean_rel_diff > 0.1
       ){
+      
+      cat("Mean relative difference in SE is greater than 0.1, please investigate")
         
-        cat("Mean relative difference in SE is smaller than 0.1 - passed check")
-        
-        #remove the dataframe used in the checking process
-        rm(cSumstats_se_check)
-        
-      }
+        } else if(
+          mean_rel_diff < 0.1
+        ){
+          
+          cat("Mean relative difference in SE is smaller than 0.1 - passed check")
+          
+          #remove the dataframe used in the checking process
+          rm(cSumstats_se_check)
+          
+        }
+}
 
 ```
 

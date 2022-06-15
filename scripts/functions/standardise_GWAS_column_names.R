@@ -142,7 +142,8 @@ standardise_GWAS_column_names <- function(column_names, stop_on_missing_essentia
                                             "IMPINFO",
                                             "IMPQUALITY",
                                             "INFO.PLINK",
-                                            "INFO_UKBB"
+                                            "INFO_UKBB",
+                                            "INFO_UKB"
                                           ),
                                           c.P = c(
                                             "P",
@@ -239,7 +240,8 @@ standardise_GWAS_column_names <- function(column_names, stop_on_missing_essentia
                                             "A1FREQ",
                                             "CODED_ALLELE_FREQUENCY",
                                             "FREQ_TESTED_ALLELE_IN_HRS",
-                                            "EAF_HRC"
+                                            "EAF_HRC",
+                                            "EAF_UKB"
                                           ),
                                           c.CHR = c(
                                             "CHR",
