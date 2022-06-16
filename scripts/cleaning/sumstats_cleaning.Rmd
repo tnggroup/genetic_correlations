@@ -95,12 +95,15 @@ for testing the script in Rmarkdown, please run the below chunk with the file pa
 e.g. file path for raw sumstats in repository: /scratch/groups/gwas_sumstats/original/
 ```{r testing chunk}
 
-column_options$file<-'/scratch/groups/gwas_sumstats/original/glad_coping/regenie_GWASv2_mh_affected_MDQ_items_allchr_mdq.sum_score.12.txt.gz'
-column_options$label<-'Test run'
-column_options$code<-'TEST_XXXX'
-column_options$`sample-size`<-'100000'
+column_options$file<-'~/project/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/Hagenaars2017_UKB_MPB_summary_results_10Feb2016.txt'
+column_options$file2<-'~/project/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/Hagenaars2017_UKB_MPB_summary_results_Xchr_15Feb2017.txt'
+column_options$label<-'Male pattern baldness (androgenic alopecia)'
+column_options$code<-'BALD01'
+column_options$`sample-size`<-52874
 column_options$population<-'EUR'
-column_options$output<-'/scratch/groups/gwas_sumstats'
+column_options$sex<-'both'
+#column_options$output<-'/scratch/groups/gwas_sumstats'
+column_options$output<-"~/project/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/cleaned_shpipeline"
 
 # #JZ
 # column_options$file<-'/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/sumstats_neuroticism_ctg_format.txt.gz'
@@ -157,6 +160,7 @@ sumstats_meta <- data.frame(
   )
 
 row.names(sumstats_meta) <- traitCodes
+sumstats_meta$code<-traitCodes
 sumstats_meta
 ```
 
@@ -227,9 +231,38 @@ cSumstats <- data.table::fread(
   # nrows=10000
   )
 
+cSumstats2 <- data.table::fread(
+  file = column_options$file2,
+  header = T,
+  quote = "\"",
+  na.strings = c(
+    ".",
+    NA,
+    "NA",
+    ""
+    ),
+  fill = T,
+  blank.lines.skip = T,
+  data.table = T,
+  nThread = 3
+  # For testing read in first 10k rows
+  # nrows=10000
+  )
+
+cSumstats<-rbindlist(list(cSumstats,cSumstats2),use.names = F)
+names(cSumstats)<-names(cSumstats2)
+rm(cSumstats2)
+
+#remove empty rows
+cSumstats<-cSumstats[complete.cases(cSumstats),]
+
+
 # Number of rows before touching the data
 nRowsRaw <- nrow(cSumstats)
+
 sumstats_meta[cCode,c("n_snp_raw")]<-nRowsRaw #add number of SNPs raw to sumstats_meta (meta data file)
+
+
 
 sumstats_meta$n_snp_raw
 ```
@@ -480,7 +513,7 @@ head(cSumstats)
 ## Add missing effect standard errors column 
 If missing, add standard errors from beta & z.
 (We always have BETA now if any effect provided previously.)
-**JZ: We don't have BETA if the effect was only porvided in Z**
+**JZ: We don't have BETA if the effect was only provided in Z**
 ```{r insert SE column if missing}
 # if no SE column
 if(
@@ -874,6 +907,7 @@ This also relies on the SEs not being adjusted for genomic control, which does h
 Using the LDSC intercept might be a better approach for detection, although there is no easy way to reverse.
 +++CH: for the checking of the Genomic Control do we need to change to Z_check
 +++CH: Have we generated Z_check somewhere before?
++++JZ: I think we also need to re-adjust BETA, SE and Z accordingly after correction
 ```{r Check and correct for genomic control}
 if(
   any(colnames(cSumstats) == "SE") == 1)
@@ -951,6 +985,8 @@ We will also only insert MAF for non-ambiguous SNPs.
 source(file = "../functions/snp_allele.R")
 ```
 
+
++++JZ: This does not seem to be working for indel alleles - maybe only use the first insertion base?
 ```{r insert IUPAC codes}
 # Insert IUPAC codes into target
 cSumstats$IUPAC<-snp_iupac(cSumstats$A1, cSumstats$A2)
@@ -975,7 +1011,17 @@ rsid_avail<-(sum(grepl('rs', cSumstats$SNP)) > 0.9*length(cSumstats$SNP))
 
 ```
 
+
++++JZ: We could add SNP counts from the different operations here to the metadata table
++++JZ: The build comparison will fail if chromosome is different across builds. Relevant for sex chromosomes.
++++JZ: Fails for chr23
 ```{r merge with reference}
+
+#for testing
+#cSumstatsOLD<-cSumstats
+#cSumstats<-cSumstatsOLD[CHR==1 | CHR==23,]
+#cSumstats<-cSumstatsOLD[CHR==1 | CHR==2,]
+
 if(chr_bp_avail){
   ###
   # Determine build
@@ -1004,6 +1050,7 @@ if(chr_bp_avail){
   }
   
   rm(matched,ref)
+  
   
   if(!is.na(target_build)){
     # Build detected, so can continue reference harmonisation
@@ -1212,6 +1259,9 @@ if('FRQ' %in% names(cSumstats_harm) & !is.na(super_pop)){
   cSumstats_harm$diff<-NULL
 }
 
+sumstats_meta[cCode,c("frq_bad")] <- sum(cSumstats_harm$FRQ_bad)
+sumstats_meta[cCode,c("frq_bad")]
+
 ```
 
 #TO-DO
@@ -1224,14 +1274,14 @@ if('FRQ' %in% names(cSumstats_harm) & !is.na(super_pop)){
 # Save cleaned file and log output
 ```{r save cleaned file as .gz file in cleaned folder}
 
-fwrite(cSumstats_harm, paste0(column_options$output,"/cleaned/", cCode, ".gz"), sep='\t', na='NA', quote=F)
+fwrite(cSumstats_harm, paste0(column_options$output,"/cleaned/", cCode, ".gz"), sep='\t', na='NA', quote=F, nThread = 3)
 
 ```
 
 ```{r create log file and save in log file folder}
 sumstats_meta %>%
   write_tsv(
-    path = paste0(column_options$output,"/cleaned_logs/", cCode, "_log.txt"),
+    file = paste0(column_options$output,"/cleaned_logs/", cCode, "_log.tsv"),
     col_names = TRUE
     )
 ```
