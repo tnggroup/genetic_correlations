@@ -214,7 +214,7 @@ cFilePath <- filePaths[1]
 
 cSumstats <- data.table::fread(
   file = cFilePath,
-  header = T,
+  header = T, #Interpret the first row as column names
   quote = "\"",
   na.strings = c(
     ".",
@@ -223,47 +223,44 @@ cSumstats <- data.table::fread(
     ""
     ),
   #check.names = T, #JZ: do we want this? - checks duplicates and variable naming syntax
-  fill = T,
-  blank.lines.skip = T,
-  data.table = T,
-  nThread = 3
+  fill = T, #Fills empty values with NA based on interpreted column names
+  blank.lines.skip = T, #skips empty lines
+  data.table = T, #convert to data table immediately
+  nThread = 3 #uses 3 threads rather than one
   # For testing read in first 10k rows
   # nrows=10000
   )
 
-cSumstats2 <- data.table::fread(
-  file = column_options$file2,
-  header = T,
-  quote = "\"",
-  na.strings = c(
-    ".",
-    NA,
-    "NA",
-    ""
-    ),
-  fill = T,
-  blank.lines.skip = T,
-  data.table = T,
-  nThread = 3
-  # For testing read in first 10k rows
-  # nrows=10000
-  )
+# Temporary code to read in the secod file from the Hagenaars2017_UKB_MPB_summary_results sumstats
+# cSumstats2 <- data.table::fread(
+#   file = column_options$file2,
+#   header = T,
+#   quote = "\"",
+#   na.strings = c(
+#     ".",
+#     NA,
+#     "NA",
+#     ""
+#     ),
+#   fill = T,
+#   blank.lines.skip = T,
+#   data.table = T,
+#   nThread = 3
+#   )
 
 cSumstats<-rbindlist(list(cSumstats,cSumstats2),use.names = F)
 names(cSumstats)<-names(cSumstats2)
 rm(cSumstats2)
 
 #remove empty rows
-cSumstats<-cSumstats[complete.cases(cSumstats),]
+naRows <- rowSums(is.na(cSumstats)) == length(colnames(cSumstats))
+cat("\nNumber of completely NA rows:",sum(naRows),"\n")
+if(sum(naRows)>0) cSumstats<-cSumstats[!naRows,]
+rm(naRows)
 
 
 # Number of rows before touching the data
-nRowsRaw <- nrow(cSumstats)
-
-sumstats_meta[cCode,c("n_snp_raw")]<-nRowsRaw #add number of SNPs raw to sumstats_meta (meta data file)
-
-
-
+sumstats_meta[cCode,c("n_snp_raw")]<-nrow(cSumstats) #add number of SNPs raw to sumstats_meta (meta data file)
 sumstats_meta$n_snp_raw
 ```
 
@@ -386,6 +383,8 @@ if(!any(colnames(cSumstats)=="FRQ") &
     cSumstats$FRQ<-((cSumstats$FRQ_CASES * cSumstats$N_CAS) + (cSumstats$FRQ_CONTROLS * cSumstats$N_CON))/(cSumstats$N_CAS + cSumstats$N_CON)
     
     colnames(cSumstats)
+  } else {
+    cat("The dataset is not a daner file")
   }
   }
 ```
@@ -410,12 +409,14 @@ if(
 
   # Calculate total N from number of cases and number of controls if they are present. Overwrite any specific total N.
   cSumstats$N <- cSumstats$N_CAS + cSumstats$N_CON
+  cat("N set from N_CAS and N_CON value")
   head(cSumstats)
   } else if(!is.null(cN)) {
     
     cSumstats$N <- NA
     
   cSumstats$N[which(is.na(cSumstats$N))] <- cN #default behaviour: add explicit N only to missing values.
+  cat("N set from input value")
   head(cSumstats)
   } else if(!any(colnames(cSumstats)=="N")) {
   
@@ -820,7 +821,7 @@ z = sign(beta) * abs(qnorm(p/2))
 se = beta/z
 ```{r}
 #if a Zscore already exists, use this to calculate SE from the BETA
-if(any(colnames(cSumstats)=="BETA")){
+if(any(colnames(cSumstats)=="BETA") & sumstats_meta[cCode, c("SE")]!="BETA,Z"){
   if(
     any(colnames(cSumstats)=="Z")
     ){
@@ -907,7 +908,7 @@ This also relies on the SEs not being adjusted for genomic control, which does h
 Using the LDSC intercept might be a better approach for detection, although there is no easy way to reverse.
 +++CH: for the checking of the Genomic Control do we need to change to Z_check
 +++CH: Have we generated Z_check somewhere before?
-+++JZ: I think we also need to re-adjust BETA, SE and Z accordingly after correction
++++JZ: I think we also need to re-adjust BETA, SE and Z accordingly after correction #TODO
 ```{r Check and correct for genomic control}
 if(
   any(colnames(cSumstats) == "SE") == 1)
@@ -999,9 +1000,10 @@ super_pop <- column_options$population
 
 ```
 
+Initially target should be merged with the reference based on CHR, BP and IUPAC. RSIDs will be inserted for all SNPs, and reference MAF will be inserted for all non-ambiguous SNPs if the super population is specified.
+If CHR and BP are unavailable, but RSID is present, target will be merged with the reference by RSID and IUPAC. CHR and BP will be inserted for all SNPs, and reference MAF will be inserted for all non-ambiguous SNPs if the super population is specified.
+
 ```{r check presence of CHR, BP and RSID information}
-# Initially target should be merged with the reference based on CHR, BP and IUPAC. RSIDs will be inserted for all SNPs, and reference MAF will be inserted for all non-ambiguous SNPs if the super population is specified.
-# If CHR and BP are unavailable, but RSID is present, target will be merged with the reference by RSID and IUPAC. CHR and BP will be inserted for all SNPs, and reference MAF will be inserted for all non-ambiguous SNPs if the super population is specified.
 
 # Check whether chromosome and base pair position information is present
 chr_bp_avail<-sum(c('CHR','ORIGBP') %in% names(cSumstats)) == 2 
@@ -1014,7 +1016,7 @@ rsid_avail<-(sum(grepl('rs', cSumstats$SNP)) > 0.9*length(cSumstats$SNP))
 
 +++JZ: We could add SNP counts from the different operations here to the metadata table
 +++JZ: The build comparison will fail if chromosome is different across builds. Relevant for sex chromosomes.
-+++JZ: Fails for chr23
++++JZ: The reference panel chromosome naming in the files does not correspond to our numeric chromosomes.
 ```{r merge with reference}
 
 #for testing
@@ -1287,7 +1289,9 @@ sumstats_meta %>%
 ```
 
 
-```{r update Google spreadsheet}
+Chunk to update a Google spreadsheet - for demo purposes
+
+```{r update google spreadsheet, eval=F}
 #update this to the real location!!!
 sheetLink <- "https://docs.google.com/spreadsheets/d/1KwmSUZvw2xoiFFKyw18YYHKdcV9R_3RRrcMBiJOJNXs/edit?usp=sharing"
 
