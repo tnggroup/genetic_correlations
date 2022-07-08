@@ -184,7 +184,6 @@ standardise_GWAS_column_names <- function(column_names, stop_on_missing_essentia
                                             "TOTALSAMPLESIZE"
                                           ),
                                           c.N_CAS = c(
-                                            "Ncas",
                                             "N_CAS",
                                             "NCASE",
                                             "N_CASE",
@@ -197,7 +196,6 @@ standardise_GWAS_column_names <- function(column_names, stop_on_missing_essentia
                                             "FRQ_A" # +++CH: Is this correct here? +++JZ: Yes, this is the use of 'FRQ' in different standards. FRQ can refer to frequency of cases as well. I believe this interpretation is taken from Helena G's scripts. FRQ_A I believe is frequencey affected while FRQ_U is frequency unaffected. Not the same as FREQ_A and FREQ_U which refers to allele frequencies, maybe stratified per affected and unaffected.
                                           ),
                                           c.N_CON = c(
-                                            "Ncon",
                                             "N_CON",
                                             "NCONTROL",
                                             "N_CONTROL",

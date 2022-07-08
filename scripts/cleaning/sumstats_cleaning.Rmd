@@ -95,22 +95,13 @@ for testing the script in Rmarkdown, please run the below chunk with the file pa
 e.g. file path for raw sumstats in repository: /scratch/groups/gwas_sumstats/original/
 ```{r testing chunk}
 
-column_options$file<-'~/project/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/Hagenaars2017_UKB_MPB_summary_results_10Feb2016.txt'
-column_options$file2<-'~/project/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/Hagenaars2017_UKB_MPB_summary_results_Xchr_15Feb2017.txt'
-column_options$label<-'Male pattern baldness (androgenic alopecia)'
-column_options$code<-'BALD01'
-column_options$`sample-size`<-52874
-column_options$population<-'EUR'
-column_options$sex<-'both'
-#column_options$output<-'/scratch/groups/gwas_sumstats'
-column_options$output<-"~/project/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/cleaned_shpipeline"
 
-# column_options$file<-'/scratch/groups/gwas_sumstats/original/glad_coping/regenie_GWASv2_mh_affected_MDQ_items_allchr_mdq.sum_score.12.txt.gz'
-# column_options$label<-'Test run'
-# column_options$code<-'TEST_XXXX'
-# column_options$`sample-size`<-'100000'
-# column_options$population<-'EUR'
-# column_options$output<-'/scratch/groups/gwas_sumstats'
+column_options$file<-'/scratch/groups/gwas_sumstats/original/glad_coping/regenie_GWASv2_mh_affected_MDQ_items_allchr_mdq.sum_score.12.txt.gz'
+column_options$label<-'Test run'
+column_options$code<-'TEST_XXXX'
+column_options$`sample-size`<-'100000'
+column_options$population<-'EUR'
+column_options$output<-'/scratch/groups/gwas_sumstats'
 
 
 # #JZ settings for PGC3 MDD GWAS
@@ -121,6 +112,27 @@ column_options$output<-"~/project/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/cl
 # column_options$population<-'EUR'
 # column_options$output<-'/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/cleaned_shpipeline'
 # column_options$reference_doi=NA
+
+# #JZ settings for PGC2 MDD GWAS
+# column_options$file<-'/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/pgc.mdd.full.2012-04.txt'
+# column_options$label<-"Major depressive disorder" #This is the nice trait name
+# column_options$code<-'MDD_PGC1'
+# column_options$`sample-size`<-NA
+# column_options$population<-'EUR'
+# column_options$output<-'/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/cleaned_shpipeline'
+# column_options$reference_doi=NA
+
+# #JZ settings for X chromosome test
+# column_options$file<-'~/project/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/Hagenaars2017_UKB_MPB_summary_results_10Feb2016.txt'
+# column_options$file2<-'~/project/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/Hagenaars2017_UKB_MPB_summary_results_Xchr_15Feb2017.txt'
+# column_options$label<-'Male pattern baldness (androgenic alopecia)'
+# column_options$code<-'BALD01'
+# column_options$`sample-size`<-52874
+# column_options$population<-'EUR'
+# column_options$sex<-'both'
+# #column_options$output<-'/scratch/groups/gwas_sumstats'
+# column_options$output<-"~/project/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/cleaned_shpipeline"
+
 
 
 ```
@@ -234,7 +246,7 @@ cSumstats <- data.table::fread(
   fill = T, #Fills empty values with NA based on interpreted column names
   blank.lines.skip = T, #skips empty lines
   data.table = T, #convert to data table immediately
-  nThread = 3 #uses 3 threads rather than one
+  nThread = 5 #uses 5 threads rather than one
   # For testing read in first 10k rows
   # nrows=10000
   )
@@ -256,9 +268,9 @@ cSumstats <- data.table::fread(
 #   nThread = 3
 #   )
 
-cSumstats<-rbindlist(list(cSumstats,cSumstats2),use.names = F)
-names(cSumstats)<-names(cSumstats2)
-rm(cSumstats2)
+# cSumstats<-rbindlist(list(cSumstats,cSumstats2),use.names = F)
+# names(cSumstats)<-names(cSumstats2)
+# rm(cSumstats2)
 
 #remove empty rows
 naRows <- rowSums(is.na(cSumstats)) == length(colnames(cSumstats))
@@ -375,14 +387,12 @@ if(!any(colnames(cSumstats)=="FRQ") &
                prefix = "FRQ_U_")
     ][1]
   
-  if(
-    !is.na(danerNcas)
-    & !is.na(danerNcon))
+  if(!is.na(danerNcas) & !is.na(danerNcon))
     {
     
-    # Add number of cases and number of controls
-    cSumstats$N_CAS <- as.numeric(gsub('FRQ_A_','',danerNcas))
-    cSumstats$N_CON <- as.numeric(gsub('FRQ_U_','',danerNcon))
+    # Add number of cases and number of controls - but only to already NA fields! The file may already contain N_CAS and N_CON columns.
+    cSumstats[is.na(cSumstats$N_CAS),]$N_CAS <- as.numeric(gsub('FRQ_A_','',danerNcas))
+    cSumstats[is.na(cSumstats$N_CON),]$N_CON <- as.numeric(gsub('FRQ_U_','',danerNcon))
     
     # Add case and control specific effect allele frequencies
     colnames(cSumstats)[colnames(cSumstats) == danerNcas] <- "FRQ_CASES"
@@ -631,6 +641,8 @@ sumstats_meta$n_removed_missing_effect
 
 ## Duplicated data
 
++++JZ: We could add some more controle over what to propritise when removing duplicates here: MAF?
+
 Deal with duplicated variants
 Remove duplicated variants across SNP, A1 and A2 columns
 ```{r clean duplicate data}
@@ -830,7 +842,7 @@ z = sign(beta) * abs(qnorm(p/2))
 se = beta/z
 ```{r}
 #if a Zscore already exists, use this to calculate SE from the BETA
-if(any(colnames(cSumstats)=="BETA") & sumstats_meta[cCode, c("SE")]!="BETA,Z"){
+if(any(colnames(cSumstats)=="BETA") & any(colnames(cSumstats)=="SE")){
   if(
     any(colnames(cSumstats)=="Z")
     ){
@@ -893,7 +905,7 @@ If it is set to FALSE, this chunk will remove indels
 +++CH: There is something wrong with this chunk. It doesn't do what it is supposed to do
 ```{r indels filter}
 if(keep_indel == FALSE)
-  { 
+{ 
   cSumstats$A1 <- as.character(toupper(cSumstats$A1), c("A", "C", "G", "T"))
   
   cSumstats$A2 <- as.character(toupper(cSumstats$A2), c("A", "C", "G", "T"))
@@ -1249,7 +1261,7 @@ If there are no impossible FRQs the script will run with no warning. If there is
 ```{r allele Frequency columns}
 # Check FRQ column is valid
 if('FRQ' %in% names(cSumstats_harm)){
-  if(any(cSumstats_harm$FRQ>1) || any(cSumstats_harm$FRQ<0)) {
+  if(any(cSumstats_harm$FRQ>1, na.rm = T) || any(cSumstats_harm$FRQ<0, na.rm = T)) {
     
     stop(
         paste0('\nThere are FRQ values larger than 1 (',sum(cSumstats_harm$FRQ>1),') or less than 0 (',sum(cSumstats_harm$FRQ<0),') which is outside of the possible FRQ range.')
