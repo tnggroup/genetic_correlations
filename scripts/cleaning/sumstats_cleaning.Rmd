@@ -95,44 +95,13 @@ for testing the script in Rmarkdown, please run the below chunk with the file pa
 e.g. file path for raw sumstats in repository: /scratch/groups/gwas_sumstats/original/
 ```{r testing chunk}
 
-
+# 
 column_options$file<-'/scratch/groups/gwas_sumstats/original/glad_coping/regenie_GWASv2_mh_affected_MDQ_items_allchr_mdq.sum_score.12.txt.gz'
 column_options$label<-'Test run'
 column_options$code<-'TEST_XXXX'
 column_options$`sample-size`<-'100000'
 column_options$population<-'EUR'
 column_options$output<-'/scratch/groups/gwas_sumstats'
-
-
-# #JZ settings for PGC3 MDD GWAS
-# column_options$file<-'/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/daner_pgc_mdd_full_eur_hg19_v3.49.24.11.rp.gz'
-# column_options$label<-"Major depressive disorder" #This is the nice trait name
-# column_options$code<-'MDD_PGC3'
-# column_options$`sample-size`<-NA
-# column_options$population<-'EUR'
-# column_options$output<-'/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/cleaned_shpipeline'
-# column_options$reference_doi=NA
-
-# #JZ settings for PGC2 MDD GWAS
-# column_options$file<-'/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/pgc.mdd.full.2012-04.txt'
-# column_options$label<-"Major depressive disorder" #This is the nice trait name
-# column_options$code<-'MDD_PGC1'
-# column_options$`sample-size`<-NA
-# column_options$population<-'EUR'
-# column_options$output<-'/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/cleaned_shpipeline'
-# column_options$reference_doi=NA
-
-# #JZ settings for X chromosome test
-# column_options$file<-'~/project/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/Hagenaars2017_UKB_MPB_summary_results_10Feb2016.txt'
-# column_options$file2<-'~/project/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/Hagenaars2017_UKB_MPB_summary_results_Xchr_15Feb2017.txt'
-# column_options$label<-'Male pattern baldness (androgenic alopecia)'
-# column_options$code<-'BALD01'
-# column_options$`sample-size`<-52874
-# column_options$population<-'EUR'
-# column_options$sex<-'both'
-# #column_options$output<-'/scratch/groups/gwas_sumstats'
-# column_options$output<-"~/project/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/cleaned_shpipeline"
-
 
 
 ```
@@ -374,8 +343,8 @@ ref: https://docs.google.com/document/d/1TWIhr8-qpCXB13WCXcU1_HDio8lC_MeWoAg2jlg
 +++JZ: Needs to be fixed? Ratio ca/co should not be stored in FRQ as this may be used for effect allele frequency. I encountered a file where ncas and ncon were provided per variant.
 ```{r Interpret daner like format}
 if(!any(colnames(cSumstats)=="FRQ") & 
-   !any(colnames(cSumstats)=="N_CAS") & 
-   !any(colnames(cSumstats)=="N_CON"))
+   any(startsWith(colnames(cSumstats),prefix = "FRQ_A_")) & 
+   any(startsWith(colnames(cSumstats),prefix = "FRQ_U_")))
   {
   danerNcas <- colnames(cSumstats)[
     startsWith(colnames(cSumstats),
@@ -1297,7 +1266,7 @@ sumstats_meta[cCode,c("frq_bad")]
 # Save cleaned file and log output
 ```{r save cleaned file as .gz file in cleaned folder}
 
-fwrite(cSumstats_harm, paste0(column_options$output,"/cleaned/", cCode, ".gz"), sep='\t', na='NA', quote=F, nThread = 3)
+fwrite(cSumstats_harm, paste0(column_options$output,"/cleaned/", cCode, ".gz"), sep='\t', na='NA', quote=F, nThread = 5)
 
 ```
 
