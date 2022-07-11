@@ -390,22 +390,18 @@ if(!any(colnames(cSumstats)=="FRQ") &
 Add columns on sample size, enough for PRS enough for pathway analysis
 
 ```{r add missing N columns}
-if(
-  any(colnames(cSumstats)=="N_CAS") 
-  && any(colnames(cSumstats)=="N_CON"))
-  {
+if(any(colnames(cSumstats)=="N_CAS") && any(colnames(cSumstats)=="N_CON")) {
 
   # Calculate total N from number of cases and number of controls if they are present. Overwrite any specific total N.
   cSumstats$N <- cSumstats$N_CAS + cSumstats$N_CON
   cat("N set from N_CAS and N_CON value")
   head(cSumstats)
   } else if(!is.null(cN)) {
-    
-    cSumstats$N <- NA
-    
-  cSumstats$N[which(is.na(cSumstats$N))] <- cN #default behaviour: add explicit N only to missing values.
-  cat("N set from input value")
-  head(cSumstats)
+  
+    cSumstats$N<-NA
+    cSumstats[is.na(cSumstats$N),]$N <- cN #default behaviour: add explicit N only to missing values.
+    cat("N set from input value")
+    head(cSumstats)
   } else if(!any(colnames(cSumstats)=="N")) {
   
     warning("\nNo N column detected!\n")
@@ -610,7 +606,7 @@ sumstats_meta$n_removed_missing_effect
 
 ## Duplicated data
 
-+++JZ: We could add some more controle over what to propritise when removing duplicates here: MAF?
++++JZ: We could add some more control over what to propritise when removing duplicates here: MAF?
 
 Deal with duplicated variants
 Remove duplicated variants across SNP, A1 and A2 columns
