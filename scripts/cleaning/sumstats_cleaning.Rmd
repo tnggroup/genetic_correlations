@@ -176,7 +176,7 @@ To avoid follow-up software using the BP column (cave: different genome builds),
 The function stops if the essential columns SNP, A1, A2, P, BETA or OR or Z are not found.
 
 ```{r Standardise GWAS column names}
-source(file = "../functions/standardise_GWAS_column_names.R")
+source(file = "scripts/functions/standardise_GWAS_column_names.R")
 ```
 
 # Chromosome numbering
@@ -185,7 +185,7 @@ plink chromosome numbering: https://zzz.bwh.harvard.edu/plink/data.shtml
 
 This chunk reads in the functions "parse_SNP_column_as_rs_number" and "parse_CHR_column" which parses the SNP and CHR columns respectively. It means that it can read different formats of data in those and convert it to rs-id and chromosome number which we expect/save to be in the SNP and CHR columns.
 ```{r Chromosome numbering}
-source(file = "../functions/column_parsing_functions.R")
+source(file = "scripts/functions/column_parsing_functions.R")
 ```
 
 
@@ -360,6 +360,8 @@ if(!any(colnames(cSumstats)=="FRQ") &
     {
     
     # Add number of cases and number of controls - but only to already NA fields! The file may already contain N_CAS and N_CON columns.
+    if(!any(colnames(cSumstats)=="N_CAS")) cSumstats$N_CAS<-NA_integer_
+    if(!any(colnames(cSumstats)=="N_CON")) cSumstats$N_CON<-NA_integer_
     cSumstats[is.na(cSumstats$N_CAS),]$N_CAS <- as.numeric(gsub('FRQ_A_','',danerNcas))
     cSumstats[is.na(cSumstats$N_CON),]$N_CON <- as.numeric(gsub('FRQ_U_','',danerNcon))
     
@@ -369,6 +371,9 @@ if(!any(colnames(cSumstats)=="FRQ") &
     
     # Add total FRQ column
     cSumstats$FRQ<-((cSumstats$FRQ_CASES * cSumstats$N_CAS) + (cSumstats$FRQ_CONTROLS * cSumstats$N_CON))/(cSumstats$N_CAS + cSumstats$N_CON)
+    
+      
+    
     
     colnames(cSumstats)
   } else {
@@ -606,7 +611,7 @@ sumstats_meta$n_removed_missing_effect
 
 ## Duplicated data
 
-+++JZ: We could add some more control over what to propritise when removing duplicates here: MAF?
++++JZ: We could add some more control over what to prioritise when removing duplicates here: MAF?
 
 Deal with duplicated variants
 Remove duplicated variants across SNP, A1 and A2 columns
@@ -885,6 +890,20 @@ if(keep_indel == FALSE)
 sumstats_meta$n_removed_indels
 ```
 
+# Remove rows with impossible FRQ reported in GWAS
+If there are no impossible FRQs the script will run with no warning. If there is a warning please investigate 
+```{r allele Frequency columns}
+# Check FRQ column is valid
+if('FRQ' %in% names(cSumstats)){
+  if(any(cSumstats$FRQ>1, na.rm = T) || any(cSumstats$FRQ<0, na.rm = T)) {
+    
+    stop(
+        paste0('\nThere are FRQ values larger than 1 (',sum(cSumstats$FRQ>1),') or less than 0 (',sum(cSumstats$FRQ<0),') which is outside of the possible FRQ range.')
+    )
+  }
+}
+
+```
 
 
 # Check and correct for Genomic Control
@@ -1216,21 +1235,6 @@ if(chr_bp_avail){
   
     cSumstats_harm<-rbind(cSumstats_matched, unmatched)
 
-  }
-}
-
-```
-
-# Remove rows with impossible FRQ reported in GWAS
-If there are no impossible FRQs the script will run with no warning. If there is a warning please investigate 
-```{r allele Frequency columns}
-# Check FRQ column is valid
-if('FRQ' %in% names(cSumstats_harm)){
-  if(any(cSumstats_harm$FRQ>1, na.rm = T) || any(cSumstats_harm$FRQ<0, na.rm = T)) {
-    
-    stop(
-        paste0('\nThere are FRQ values larger than 1 (',sum(cSumstats_harm$FRQ>1),') or less than 0 (',sum(cSumstats_harm$FRQ<0),') which is outside of the possible FRQ range.')
-    )
   }
 }
 
