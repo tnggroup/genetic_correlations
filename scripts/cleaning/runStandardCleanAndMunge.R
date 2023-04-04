@@ -1,6 +1,13 @@
 #New cleaning/munging routine to be run on CREATE
 # Will run the standardised pipeline as a command line program
 
+#for testing
+# library(googlesheets4)
+# library(data.table)
+# library(tidyverse)
+# library(optparse)
+
+
 #command line options
 column_parser <- OptionParser()
 
@@ -41,7 +48,7 @@ column_parser <- add_option(
 
 column_parser <- add_option(
   object = column_parser,
-  opt_str = c("-ref", "--reference-file-path"),
+  opt_str = c("-r", "--reference-file-path"),
   type = "character",
   help = "Path to the reference variant list file."
 )
@@ -53,8 +60,10 @@ column_parser <- add_option(
   help = "Path to gwas_sumstats group folder."
 )
 
+column_options <- parse_args(column_parser)
 
-# # test
+
+# # # test
 # projectFolderpath <- normalizePath("/Users/jakz/project/JZ_GED_PHD_C1",mustWork = T)
 # column_options$file <-paste0(
 #   file.path(projectFolderpath,"data","gwas_sumstats","raw","PGC3_ED_2022","daner_BENARROW.gz"),
@@ -68,7 +77,7 @@ column_parser <- add_option(
 # column_options$`reference-file-path`<- file.path(projectFolderpath,"data","variant_lists","combined.hm3_1kg.snplist.vanilla.jz2020.gz")
 # column_options$output<-'/scratch/groups/gwas_sumstats'
 
-column_options <- parse_args(column_parser)
+
 
 #settings
 filePaths <-  unlist(strsplit(column_options$file,split = ",",fixed = T))
@@ -90,8 +99,7 @@ maf_filter <- 0.01
 info_filter <- 0.6
 
 groupFolderPath <- normalizePath("/scratch/prj/gwas_sumstats",mustWork = T)
+#groupFolderPath <- normalizePath("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/gwas_sumstats_test",mustWork = T) #for test
 
 
-
-
-tngpipeline::standardPipelineCleaningAndMunging(traitCodes = traitCodes, traitNames = traitNames,)
+tngpipeline::standardPipelineCleaningAndMunging(traitCodes = traitCodes, traitNames = traitNames,referenceFilePath = referenceFilePath, n_threads = n_threads, keep_indel = keep_indel, maf_filter = maf_filter,info_filter = info_filter,groupFolderPath = groupFolderPath)
