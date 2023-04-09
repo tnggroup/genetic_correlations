@@ -1,12 +1,14 @@
 #New cleaning/munging routine to be run on CREATE
 # Will run the standardised pipeline as a command line program
 
+#install the pipeline package
+#devtools::install_github("tnggroup/genetic_correlations",ref = 'mod-jz')
+
 #for testing
 # library(googlesheets4)
 # library(data.table)
 # library(tidyverse)
 # library(optparse)
-
 
 #command line options
 column_parser <- OptionParser()

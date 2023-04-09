@@ -7,10 +7,10 @@
 
 
 # #Test
- # filePaths = c(
- #  file.path("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/","PGC3_ED_2022","daner_BENARROW.gz"),
- #  file.path("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/","Meta-analysis_Locke_et_al+UKBiobank_2018_UPDATED.txt.gz")
- # )
+# filePaths = c(
+#  file.path("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/","PGC3_ED_2022","daner_BENARROW.gz"),
+#  file.path("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/","Meta-analysis_Locke_et_al+UKBiobank_2018_UPDATED.txt.gz")
+# )
 # traitCodes = c("BEN","BMI")
 # traitNames = c("Binge Eating (Narrow)","BMI 2018")
 # referenceFilePath = "/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/variant_lists/combined.hm3_1kg.snplist.vanilla.jz2020.gz"
@@ -39,6 +39,8 @@ standardPipelineCleaningAndMunging <- function(
     ancestrySetting
     ){
 
+
+#set up metadata df
   sumstats_meta <- data.frame(
     name = traitNames
   )
@@ -49,12 +51,29 @@ standardPipelineCleaningAndMunging <- function(
   sumstats_meta$N<-N
   sumstats_meta$ancestrySetting<-ancestrySetting
 
+  #setDT(sumstats_meta)
+
+
+
+  #used by supermunge - may be harmonised later so all steps use the same format of variant lists (summary level reference panel).
   varlist<-fread(file = referenceFilePath, na.strings =c(".",NA,"NA",""), encoding = "UTF-8",check.names = T, fill = T, blank.lines.skip = T, data.table = T, nThread = n_threads, showProgress = F)
 
   #testTrait<-readFile(filePath = filePaths[iTrait])
 
   for(iTrait in 1:filePaths){
     #iTrait <-1 #test
+
+    #read trait metadata if exists
+    metaFilePath <- paste0(filePaths[iTrait],".txt")
+    #metaFilePath <- "/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/bmi.giant-ukbb.meta-analysis.combined.23May2018.txt.gz.txt"
+    if(file.exists(metaFilePath)){
+      nMetaList <- readMetadata(sumstats_meta_list = unlist(sumstats_meta[iTrait,]), filePath = metaFilePath)
+      nMetaList.names<-names(nMetaList)
+
+      sumstats_meta[iTrait,nMetaList.names]<-nMetaList
+    }
+
+    #clean using shru::supermunge - implements most of the cleaning and parsing steps in the previous implementation, plus some additions and fixes. this may be harmonised later to either increase or reduce the dependency on the shru package.
     smungeResults <- shru::supermunge(
       filePaths = filePaths[iTrait],
       ref_df = ifelse(munge="supermunge",varlist,NULL),
@@ -90,6 +109,31 @@ standardPipelineCleaningAndMunging <- function(
 
 
   }
+
+}
+
+readMetadata <- function(sumstats_meta_list,filePath){
+  #filePath <- "/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/bmi.giant-ukbb.meta-analysis.combined.23May2018.txt.gz.txt"
+  f <- readLines(con = file(filePath,open="r"),encoding = "UTF-8")
+  for(iLine in 1:length(f)){
+    if(nchar(f[iLine])>2){
+      #iLine<-29
+      #strsplit(x = f[iLine], split = "\\s")
+      m<-gregexpr(pattern = "\\s*(\\w+)\\s*",text = f[iLine])
+      k<-NA
+      v<-NA
+      if(length(m)>0){
+        if(length(m[[1]])>0) k<- trimws(substr(x =f[iLine], start = m[[1]][[1]],  stop = m[[1]][[1]]+(attr(x = m[[1]], which = "match.length")[[1]]-1)),which = "both")
+
+        v <- trimws(substr(f[iLine],start = m[[1]][[1]]+(attr(x = m[[1]], which = "match.length")[[1]]),stop = nchar(f[iLine])), which = "both")
+      }
+
+      if(!is.na(k) & !is.na(v)) sumstats_meta_list[k]<-v
+
+    }
+  }
+
+  return(sumstats_meta_list)
 
 }
 
