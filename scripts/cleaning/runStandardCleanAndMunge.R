@@ -2,7 +2,7 @@
 # Will run the standardised pipeline as a command line program
 
 #install the pipeline package
-#devtools::install_github("tnggroup/genetic_correlations",ref = 'mod-jz')
+#devtools::install_github("tnggroup/genetic_correlations",ref = 'edits_after_test_jz', auth_token = "YOUR_PAT")
 
 #for testing
 # library(googlesheets4)
