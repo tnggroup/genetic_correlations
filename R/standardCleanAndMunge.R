@@ -18,24 +18,44 @@
 # keep_indel=T
 # maf_filter=0.01
 # info_filter=0.6
+# serviceAccountTokenPath=normalizePath("/scratch/prj/gwas_sumstats/tngpipeline/tngpipeline-8130dbd7d58a.json",mustWork = T)
 # groupFolderPath = normalizePath("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/gwas_sumstats_test",mustWork = T)
 # munge="opmunge"
 # N = c(830917,681275)
 # ancestrySetting =c("EUR")
 
+#
+# filePaths = c(
+#   file.path("new","bmi.giant-ukbb.meta-analysis.combined.23May2018.txt.gz"),
+#   file.path("new","ADHD2023.gz")
+# )
+# traitCodes = NA_character_
+# traitNames = c("BMI", "ADHD")
+# referenceFilePath = "variant_lists/combined.hm3_1kg.snplist.vanilla.jz2020.gz"
+# n_threads=5
+# keep_indel=T
+# maf_filter=0.01
+# info_filter=0.6
+# serviceAccountTokenPath=normalizePath("/scratch/prj/gwas_sumstats/tngpipeline/tngpipeline-8130dbd7d58a.json",mustWork = T)
+# groupFolderPath = normalizePath("/scratch/prj/gwas_sumstats",mustWork = T)
+# munge="opmunge"
+# N = c(806834,NA)
+# ancestrySetting =c("EUR")
+
 standardPipelineCleaningAndMunging <- function(
     filePaths,
-    traitCodes,
+    traitCodes=NA_character_, #set explicit code(s) here
     traitNames,
     referenceFilePath,
     n_threads=5,
     keep_indel=T,
     maf_filter=0.01,
     info_filter=0.6,
+    serviceAccountTokenPath=normalizePath("/scratch/prj/gwas_sumstats/tngpipeline/tngpipeline-8130dbd7d58a.json",mustWork = T),
     groupFolderPath = normalizePath("/scratch/prj/gwas_sumstats",mustWork = T),
     munge="opmunge", #alt supermunge
     filter.mhc=NULL, #can be either 37 or 38 for filtering the MHC region according to either grch37 or grch38
-    N,
+    N=NA_integer_,
     ancestrySetting
     ){
 
@@ -45,15 +65,20 @@ standardPipelineCleaningAndMunging <- function(
     name = traitNames
   )
 
-  row.names(sumstats_meta) <- traitCodes
+  #row.names(sumstats_meta) <- traitCodes
   sumstats_meta$code<-traitCodes
   sumstats_meta$path_orig<-filePaths
   sumstats_meta$N<-N
   sumstats_meta$ancestrySetting<-ancestrySetting
+  sumstats_meta$n_case<-NA_character_
+  sumstats_meta$n_control<-NA_character_
 
-  #setDT(sumstats_meta)
 
-
+  #configure gs4 for non-browser login #https://gargle.r-lib.org/articles/non-interactive-auth.html
+  drive_auth(email = "johan.kallberg_zvrskovec@kcl.ac.uk", path = serviceAccountTokenPath)
+  #drive_auth(email = "jane_doe@example.com") # gets a suitably scoped token
+  # and stashes for googledrive use
+  gs4_auth(token = drive_token())            # registers token with googlesheets4
 
   #used by supermunge - may be harmonised later so all steps use the same format of variant lists (summary level reference panel).
   varlist<-fread(file = referenceFilePath, na.strings =c(".",NA,"NA",""), encoding = "UTF-8",check.names = T, fill = T, blank.lines.skip = T, data.table = T, nThread = n_threads, showProgress = F)
@@ -73,10 +98,27 @@ standardPipelineCleaningAndMunging <- function(
       sumstats_meta[iTrait,nMetaList.names]<-nMetaList
     }
 
+    #set new code using the spreadsheet metadata
+    if(is.na(sumstats_meta[iTrait,]$code)){
+      cSort<-sumstats_meta[iTrait,]$sort
+      if(is.na(cSort)) cSort<-"UNST" #unsorted
+      nCode <- assignCodeFromSortAndSpreadsheet(sort = cSort)
+      sumstats_meta[iTrait,c("code")]<-nCode
+    }
+
+
+    #edit metadata after reading the file-based metadata
+    if(is.na(sumstats_meta[iTrait,]$N)) sumstats_meta[iTrait,c("N")] <- sum(as.integer(sumstats_meta[iTrait,c("n_case")]), as.integer(sumstats_meta[iTrait,c("n_control")]),na.rm = T)
+
+    sumstats_meta[iTrait,c("dependent_variable")]<-ifelse(!is.na(sumstats_meta[iTrait,]$n_case) & !is.na(sumstats_meta[iTrait,]$n_control), "binary", "continuous")
+
     #clean using shru::supermunge - implements most of the cleaning and parsing steps in the previous implementation, plus some additions and fixes. this may be harmonised later to either increase or reduce the dependency on the shru package.
+    ref_df_arg <-NULL
+    if(munge=="supermunge") ref_df_arg<-varlist
+
     smungeResults <- shru::supermunge(
       filePaths = filePaths[iTrait],
-      ref_df = ifelse(munge="supermunge",varlist,NULL),
+      ref_df = ref_df_arg,
       traitNames = traitCodes[iTrait],
       ancestrySetting = ancestrySetting[iTrait],
       N = N[iTrait],
@@ -624,11 +666,32 @@ standardPipelineExplicitSumstatProcessing <- function(cSumstats, sumstats_meta, 
 
 }
 
+assignCodeFromSortAndSpreadsheet <- function(
+    sort,
+    sheetLink="https://docs.google.com/spreadsheets/d/1gjKI0OmYUxK66-HoXY9gG4d_OjiPJ58t7cl-OsLK8vU/edit?usp=sharing"
+    ){
+
+  #sheetLink <- "https://docs.google.com/spreadsheets/d/1gjKI0OmYUxK66-HoXY9gG4d_OjiPJ58t7cl-OsLK8vU/edit?usp=sharing"
+
+  currentSheet <- as.data.frame(read_sheet(ss = sheetLink, col_names = T, range="SGDP_GWASLIST_EDITTHIS"))
+  sorts<-currentSheet[grep(pattern = paste0("^",toupper(sort)), x = currentSheet$code),]
+  if(nrow(sorts)>0){
+    indexesLengths<-regexec(pattern = "\\d+", text=sorts$code)
+    matches<-regmatches(sorts$code,indexesLengths)
+    nums<-as.integer(unique(unlist(matches)))
+    return(paste0(sort,shru::padStringLeft(s = paste0("",(max(nums)+1)), padding = "0", targetLength = 2)))
+  } else return(paste0(sort,"01"))
+
+}
+
+
 
 updateSpreadsheet <- function(sheetLink,sumstats_meta){
-  #sheetLink <- "https://docs.google.com/spreadsheets/d/1KwmSUZvw2xoiFFKyw18YYHKdcV9R_3RRrcMBiJOJNXs/edit?usp=sharing"
+  #sheetLink <- "https://docs.google.com/spreadsheets/d/1gjKI0OmYUxK66-HoXY9gG4d_OjiPJ58t7cl-OsLK8vU/edit?usp=sharing"
 
-  currentSheet <- as.data.frame(read_sheet(ss = sheetLink, col_names = T))
+  currentSheet <- as.data.frame(read_sheet(ss = sheetLink, col_names = T, range="SGDP_GWASLIST_EDITTHIS"))
+  cols<-colnames(currentSheet)
+
   if(nrow(currentSheet)>0) currentSheet$x_row<-1:nrow(currentSheet)
   setDT(currentSheet)
   setkeyv(currentSheet,cols = c("code"))
@@ -645,23 +708,45 @@ updateSpreadsheet <- function(sheetLink,sumstats_meta){
   dfToInsert<-as.data.frame(matrix(data=NA,nrow = 0, ncol = length(colnames(currentSheet))))
   colnames(dfToInsert)<-colnames(currentSheet)
 
+  setDT(sumstats_meta)
+  sumstats_meta<-sumstats_meta[,.(
+    name,
+    code,
+    N,
+    n_case,
+    n_control,
+    doi,
+    pmid,
+    permission,
+    phenotype_type,
+    ancestry,
+    sex,
+    phenotype,
+    category,
+    notes,
+    dependent_variable
+  )]
+  setkeyv(sumstats_meta,cols = c("code"))
+
+
   dfToInsert<-rbindlist(list(
     dfToInsert,
     sumstats_meta
   ), fill = T)
 
-  cols<-colnames(currentSheet)
-  dfToInsert <- dfToInsert[,..cols]
 
+  dfToInsert <- dfToInsert[,..cols]
   for(iRec in 1:nrow(dfToInsert)){
     #iRec<-1
     cRec <- dfToInsert[iRec,]
-
-    if(any(currentSheet$code==cRec$code)){
-      toUpdate<-currentSheet[currentSheet$code==cRec$code,]$x_row
-      range_write(ss = sheetLink,data = cRec,cell_rows(toUpdate[[1]]:toUpdate[[1]]))
-    } else {
-      sheet_append(ss = sheetLink,data = cRec)
+    if(!is.na(cRec$code)){
+      if(any(currentSheet$code==cRec$code)){
+        #inactivated update for now
+        # toUpdate<-currentSheet[currentSheet$code==cRec$code,]$x_row
+        # range_write(ss = sheetLink,data = cRec,cell_rows(toUpdate[[1]]:toUpdate[[1]]))
+      } else {
+        sheet_append(ss = sheetLink,data = cRec, sheet="SGDP_GWASLIST_EDITTHIS") #this does not recognise some columns
+      }
     }
   }
 }
