@@ -688,6 +688,7 @@ assignCodeFromSortAndSpreadsheet <- function(
 
 updateSpreadsheet <- function(sheetLink,sumstats_meta){
   #sheetLink <- "https://docs.google.com/spreadsheets/d/1gjKI0OmYUxK66-HoXY9gG4d_OjiPJ58t7cl-OsLK8vU/edit?usp=sharing"
+  #sumstats_meta <- cGWAS
 
   currentSheet <- as.data.frame(read_sheet(ss = sheetLink, col_names = T, range="SGDP_GWASLIST_EDITTHIS"))
   cols<-colnames(currentSheet)
@@ -705,30 +706,52 @@ updateSpreadsheet <- function(sheetLink,sumstats_meta){
   #   )
   # sumstats_meta_dummy$n_tot<-sumstats_meta_dummy$n_ca + ifelse(is.na(sumstats_meta_dummy$n_co),0,sumstats_meta_dummy$n_co)
 
-  dfToInsert<-as.data.frame(matrix(data=NA,nrow = 0, ncol = length(colnames(currentSheet))))
-  colnames(dfToInsert)<-colnames(currentSheet)
+  #dfToInsert<-as.data.frame(matrix(data=NA,nrow = 0, ncol = length(colnames(currentSheet))))
+  #colnames(dfToInsert)<-colnames(currentSheet)
+  dfToInsert <- currentSheet
+  dfToInsert<-dfToInsert[FALSE,]
 
   setDT(sumstats_meta)
+  #add missing columns
+  if(!any(colnames(sumstats_meta)=="doi")) sumstats_meta[,doi:=NA_character_]
+  if(!any(colnames(sumstats_meta)=="permissions")) sumstats_meta[,permissions:=NA_character_]
+  sumstats_meta$phenotype_type<-as.character(sumstats_meta$phenotype_type)
+  sumstats_meta$assembly<-as.character(sumstats_meta$assembly)
+  sumstats_meta$ancestry<-as.character(sumstats_meta$ancestry)
+  sumstats_meta$sex<-as.character(sumstats_meta$sex)
+  sumstats_meta$permissions<-as.character(sumstats_meta$permissions)
+  sumstats_meta$dependent_variable<-as.character(sumstats_meta$dependent_variable)
   sumstats_meta<-sumstats_meta[,.(
     name,
     code,
-    N,
-    n_case,
-    n_control,
+    n_cases,
+    n_controls,
+    sample_size_discovery=n_total,
+    download_link,
+    filename,
+    platform,
+    n_details,
+    ancestry_details,
+    permissions,
+    assembly,
+    uk_biobank,
+    ancestry,
     doi,
     pmid,
-    permission,
+    trait_detail=phenotype,
     phenotype_type,
     ancestry,
     sex,
     phenotype,
-    category,
+    phenotype_category=category_name,
     notes,
-    dependent_variable
+    dependent_variable,
+    year,
+    consortium
   )]
   setkeyv(sumstats_meta,cols = c("code"))
 
-
+  print(colnames(sumstats_meta))
   dfToInsert<-rbindlist(list(
     dfToInsert,
     sumstats_meta
