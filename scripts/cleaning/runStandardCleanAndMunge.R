@@ -66,6 +66,7 @@ column_options <- parse_args(column_parser)
 
 
 # # # test
+# column_options<-c()
 # projectFolderpath <- normalizePath("/Users/jakz/project/JZ_GED_PHD_C1",mustWork = T)
 # column_options$file <-paste0(
 #   file.path(projectFolderpath,"data","gwas_sumstats","raw","PGC3_ED_2022","daner_BENARROW.gz"),

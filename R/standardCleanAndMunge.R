@@ -6,6 +6,11 @@
 #devtools::install_github("johanzvrskovec/shru")
 
 
+# require(googledrive)
+# require(googlesheets4)
+# require(data.table)
+
+
 # #Test
 # filePaths = c(
 #  file.path("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/","PGC3_ED_2022","daner_BENARROW.gz"),
