@@ -5,10 +5,10 @@
 #devtools::install_github("tnggroup/genetic_correlations",ref = 'edits_after_test_jz', auth_token = "YOUR_PAT")
 
 #for testing
-# library(googlesheets4)
-# library(data.table)
-# library(tidyverse)
-# library(optparse)
+library(tidyverse)
+library(googlesheets4)
+library(data.table)
+library(optparse)
 
 #command line options
 column_parser <- OptionParser()
@@ -59,7 +59,7 @@ column_parser <- add_option(
   object = column_parser,
   opt_str = c("-o", "--output"),
   type = "character",
-  help = "Path to gwas_sumstats group folder."
+  help = "Path to where you want tp place the output files."
 )
 
 column_options <- parse_args(column_parser)
@@ -91,6 +91,7 @@ traitCodes <- unlist(strsplit(column_options$code,split = ",",fixed = T)) #not w
 ancestrySetting <- unlist(strsplit(column_options$population,split = ",",fixed = T))
 referenceFilePath <- column_options$`reference-file-path`
 N <- unlist(strsplit(column_options$`sample-size`,split = ",",fixed = T))
+pathDirOutput <- column_options$output
 
 
 
@@ -105,4 +106,4 @@ groupFolderPath <- normalizePath("/scratch/prj/gwas_sumstats",mustWork = T)
 #groupFolderPath <- normalizePath("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/gwas_sumstats_test",mustWork = T) #for test
 
 
-tngpipeline::standardPipelineCleanAndMunge(traitCodes = traitCodes, traitNames = traitNames,referenceFilePath = referenceFilePath, n_threads = n_threads, keep_indel = keep_indel, maf_filter = maf_filter,info_filter = info_filter,groupFolderPath = groupFolderPath)
+tngpipeline::standardPipelineCleanAndMunge(filePaths = filePaths, traitCodes = traitCodes, traitNames = traitNames,referenceFilePath = referenceFilePath, n_threads = n_threads, keep_indel = keep_indel, maf_filter = maf_filter,info_filter = info_filter, pathDirOutput = pathDirOutput)
