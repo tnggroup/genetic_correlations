@@ -110,11 +110,11 @@ standardPipelineCleanAndMunge <- function(
 
   #testTrait<-readFile(filePath = filePaths[iTrait])
 
-  for(iTrait in 1:filePaths){
+  for(iTrait in 1:nrow(sumstats_meta)){
     #iTrait <-1 #test
 
     #read trait metadata if exists
-    metaFilePath <- paste0(filePaths[iTrait],".txt")
+    metaFilePath <- paste0(sumstats_meta[iTrait,]$path_orig,".txt")
     #metaFilePath <- "/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/bmi.giant-ukbb.meta-analysis.combined.23May2018.txt.gz.txt"
     if(file.exists(metaFilePath)){
       nMetaList <- readMetadata(sumstats_meta_list = unlist(sumstats_meta[iTrait,]), filePath = metaFilePath)
@@ -126,7 +126,7 @@ standardPipelineCleanAndMunge <- function(
     #set new code using the spreadsheet metadata
     if(is.na(sumstats_meta[iTrait,]$code)){
       cSort<-sumstats_meta[iTrait,]$sort
-      if(is.na(cSort)) cSort<-"UNST" #unsorted
+      if(is.na(cSort)) cSort<-"USRT" #unsorted
       nCode <- assignCodeFromSortAndSpreadsheet(sort = cSort)
       sumstats_meta[iTrait,c("code")]<-nCode
     }
