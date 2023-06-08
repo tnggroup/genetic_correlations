@@ -89,6 +89,8 @@ standardPipelineCleanAndMunge <- function(
   setDT(sumstats_meta)
   setkeyv(sumstats_meta,cols = c("code"))
 
+  print(sumstats_meta)
+
 
   if(!is.null(serviceAccountTokenPath)){
     #configure gs4 for non-browser login #https://gargle.r-lib.org/articles/non-interactive-auth.html
