@@ -88,12 +88,14 @@ traitNames <- unlist(strsplit(column_options$label,split = ",",fixed = T)) #not 
 #traitNames <- c("Binge Eating (Narrow)","BMI 2018")
 traitCodes <- unlist(strsplit(column_options$code,split = ",",fixed = T)) #not working now for some reason
 #traitCodes <- c("BEN","BMI")
-ancestrySetting <- unlist(strsplit(column_options$population,split = ",",fixed = T))
-referenceFilePath <- column_options$`reference-file-path`
-N <- unlist(strsplit(column_options$`sample-size`,split = ",",fixed = T))
-pathDirOutput <- column_options$output
-
-
+ancestrySetting<-NULL
+if(!is.na(column_options$population)) ancestrySetting <- unlist(strsplit(column_options$population,split = ",",fixed = T))
+referenceFilePath<-NULL
+if(!is.na(column_options$`reference-file-path`)) referenceFilePath <- column_options$`reference-file-path`
+N<-NULL
+if(!is.na(column_options$`sample-size`)) N <- unlist(strsplit(column_options$`sample-size`,split = ",",fixed = T))
+pathDirOutput<-NULL
+if(!is.na(column_options$output)) pathDirOutput <- column_options$output
 
 
 #hard coded options
