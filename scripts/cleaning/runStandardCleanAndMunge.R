@@ -105,4 +105,4 @@ groupFolderPath <- normalizePath("/scratch/prj/gwas_sumstats",mustWork = T)
 #groupFolderPath <- normalizePath("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/gwas_sumstats_test",mustWork = T) #for test
 
 
-tngpipeline::standardPipelineCleaningAndMunging(traitCodes = traitCodes, traitNames = traitNames,referenceFilePath = referenceFilePath, n_threads = n_threads, keep_indel = keep_indel, maf_filter = maf_filter,info_filter = info_filter,groupFolderPath = groupFolderPath)
+tngpipeline::standardPipelineCleanAndMunge(traitCodes = traitCodes, traitNames = traitNames,referenceFilePath = referenceFilePath, n_threads = n_threads, keep_indel = keep_indel, maf_filter = maf_filter,info_filter = info_filter,groupFolderPath = groupFolderPath)

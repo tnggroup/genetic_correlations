@@ -5,28 +5,35 @@
 #needs the shru package
 #devtools::install_github("johanzvrskovec/shru")
 
-
+# require(tidyverse)
+# require(readr)
 # require(googledrive)
 # require(googlesheets4)
 # require(data.table)
 
 
-# #Test
+
+#Test
 # filePaths = c(
-#  file.path("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/","PGC3_ED_2022","daner_BENARROW.gz"),
-#  file.path("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/","Meta-analysis_Locke_et_al+UKBiobank_2018_UPDATED.txt.gz")
+#  file.path("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/cleaned/","ADHD05.gz"),
+#  file.path("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/cleaned/","ALCD03.gz")
 # )
-# traitCodes = c("BEN","BMI")
-# traitNames = c("Binge Eating (Narrow)","BMI 2018")
+# traitCodes = c("ADHD05","ALCD03")
+# traitNames = c("ADHD","AD")
 # referenceFilePath = "/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/variant_lists/combined.hm3_1kg.snplist.vanilla.jz2020.gz"
 # n_threads=5
 # keep_indel=T
 # maf_filter=0.01
 # info_filter=0.6
-# serviceAccountTokenPath=normalizePath("/scratch/prj/gwas_sumstats/tngpipeline/tngpipeline-8130dbd7d58a.json",mustWork = T)
+# or_filter=10000
+# mhc_filter=NULL
+# serviceAccountTokenPath=normalizePath("/Users/jakz/Documents/local_db/tngpipeline/tngpipeline-8130dbd7d58a.json",mustWork = T)
+# sheetLink = "https://docs.google.com/spreadsheets/d/1gjKI0OmYUxK66-HoXY9gG4d_OjiPJ58t7cl-OsLK8vU/edit?usp=sharing"
+#pathDirOutput = normalizePath("./",mustWork = T)
 # groupFolderPath = normalizePath("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/gwas_sumstats_test",mustWork = T)
-# munge="opmunge"
-# N = c(830917,681275)
+# munge="supermunge"
+# N=NA_integer_
+# #N = c(830917,681275)
 # ancestrySetting =c("EUR")
 
 #
@@ -47,21 +54,23 @@
 # N = c(806834,NA)
 # ancestrySetting =c("EUR")
 
-standardPipelineCleaningAndMunging <- function(
+standardPipelineCleanAndMunge <- function(
     filePaths,
     traitCodes=NA_character_, #set explicit code(s) here
-    traitNames,
+    traitNames=NA_character_,
     referenceFilePath,
     n_threads=5,
     keep_indel=T,
-    maf_filter=0.01,
-    info_filter=0.6,
+    maf_filter=NULL,
+    info_filter=NULL,
+    or_filter=NULL,
     serviceAccountTokenPath=normalizePath("/scratch/prj/gwas_sumstats/tngpipeline/tngpipeline-8130dbd7d58a.json",mustWork = T),
-    groupFolderPath = normalizePath("/scratch/prj/gwas_sumstats",mustWork = T),
-    munge="opmunge", #alt supermunge
-    filter.mhc=NULL, #can be either 37 or 38 for filtering the MHC region according to either grch37 or grch38
+    sheetLink = "https://docs.google.com/spreadsheets/d/1gjKI0OmYUxK66-HoXY9gG4d_OjiPJ58t7cl-OsLK8vU/edit?usp=sharing",
+    pathDirOutput = normalizePath("./",mustWork = T),
+    munge="supermunge", #alt opmunge
+    mhc_filter=NULL, #can be either 37 or 38 for filtering the MHC region according to either grch37 or grch38
     N=NA_integer_,
-    ancestrySetting
+    ancestrySetting=NA_character_
     ){
 
 
@@ -74,19 +83,28 @@ standardPipelineCleaningAndMunging <- function(
   sumstats_meta$code<-traitCodes
   sumstats_meta$path_orig<-filePaths
   sumstats_meta$N<-N
-  sumstats_meta$ancestrySetting<-ancestrySetting
-  sumstats_meta$n_case<-NA_character_
-  sumstats_meta$n_control<-NA_character_
+  sumstats_meta$ancestry<-ancestrySetting
+  sumstats_meta$n_cases<-NA_character_
+  sumstats_meta$n_controls<-NA_character_
+  setDT(sumstats_meta)
+  setkeyv(sumstats_meta,cols = c("code"))
 
 
-  #configure gs4 for non-browser login #https://gargle.r-lib.org/articles/non-interactive-auth.html
-  drive_auth(email = "johan.kallberg_zvrskovec@kcl.ac.uk", path = serviceAccountTokenPath)
-  #drive_auth(email = "jane_doe@example.com") # gets a suitably scoped token
-  # and stashes for googledrive use
-  gs4_auth(token = drive_token())            # registers token with googlesheets4
-
+  if(!is.null(serviceAccountTokenPath)){
+    #configure gs4 for non-browser login #https://gargle.r-lib.org/articles/non-interactive-auth.html
+    drive_auth(email = "johan.kallberg_zvrskovec@kcl.ac.uk", path = serviceAccountTokenPath)
+    #drive_auth(email = "jane_doe@example.com") # gets a suitably scoped token
+    # and stashes for googledrive use
+    gs4_auth(token = drive_token())            # registers token with googlesheets4
+  }
   #used by supermunge - may be harmonised later so all steps use the same format of variant lists (summary level reference panel).
   varlist<-fread(file = referenceFilePath, na.strings =c(".",NA,"NA",""), encoding = "UTF-8",check.names = T, fill = T, blank.lines.skip = T, data.table = T, nThread = n_threads, showProgress = F)
+
+  currentSheet <- as.data.frame(read_sheet(ss = sheetLink, col_names = T, range="SGDP_GWASLIST_EDITTHIS"))
+  currentSheet.cols<-colnames(currentSheet)
+  if(nrow(currentSheet)>0) currentSheet$x_row<-1:nrow(currentSheet)
+  setDT(currentSheet)
+  setkeyv(currentSheet,cols = c("code"))
 
   #testTrait<-readFile(filePath = filePaths[iTrait])
 
@@ -111,27 +129,38 @@ standardPipelineCleaningAndMunging <- function(
       sumstats_meta[iTrait,c("code")]<-nCode
     }
 
+    #add in metadata from database
+    cSheet <- head(currentSheet[code==eval(sumstats_meta[iTrait,]$code),],n = 1)
+    if(!is.na(cSheet$ancestry)) sumstats_meta[iTrait,ancestry:=eval(parseAncestryText(cSheet$ancestry))]
+    if(!is.na(cSheet$trait_detail)) sumstats_meta[iTrait,name:=eval(cSheet$trait_detail)]
+    if(!is.na(cSheet$n_cases)) sumstats_meta[iTrait,n_cases:=eval(readr::parse_number(cSheet$n_cases))]
+    if(!is.na(cSheet$n_controls)) sumstats_meta[iTrait,n_controls:=eval(readr::parse_number(cSheet$n_controls))]
 
-    #edit metadata after reading the file-based metadata
-    if(is.na(sumstats_meta[iTrait,]$N)) sumstats_meta[iTrait,c("N")] <- sum(as.integer(sumstats_meta[iTrait,c("n_case")]), as.integer(sumstats_meta[iTrait,c("n_control")]),na.rm = T)
+    #edit metadata after reading the file-based metadata and database data (if known)
+    if(!is.na(sumstats_meta[iTrait,]$n_cases)) sumstats_meta[iTrait,c("N")] <- sum(as.integer(sumstats_meta[iTrait,c("n_cases")]), as.integer(sumstats_meta[iTrait,c("n_controls")]),na.rm = T)
 
-    sumstats_meta[iTrait,c("dependent_variable")]<-ifelse(!is.na(sumstats_meta[iTrait,]$n_case) & !is.na(sumstats_meta[iTrait,]$n_control), "binary", "continuous")
+    sumstats_meta[iTrait,c("dependent_variable")]<-ifelse(!is.na(sumstats_meta[iTrait,]$n_cases) & !is.na(sumstats_meta[iTrait,]$n_controls), "binary", "continuous")
 
     #clean using shru::supermunge - implements most of the cleaning and parsing steps in the previous implementation, plus some additions and fixes. this may be harmonised later to either increase or reduce the dependency on the shru package.
     ref_df_arg <-NULL
     if(munge=="supermunge") ref_df_arg<-varlist
 
     smungeResults <- shru::supermunge(
-      filePaths = filePaths[iTrait],
+      filePaths = sumstats_meta[iTrait,]$path_orig,
       ref_df = ref_df_arg,
-      traitNames = traitCodes[iTrait],
-      ancestrySetting = ancestrySetting[iTrait],
-      N = N[iTrait],
+      traitNames = sumstats_meta[iTrait,]$code,
+      ancestrySetting = sumstats_meta[iTrait,]$ancestry,
+      N = sumstats_meta[iTrait,]$N,
       keepIndel = keep_indel,
       writeOutput = F,
       filter.maf = maf_filter,
       filter.info = info_filter,
-      lossless = T)
+      filter.or = or_filter,
+      filter.mhc = mhc_filter,
+      lossless = T
+      )
+
+    cat("\n**** Now continuing with explicit standard cleaning and mungiung routines ****")
 
     procResults <- standardPipelineExplicitSumstatProcessing(
       cSumstats = smungeResults$last,
@@ -141,20 +170,18 @@ standardPipelineCleaningAndMunging <- function(
       munge = (munge=="opmunge")
       )
 
-    cSumstats <- procResults$procResults
+    cSumstats <- procResults$cSumstats
     sumstats_meta <-procResults$sumstats_meta
 
-    if(!is.na(filter.mhc)){
-      smungeResults2 <- shru::supermunge(
-        list_df = list(procResults),
-        filter.mhc=38,
-        process = F
+    #silence final supermunge messages as we just want to print the result to file with standardised column filtering
+    capture.output(
+      shru::supermunge(
+        list_df = list(cSumstats),
+        traitNames = sumstats_meta[iTrait,]$code,
+        process = F,
+        pathDirOutput = pathDirOutput
         )
-      cSumstats <- smungeResults2$last
-    }
-
-
-
+      )
   }
 
 }
@@ -229,48 +256,48 @@ standardPipelineExplicitSumstatProcessing <- function(cSumstats, sumstats_meta, 
   }
 
 
-  #explicit OR filter
-  if(
-    any(colnames(cSumstats)=="OR")
-  ){
-
-    rm <- (!is.na(cSumstats$OR) & cSumstats$OR>10000)
-
-    cSumstats <- cSumstats[!rm, ]
-
-    cat("Removing", sum(rm), "SNPs with OR > 10000;", nrow(cSumstats), "remain")
-
-    sumstats_meta[cCode,c("n_removed_or")] <- sum(rm)
-
-  } else {
-
-    cat("Warning: The dataset does not contain an OR column to apply the specified filter on.")
-
-  }
+  # #explicit OR filter
+  # if(
+  #   any(colnames(cSumstats)=="OR")
+  # ){
+  #
+  #   rm <- (!is.na(cSumstats$OR) & cSumstats$OR>10000)
+  #
+  #   cSumstats <- cSumstats[!rm, ]
+  #
+  #   cat("Removing", sum(rm), "SNPs with OR > 10000;", nrow(cSumstats), "remain")
+  #
+  #   sumstats_meta[cCode,c("n_removed_or")] <- sum(rm)
+  #
+  # } else {
+  #
+  #   cat("Warning: The dataset does not contain an OR column to apply the specified filter on.")
+  #
+  # }
 
 
   #explicit N statistics
-  if(any(names(cSumstats) == 'NEF')){
-    # NEF is present in sumstats so variants will be filtered by provided NEF
-    N_sd <- sd(cSumstats$NEF)
-    N_median <- median(cSumstats$NEF)
+  if(any(names(cSumstats) == 'NEFF')){
+    # NEFF is present in sumstats so variants will be filtered by provided NEFF
+    N_sd <- sd(cSumstats$NEFF)
+    N_median <- median(cSumstats$NEFF)
 
-    cSumstats$N_outlier<-cSumstats$NEF > N_median+(3*N_sd) | cSumstats$NEF < N_median-(3*N_sd)
+    cSumstats$N_outlier<-cSumstats$NEFF > N_median+(3*N_sd) | cSumstats$NEFF < N_median-(3*N_sd)
 
-    cat(sum(cSumstats$N_outlier, na.rm=T), "SNPs have reported NEF outside median(N) ± 3SD(N).\n", sep='')
+    cat(sum(cSumstats$N_outlier, na.rm=T), "SNPs have reported NEFF outside median(N) ± 3SD(N).\n", sep='')
     sumstats_meta[cCode,c("n_outlier_n")] <- sum(cSumstats$N_outlier, na.rm=T)
 
   } else {
     if(any(names(cSumstats) == 'N_CAS') & any(names(cSumstats) == 'N_CON')){
-      # NEF isn't present, but N_CAS and N_CON are present, so we will calculate NEF from N_CAS and N_CON.
-      cSumstats$NEF_est<-4/(1/cSumstats$N_CAS+1/cSumstats$N_CON)
+      # NEFF isn't present, but N_CAS and N_CON are present, so we will calculate NEFF from N_CAS and N_CON.
+      cSumstats$NEFF_est<-4/(1/cSumstats$N_CAS+1/cSumstats$N_CON)
 
-      N_sd <- sd(cSumstats$NEF_est)
+      N_sd <- sd(cSumstats$NEFF_est)
       N_median <- median(cSumstats$NEF_est)
 
-      cSumstats$N_outlier<-cSumstats$NEF_est > N_median+(3*N_sd) | cSumstats$NEF < N_median-(3*N_sd)
+      cSumstats$N_outlier<-cSumstats$NEFF_est > N_median+(3*N_sd) | cSumstats$NEFF < N_median-(3*N_sd)
 
-      cat(sum(cSumstats$N_outlier, na.rm=T), "SNPs have estimated NEF outside median(N) ± 3SD(N).\n", sep='')
+      cat(sum(cSumstats$N_outlier, na.rm=T), "SNPs have estimated NEFF outside median(N) ± 3SD(N).\n", sep='')
       sumstats_meta[cCode,c("n_outlier_n")] <- sum(cSumstats$N_outlier, na.rm=T)
 
     } else {
@@ -387,12 +414,12 @@ standardPipelineExplicitSumstatProcessing <- function(cSumstats, sumstats_meta, 
         abs(mean(cSumstats$P[!is.na(cSumstats$P_check)]) - mean(cSumstats$P_check[!is.na(cSumstats$P_check)])) > 0.01)
       {
 
-        cSumstats$P <- cSumstats$P_check
+        #cSumstats$P <- cSumstats$P_check
 
         cSumstats$P_check <- NULL
 
-        cat("Genomic control detected. P-value recomputed using BETA and SE.")
-
+        #+++JZ: replaced the automatic computation with a warning
+        cat("Genomic control detected. Please investigate")
         sumstats_meta[cCode,c("GC")] <- TRUE
 
       } else {
@@ -417,8 +444,7 @@ standardPipelineExplicitSumstatProcessing <- function(cSumstats, sumstats_meta, 
 
   cat(
     "\nThe genomic inflation factor (lambda GC) was calculated as:",
-    round(sumstats_meta[cCode,c("lambdaGC")],
-          digits = 2)
+    as.character(round(sumstats_meta[cCode,c("lambdaGC")],digits = 2))
   )
 
   # Harmonise with the reference

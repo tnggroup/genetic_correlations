@@ -1,5 +1,7 @@
 exportPattern("^[[:alpha:]]+")
+import(tidyverse)
 import(optparse)
+import(readr)
 import(googledrive)
 import(googlesheets4)
 import(data.table)
