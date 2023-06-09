@@ -111,6 +111,7 @@ standardPipelineCleanAndMunge <- function(
     ancestrySetting=NA_character_
     ){
 
+  cat("\n***Standard clean and munge***\n")
 
 #set up metadata df
   sumstats_meta <- data.frame(
@@ -177,15 +178,21 @@ standardPipelineCleanAndMunge <- function(
 
     #add in metadata from database
     cSheet <- head(currentSheet[code==eval(sumstats_meta[iTrait,]$code),],n = 1)
+    print(sumstats_meta[iTrait,])
     if(!is.na(cSheet$ancestry)) sumstats_meta[iTrait,ancestry:=eval(tngpipeline::parseAncestryText(cSheet$ancestry))]
+    print(sumstats_meta[iTrait,])
     if(!is.na(cSheet$trait_detail)) sumstats_meta[iTrait,name:=eval(cSheet$trait_detail)]
+    print(sumstats_meta[iTrait,])
     if(!is.na(cSheet$n_cases)) sumstats_meta[iTrait,n_cases:=eval(readr::parse_number(cSheet$n_cases))]
+    print(sumstats_meta[iTrait,])
     if(!is.na(cSheet$n_controls)) sumstats_meta[iTrait,n_controls:=eval(readr::parse_number(cSheet$n_controls))]
-
+    print(sumstats_meta[iTrait,])
     #edit metadata after reading the file-based metadata and database data (if known)
     if(!is.na(sumstats_meta[iTrait,]$n_cases)) sumstats_meta[iTrait,c("N")] <- sum(as.integer(sumstats_meta[iTrait,c("n_cases")]), as.integer(sumstats_meta[iTrait,c("n_controls")]),na.rm = T)
+    print(sumstats_meta[iTrait,])
 
     sumstats_meta[iTrait,c("dependent_variable")]<-ifelse(!is.na(sumstats_meta[iTrait,]$n_cases) & !is.na(sumstats_meta[iTrait,]$n_controls), "binary", "continuous")
+    print(sumstats_meta[iTrait,])
 
     #clean using shru::supermunge - implements most of the cleaning and parsing steps in the previous implementation, plus some additions and fixes. this may be harmonised later to either increase or reduce the dependency on the shru package.
     ref_df_arg <-NULL
