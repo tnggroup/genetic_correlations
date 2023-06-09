@@ -69,12 +69,12 @@ column_options <- parse_args(column_parser)
 # #projectFolderpath <- normalizePath("/Users/jakz/project/JZ_GED_PHD_C1",mustWork = T)
 # projectFolderpath <- normalizePath("/scratch/prj/gwas_sumstats",mustWork = T)
 # column_options$file <-paste0(
-#   file.path(projectFolderpath,"cleaned","ADHD05.gz"),
+#   file.path(projectFolderpath,"cleaned","ACCU01.gz"),
 #   ",",
 #   file.path(projectFolderpath,"cleaned","ALCD03.gz")
 # )
 # #column_options$label <- "Binge Eating (Narrow),BMI 2018"
-# column_options$code <- "ADHD05,ALCD03"
+# column_options$code <- "ACCU01,ALCD03"
 # #column_options$`sample-size`<-"830917,681275"
 # #column_options$population<-"EUR"
 # column_options$`reference-file-path`<- file.path(projectFolderpath,"variant_lists","hc1kgp3.b38.mix.l2.jz2023.gz")

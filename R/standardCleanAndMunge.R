@@ -4,7 +4,6 @@
 
 #needs the shru package and the tngpipeline/genetic_correlations package
 #devtools::install_github("johanzvrskovec/shru")
-#devtools::install_github("tnggroup/genetic_correlations",ref = 'dev_jz', auth_token = "YOUR_PAT")
 
 # require(tidyverse)
 # require(readr)
@@ -12,6 +11,27 @@
 # require(googlesheets4)
 # require(data.table)
 
+
+#Test CREATE
+# filePaths = c(
+#  file.path("/scratch/prj/gwas_sumstats/cleaned","ACCU01.gz"),
+#  file.path("/scratch/prj/gwas_sumstats/cleaned","ALCD03.gz")
+# )
+# traitCodes = c("ACCU01","ALCD03")
+# traitNames = c("ACCU","AD")
+# #referenceFilePath = "/scratch/prj/gwas_sumstats/variant_lists/hc1kgp3.b38.mix.l2.jz2023.gz"
+# referenceFilePath = "/scratch/prj/gwas_sumstats/variant_lists/combined.hm3_1kg.snplist.vanilla.jz2020.gz"
+# n_threads=5
+# keep_indel=T
+# maf_filter=0.01
+# info_filter=0.6
+# or_filter=10000
+# mhc_filter=NULL
+# pathDirOutput = normalizePath("./",mustWork = T)
+# munge="supermunge"
+# N=NA_integer_
+# #N = c(830917,681275)
+# ancestrySetting =c("EUR")
 
 
 #Test
@@ -30,7 +50,7 @@
 # mhc_filter=NULL
 # serviceAccountTokenPath=normalizePath("/Users/jakz/Documents/local_db/tngpipeline/tngpipeline-8130dbd7d58a.json",mustWork = T)
 # sheetLink = "https://docs.google.com/spreadsheets/d/1gjKI0OmYUxK66-HoXY9gG4d_OjiPJ58t7cl-OsLK8vU/edit?usp=sharing"
-#pathDirOutput = normalizePath("./",mustWork = T)
+# pathDirOutput = normalizePath("./",mustWork = T)
 # groupFolderPath = normalizePath("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/gwas_sumstats_test",mustWork = T)
 # munge="supermunge"
 # N=NA_integer_
@@ -54,6 +74,23 @@
 # munge="opmunge"
 # N = c(806834,NA)
 # ancestrySetting =c("EUR")
+
+
+#defaults
+# traitCodes=NA_character_ #set explicit code(s) here
+# traitNames=NA_character_
+# n_threads=5
+# keep_indel=T
+# maf_filter=NULL
+# info_filter=NULL
+# or_filter=NULL
+# serviceAccountTokenPath=normalizePath("/scratch/prj/gwas_sumstats/tngpipeline/tngpipeline-8130dbd7d58a.json",mustWork = T)
+# sheetLink = "https://docs.google.com/spreadsheets/d/1gjKI0OmYUxK66-HoXY9gG4d_OjiPJ58t7cl-OsLK8vU/edit?usp=sharing"
+# pathDirOutput = normalizePath("./",mustWork = T)
+# munge="supermunge" #alt opmunge
+# mhc_filter=NULL #can be either 37 or 38 for filtering the MHC region according to either grch37 or grch38
+# N=NA_integer_
+# ancestrySetting=NA_character_
 
 standardPipelineCleanAndMunge <- function(
     filePaths,
@@ -134,7 +171,7 @@ standardPipelineCleanAndMunge <- function(
 
     #add in metadata from database
     cSheet <- head(currentSheet[code==eval(sumstats_meta[iTrait,]$code),],n = 1)
-    if(!is.na(cSheet$ancestry)) sumstats_meta[iTrait,ancestry:=eval(parseAncestryText(cSheet$ancestry))]
+    if(!is.na(cSheet$ancestry)) sumstats_meta[iTrait,ancestry:=eval(tngpipeline::parseAncestryText(cSheet$ancestry))]
     if(!is.na(cSheet$trait_detail)) sumstats_meta[iTrait,name:=eval(cSheet$trait_detail)]
     if(!is.na(cSheet$n_cases)) sumstats_meta[iTrait,n_cases:=eval(readr::parse_number(cSheet$n_cases))]
     if(!is.na(cSheet$n_controls)) sumstats_meta[iTrait,n_controls:=eval(readr::parse_number(cSheet$n_controls))]
@@ -149,12 +186,12 @@ standardPipelineCleanAndMunge <- function(
     if(munge=="supermunge") ref_df_arg<-varlist
 
     cat("\nProcessing file with the following updated settings:\n")
-    print(sumstats_meta)
+    #print(sumstats_meta)
     print(sumstats_meta[iTrait,])
-    print(sumstats_meta[iTrait,]$path_orig)
-    print(sumstats_meta[iTrait,]$code)
-    print(sumstats_meta[iTrait,]$ancestry)
-    print(sumstats_meta[iTrait,]$N)
+    # print(sumstats_meta[iTrait,]$path_orig)
+    # print(sumstats_meta[iTrait,]$code)
+    # print(sumstats_meta[iTrait,]$ancestry)
+    # print(sumstats_meta[iTrait,]$N)
 
     smungeResults <- shru::supermunge(
       filePaths = sumstats_meta[iTrait,]$path_orig,
@@ -171,7 +208,7 @@ standardPipelineCleanAndMunge <- function(
       lossless = T
       )
 
-    cat("\n**** Now continuing with explicit standard cleaning and mungiung routines ****")
+    cat("\n**** Now continuing with pipeline specific standard cleaning and munging routines ****")
 
     procResults <- standardPipelineExplicitSumstatProcessing(
       cSumstats = smungeResults$last,
