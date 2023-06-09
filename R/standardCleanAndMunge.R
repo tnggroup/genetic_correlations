@@ -156,6 +156,8 @@ standardPipelineCleanAndMunge <- function(
 
   for(iTrait in 1:nrow(sumstats_meta)){
     #iTrait <-1 #test
+    cat("\nClean & munge #",iTrait)
+    print(sumstats_meta[iTrait,])
 
     #read trait metadata if exists
     metaFilePath <- paste0(sumstats_meta[iTrait,]$path_orig,".txt")
@@ -177,7 +179,9 @@ standardPipelineCleanAndMunge <- function(
     }
 
     #add in metadata from database
-    cSheet <- head(currentSheet[code==eval(sumstats_meta[iTrait,]$code),],n = 1)
+    cSheet <- currentSheet[code==eval(sumstats_meta[iTrait,]$code),]
+    if(nrow(cSheet)>1) cSheet<-cSheet[1,]
+
     print(sumstats_meta[iTrait,])
     if(!is.na(cSheet$ancestry)) sumstats_meta[iTrait,ancestry:=eval(tngpipeline::parseAncestryText(cSheet$ancestry))]
     print(sumstats_meta[iTrait,])
