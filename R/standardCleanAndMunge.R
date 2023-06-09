@@ -149,7 +149,12 @@ standardPipelineCleanAndMunge <- function(
     if(munge=="supermunge") ref_df_arg<-varlist
 
     cat("\nProcessing file with the following updated settings:\n")
+    print(sumstats_meta)
     print(sumstats_meta[iTrait,])
+    print(sumstats_meta[iTrait,]$path_orig)
+    print(sumstats_meta[iTrait,]$code)
+    print(sumstats_meta[iTrait,]$ancestry)
+    print(sumstats_meta[iTrait,]$N)
 
     smungeResults <- shru::supermunge(
       filePaths = sumstats_meta[iTrait,]$path_orig,
