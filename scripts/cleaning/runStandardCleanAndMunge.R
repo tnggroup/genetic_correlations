@@ -63,6 +63,7 @@ column_parser <- add_option(
 
 column_options <- parse_args(column_parser)
 
+cat("\n***Run standard clean and munge***\n")
 
 # # # test
 # column_options<-c()
@@ -83,24 +84,24 @@ column_options <- parse_args(column_parser)
 #
 
 #settings
-# filePaths <-  unlist(strsplit(column_options$file,split = ",",fixed = T))
-# traitCodes <- unlist(strsplit(column_options$code,split = ",",fixed = T))
-# #traitCodes <- c("BEN","BMI")
-# traitNames<-NULL
-# if(!is.null(column_options$label)) {
-#   traitNames <- unlist(strsplit(column_options$label,split = ",",fixed = T))
-# } else {
-#   traitNames <- traitCodes
-#   }
-# #traitNames <- c("Binge Eating (Narrow)","BMI 2018")
-# ancestrySetting<-NULL
-# if(!is.null(column_options$population)) ancestrySetting <- unlist(strsplit(column_options$population,split = ",",fixed = T))
-# referenceFilePath<-NULL
-# if(!is.null(column_options$`reference-file-path`)) referenceFilePath <- column_options$`reference-file-path`
-# N<-NULL
-# if(!is.null(column_options$`sample-size`)) N <- unlist(strsplit(column_options$`sample-size`,split = ",",fixed = T))
-# pathDirOutput<-NULL
-# if(!is.null(column_options$output)) pathDirOutput <- column_options$output
+filePaths <-  unlist(strsplit(column_options$file,split = ",",fixed = T))
+traitCodes <- unlist(strsplit(column_options$code,split = ",",fixed = T))
+#traitCodes <- c("BEN","BMI")
+traitNames<-NULL
+if(!is.null(column_options$label)) {
+  traitNames <- unlist(strsplit(column_options$label,split = ",",fixed = T))
+} else {
+  traitNames <- traitCodes
+  }
+#traitNames <- c("Binge Eating (Narrow)","BMI 2018")
+ancestrySetting<-NULL
+if(!is.null(column_options$population)) ancestrySetting <- unlist(strsplit(column_options$population,split = ",",fixed = T))
+referenceFilePath<-NULL
+if(!is.null(column_options$`reference-file-path`)) referenceFilePath <- column_options$`reference-file-path`
+N<-NULL
+if(!is.null(column_options$`sample-size`)) N <- unlist(strsplit(column_options$`sample-size`,split = ",",fixed = T))
+pathDirOutput<-NULL
+if(!is.null(column_options$output)) pathDirOutput <- column_options$output
 
 
 #hard coded options
@@ -112,5 +113,14 @@ info_filter <- 0.6
 #groupFolderPath <- normalizePath("/scratch/prj/gwas_sumstats",mustWork = T)
 #groupFolderPath <- normalizePath("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/gwas_sumstats_test",mustWork = T) #for test
 
+
+cat("\nFile paths:")
+print(filePaths)
+
+cat("\nTrait names:")
+print(traitNames)
+
+cat("\nTrait codes:")
+print(traitCodes)
 
 tngpipeline::standardPipelineCleanAndMunge(filePaths = filePaths, traitCodes = traitCodes, traitNames = traitNames,referenceFilePath = referenceFilePath, n_threads = n_threads, keep_indel = keep_indel, maf_filter = maf_filter,info_filter = info_filter, pathDirOutput = pathDirOutput)
