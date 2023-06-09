@@ -114,16 +114,21 @@ standardPipelineCleanAndMunge <- function(
 
 #set up metadata df
   sumstats_meta <- data.frame(
-    name = traitNames
+    code = traitCodes,
+    name = traitNames,
+    path_orig = filePaths,
+    N = N,
+    ancestry = ancestrySetting,
+    n_cases = NA_character_,
+    n_controls = NA_character_
   )
 
-  #row.names(sumstats_meta) <- traitCodes
-  sumstats_meta$code<-traitCodes
-  sumstats_meta$path_orig<-filePaths
-  sumstats_meta$N<-N
-  sumstats_meta$ancestry<-ancestrySetting
-  sumstats_meta$n_cases<-NA_character_
-  sumstats_meta$n_controls<-NA_character_
+  # sumstats_meta$code<-traitCodes
+  # sumstats_meta$path_orig<-filePaths
+  # sumstats_meta$N<-N
+  # sumstats_meta$ancestry<-ancestrySetting
+  # sumstats_meta$n_cases<-NA_character_
+  # sumstats_meta$n_controls<-NA_character_
   setDT(sumstats_meta)
   setkeyv(sumstats_meta,cols = c("code"))
 
