@@ -12,6 +12,8 @@ folderpath.munged2<-normalizePath("/scratch/prj/gwas_sumstats/munged_hc1kg",must
 
 filepath.varlist<-normalizePath("/scratch/prj/gwas_sumstats/variant_lists/hc1kgp3.b38.mix.l2.jz2023.gz",mustWork = T)
 
+filepath.commands.out<-"mungeAll.txt"
+
 sheetLink <- "https://docs.google.com/spreadsheets/d/1gjKI0OmYUxK66-HoXY9gG4d_OjiPJ58t7cl-OsLK8vU/edit?usp=sharing"
 serviceAccountTokenPath=normalizePath("/scratch/prj/gwas_sumstats/tngpipeline/tngpipeline-8130dbd7d58a.json",mustWork = T)
 
@@ -27,12 +29,44 @@ if(nrow(currentSheet)>0) currentSheet$x_row<-1:nrow(currentSheet)
 setDT(currentSheet)
 setkeyv(currentSheet,cols = c("code"))
 
+if(file.exists(filepath.commands.out)){
+    file.remove(filepath.commands.out)
+    file.create(filepath.commands.out)
+}
+
 for(iTrait in 1:nrow(currentSheet)){
   #iTrait<-1
   cTrait <- currentSheet[iTrait,]
 
   filepath.raw<-file.path(folderpath.raw,cTrait$file_name)
   filepath.cleaned<-file.path(folderpath.cleaned,paste0(cTrait$code,".gz"))
+  if(file.exists(filepath.raw)) {
+    filepath.touse <-filepath.raw
+  } else {
+    filepath.touse <-filepath.cleaned
+  }
 
+  wrapCommand<-paste0("Rscript ~/project/genetic_correlations/scripts/cleaning/runStandardCleanAndMunge.R -f '",filepath.touse,"' -c '",cTrait$code,"' -r '",filepath.varlist,"'")
+
+  args <- c(
+    paste0("--time 01:00:00"),
+    paste0("--partition cpu"),
+    paste0("--job-name=\"tng",iTrait,"\""),
+    paste0("--ntasks 1"),
+    paste0("--cpus-per-task 5"),
+    paste0("--mem 64G"),
+    paste0("--wrap \"",wrapCommand,"\""),
+    paste0("--output \"",cTrait$code,".$(date +%Y%m%d).out.txt\"") #this probably does not work
+  )
+
+  # output <- system2(
+  #   command="sbatch",
+  #   args=args,
+  #   stdout = T
+  # )
+
+  fullTextCommand<-paste("sbatch",paste(args, collapse=" "))
+
+  data.table::fwrite(x = list(fullTextCommand), append = T, file = filepath.commands.out, quote = F)
 
 }
