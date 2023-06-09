@@ -185,8 +185,8 @@ standardPipelineCleanAndMunge <- function(
     print(sumstats_meta[iTrait,])
     if(!is.na(cSheet$ancestry)) sumstats_meta[iTrait,ancestry:=eval(tngpipeline::parseAncestryText(cSheet$ancestry))]
     print(sumstats_meta[iTrait,])
-    if(!is.na(cSheet$trait_detail)) sumstats_meta[iTrait,name:=eval(cSheet$trait_detail)]
-    print(sumstats_meta[iTrait,])
+    # if(!is.na(cSheet$trait_detail)) sumstats_meta[iTrait,name:=eval(cSheet$trait_detail)]
+    # print(sumstats_meta[iTrait,])
     if(!is.na(cSheet$n_cases)) sumstats_meta[iTrait,n_cases:=eval(readr::parse_number(cSheet$n_cases))]
     print(sumstats_meta[iTrait,])
     if(!is.na(cSheet$n_controls)) sumstats_meta[iTrait,n_controls:=eval(readr::parse_number(cSheet$n_controls))]
