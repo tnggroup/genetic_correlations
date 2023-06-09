@@ -2,8 +2,9 @@
 # Standardised pipeline as an R function
 
 
-#needs the shru package
+#needs the shru package and the tngpipeline/genetic_correlations package
 #devtools::install_github("johanzvrskovec/shru")
+#devtools::install_github("tnggroup/genetic_correlations",ref = 'dev_jz', auth_token = "YOUR_PAT")
 
 # require(tidyverse)
 # require(readr)
@@ -147,8 +148,8 @@ standardPipelineCleanAndMunge <- function(
     ref_df_arg <-NULL
     if(munge=="supermunge") ref_df_arg<-varlist
 
-    cat("\nProcessing file with the following settings:\n")
-    cat(sumstats_meta[iTrait,])
+    cat("\nProcessing file with the following updated settings:\n")
+    print(sumstats_meta[iTrait,])
 
     smungeResults <- shru::supermunge(
       filePaths = sumstats_meta[iTrait,]$path_orig,
