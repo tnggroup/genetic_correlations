@@ -5,11 +5,11 @@
 #needs the shru package and the tngpipeline/genetic_correlations package
 #devtools::install_github("johanzvrskovec/shru")
 
-# require(tidyverse)
-# require(readr)
-# require(googledrive)
-# require(googlesheets4)
-# require(data.table)
+require(tidyverse)
+require(readr)
+require(googledrive)
+require(googlesheets4)
+require(data.table)
 
 
 #Test CREATE
@@ -157,7 +157,7 @@ standardPipelineCleanAndMunge <- function(
     if(file.exists(metaFilePath)){
       nMetaList <- readMetadata(sumstats_meta_list = unlist(sumstats_meta[iTrait,]), filePath = metaFilePath)
       nMetaList.names<-names(nMetaList)
-
+      cat("\nMetadata from file read.")
       sumstats_meta[iTrait,nMetaList.names]<-nMetaList
     }
 
@@ -166,6 +166,7 @@ standardPipelineCleanAndMunge <- function(
       cSort<-sumstats_meta[iTrait,]$sort
       if(is.na(cSort)) cSort<-"USRT" #unsorted
       nCode <- assignCodeFromSortAndSpreadsheet(sort = cSort)
+      cat("\nNew code from DB: ",nCode)
       sumstats_meta[iTrait,c("code")]<-nCode
     }
 
@@ -210,7 +211,7 @@ standardPipelineCleanAndMunge <- function(
 
     cat("\n**** Now continuing with pipeline specific standard cleaning and munging routines ****")
 
-    procResults <- standardPipelineExplicitSumstatProcessing(
+    procResults <- tngpipeline::standardPipelineExplicitSumstatProcessing(
       cSumstats = smungeResults$last,
       sumstats_meta = sumstats_meta,
       cCode = traitCodes[iTrait],

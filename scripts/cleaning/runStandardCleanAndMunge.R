@@ -79,28 +79,28 @@ column_options <- parse_args(column_parser)
 # #column_options$population<-"EUR"
 # column_options$`reference-file-path`<- file.path(projectFolderpath,"variant_lists","hc1kgp3.b38.mix.l2.jz2023.gz")
 # column_options$output<-'/scratch/groups/gwas_sumstats/munged_hc1kg'
-
-
+#
+#
 
 #settings
-filePaths <-  unlist(strsplit(column_options$file,split = ",",fixed = T))
-traitCodes <- unlist(strsplit(column_options$code,split = ",",fixed = T))
-#traitCodes <- c("BEN","BMI")
-traitNames<-NULL
-if(!is.null(column_options$label)) {
-  traitNames <- unlist(strsplit(column_options$label,split = ",",fixed = T))
-} else {
-  traitNames <- traitCodes
-  }
-#traitNames <- c("Binge Eating (Narrow)","BMI 2018")
-ancestrySetting<-NULL
-if(!is.null(column_options$population)) ancestrySetting <- unlist(strsplit(column_options$population,split = ",",fixed = T))
-referenceFilePath<-NULL
-if(!is.null(column_options$`reference-file-path`)) referenceFilePath <- column_options$`reference-file-path`
-N<-NULL
-if(!is.null(column_options$`sample-size`)) N <- unlist(strsplit(column_options$`sample-size`,split = ",",fixed = T))
-pathDirOutput<-NULL
-if(!is.null(column_options$output)) pathDirOutput <- column_options$output
+# filePaths <-  unlist(strsplit(column_options$file,split = ",",fixed = T))
+# traitCodes <- unlist(strsplit(column_options$code,split = ",",fixed = T))
+# #traitCodes <- c("BEN","BMI")
+# traitNames<-NULL
+# if(!is.null(column_options$label)) {
+#   traitNames <- unlist(strsplit(column_options$label,split = ",",fixed = T))
+# } else {
+#   traitNames <- traitCodes
+#   }
+# #traitNames <- c("Binge Eating (Narrow)","BMI 2018")
+# ancestrySetting<-NULL
+# if(!is.null(column_options$population)) ancestrySetting <- unlist(strsplit(column_options$population,split = ",",fixed = T))
+# referenceFilePath<-NULL
+# if(!is.null(column_options$`reference-file-path`)) referenceFilePath <- column_options$`reference-file-path`
+# N<-NULL
+# if(!is.null(column_options$`sample-size`)) N <- unlist(strsplit(column_options$`sample-size`,split = ",",fixed = T))
+# pathDirOutput<-NULL
+# if(!is.null(column_options$output)) pathDirOutput <- column_options$output
 
 
 #hard coded options
