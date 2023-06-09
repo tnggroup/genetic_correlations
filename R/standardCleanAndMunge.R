@@ -5,11 +5,11 @@
 #needs the shru package and the tngpipeline/genetic_correlations package
 #devtools::install_github("johanzvrskovec/shru")
 
-require(tidyverse)
-require(readr)
-require(googledrive)
-require(googlesheets4)
-require(data.table)
+# require(tidyverse)
+# require(readr)
+# require(googledrive)
+# require(googlesheets4)
+# require(data.table)
 
 
 #Test CREATE
