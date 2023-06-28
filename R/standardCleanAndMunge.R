@@ -239,14 +239,16 @@ standardPipelineCleanAndMunge <- function(
     sumstats_meta <-procResults$sumstats_meta
 
     #silence final supermunge messages as we just want to print the result to file with standardised column filtering
-    capture.output(
+    cat("\n**** Writing output using selected standardised columns names ****")
+    if(is.null(pathDirOutput)) pathDirOutput<-normalizePath("./",mustWork = T)
+    #capture.output(
       shru::supermunge(
         list_df = list(cSumstats),
         traitNames = sumstats_meta[iTrait,]$code,
         process = F,
         pathDirOutput = pathDirOutput
         )
-      )
+      #)
   }
 
 }
@@ -297,28 +299,29 @@ standardPipelineExplicitSumstatProcessing <- function(cSumstats, sumstats_meta, 
     any(colnames(cSumstats)=="P")
 
 
-  #explicit hard coded FRQ filter
-  if(
-    any(colnames(cSumstats)=="FRQ")
-  ){
-
-    frq.filter<-0.005
-
-    # If outside of bounds
-    rm <- (!is.na(cSumstats$FRQ)
-           & (cSumstats$FRQ<frq.filter | cSumstats$FRQ>(1-frq.filter)))
-
-    cSumstats <- cSumstats[!rm, ]
-
-    cat("Removing", sum(rm), "SNPs with FRQ <", frq.filter, " or (1-",frq.filter,");", nrow(cSumstats), "remain")
-
-    sumstats_meta[cCode,c("n_removed_frq")] <- sum(rm)
-
-  } else {
-
-    cat("Warning: The dataset does not contain a FRQ or MAF column to apply the specified filter on.")
-
-  }
+  #+++JZ: these parts were excluded in favor of the supermunge filters
+  # #explicit hard coded FRQ filter
+  # if(
+  #   any(colnames(cSumstats)=="FRQ")
+  # ){
+  #
+  #   frq.filter<-0.005
+  #
+  #   # If outside of bounds
+  #   rm <- (!is.na(cSumstats$FRQ)
+  #          & (cSumstats$FRQ<frq.filter | cSumstats$FRQ>(1-frq.filter)))
+  #
+  #   cSumstats <- cSumstats[!rm, ]
+  #
+  #   cat("Removing", sum(rm), "SNPs with FRQ <", frq.filter, " or (1-",frq.filter,");", nrow(cSumstats), "remain")
+  #
+  #   sumstats_meta[cCode,c("n_removed_frq")] <- sum(rm)
+  #
+  # } else {
+  #
+  #   cat("Warning: The dataset does not contain a FRQ or MAF column to apply the specified filter on.")
+  #
+  # }
 
 
   # #explicit OR filter

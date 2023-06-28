@@ -1,4 +1,5 @@
 # munge all repository sumstats
+# devtools::install_github("tnggroup/genetic_correlations",ref = 'dev_jz', auth_token = "YOUR_PAT")
 
 library(data.table)
 library(googledrive)
