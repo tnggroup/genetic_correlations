@@ -241,14 +241,14 @@ standardPipelineCleanAndMunge <- function(
     #silence final supermunge messages as we just want to print the result to file with standardised column filtering
     cat("\n**** Writing output using selected standardised columns names ****")
     if(is.null(pathDirOutput)) pathDirOutput<-normalizePath("./",mustWork = T)
-    #capture.output(
+    capture.output(
       shru::supermunge(
         list_df = list(cSumstats),
         traitNames = sumstats_meta[iTrait,]$code,
         process = F,
         pathDirOutput = pathDirOutput
         )
-      #)
+      )
   }
 
 }
@@ -352,7 +352,7 @@ standardPipelineExplicitSumstatProcessing <- function(cSumstats, sumstats_meta, 
 
     cSumstats$N_outlier<-cSumstats$NEFF > N_median+(3*N_sd) | cSumstats$NEFF < N_median-(3*N_sd)
 
-    cat(sum(cSumstats$N_outlier, na.rm=T), "SNPs have reported NEFF outside median(N) ± 3SD(N).\n", sep='')
+    cat("\n",sum(cSumstats$N_outlier, na.rm=T), "SNPs have reported NEFF outside median(N) ± 3SD(N).\n", sep='')
     sumstats_meta[cCode,c("n_outlier_n")] <- sum(cSumstats$N_outlier, na.rm=T)
 
   } else {
@@ -365,7 +365,7 @@ standardPipelineExplicitSumstatProcessing <- function(cSumstats, sumstats_meta, 
 
       cSumstats$N_outlier<-cSumstats$NEFF_est > N_median+(3*N_sd) | cSumstats$NEFF < N_median-(3*N_sd)
 
-      cat(sum(cSumstats$N_outlier, na.rm=T), "SNPs have estimated NEFF outside median(N) ± 3SD(N).\n", sep='')
+      cat("\n",sum(cSumstats$N_outlier, na.rm=T), "SNPs have estimated NEFF outside median(N) ± 3SD(N).\n", sep='')
       sumstats_meta[cCode,c("n_outlier_n")] <- sum(cSumstats$N_outlier, na.rm=T)
 
     } else {
@@ -377,7 +377,7 @@ standardPipelineExplicitSumstatProcessing <- function(cSumstats, sumstats_meta, 
 
         cSumstats$N_outlier<-cSumstats$N > N_median+(3*N_sd) | cSumstats$N < N_median-(3*N_sd)
 
-        cat(sum(cSumstats$N_outlier, na.rm=T), "SNPs have N outside median(N) ± 3SD(N).\n", sep='')
+        cat("\n",sum(cSumstats$N_outlier, na.rm=T), "SNPs have N outside median(N) ± 3SD(N).\n", sep='')
         sumstats_meta[cCode,c("n_outlier_n")] <- sum(cSumstats$N_outlier, na.rm=T)
       } else {
         # Per variant sample size information is not available. Set column indicating outliers to NA
@@ -399,13 +399,13 @@ standardPipelineExplicitSumstatProcessing <- function(cSumstats, sumstats_meta, 
 
     cSumstats <- cSumstats[!rm, ]
 
-    cat("Removing", sum(rm), "SNPs with SE = 0 or NA;", nrow(cSumstats), "remain")
+    cat("\nRemoving", sum(rm), "SNPs with SE = 0 or NA;", nrow(cSumstats), "remain")
 
     sumstats_meta[cCode,c("n_removed_se")] <- sum(rm)
 
   } else {
 
-    cat("Warning: The dataset does not contain an SE column to apply the specified filter on.")
+    cat("\nWarning: The dataset does not contain an SE column to apply the specified filter on.")
 
   }
 
@@ -451,13 +451,13 @@ standardPipelineExplicitSumstatProcessing <- function(cSumstats, sumstats_meta, 
       mean_rel_diff > 0.1
     ){
 
-      cat("Mean relative difference in SE is greater than 0.1, please investigate")
+      cat("\nMean relative difference in SE is greater than 0.1, please investigate")
 
     } else if(
       mean_rel_diff < 0.1
     ){
 
-      cat("Mean relative difference in SE is smaller than 0.1 - passed check")
+      cat("\nMean relative difference in SE is smaller than 0.1 - passed check")
 
       #remove the dataframe used in the checking process
       rm(cSumstats_se_check)
@@ -487,12 +487,12 @@ standardPipelineExplicitSumstatProcessing <- function(cSumstats, sumstats_meta, 
         cSumstats$P_check <- NULL
 
         #+++JZ: replaced the automatic computation with a warning
-        cat("Genomic control detected. Please investigate")
+        cat("\nGenomic control detected. Please investigate")
         sumstats_meta[cCode,c("GC")] <- TRUE
 
       } else {
 
-        cat("Genomic control was not detected.")
+        cat("\nGenomic control was not detected.")
 
         sumstats_meta[cCode,c("GC")] <- FALSE
 
@@ -502,7 +502,7 @@ standardPipelineExplicitSumstatProcessing <- function(cSumstats, sumstats_meta, 
     }
   } else {
 
-    cat("SE column is not present, genomic control cannot be detected.")
+    cat("\nSE column is not present, genomic control cannot be detected.")
 
   }
 
@@ -544,8 +544,8 @@ standardPipelineExplicitSumstatProcessing <- function(cSumstats, sumstats_meta, 
       matched[['GRCh37']]<-merge(cSumstats, ref, by.x=c('CHR','BP','IUPAC'), by.y=c('CHR','BP_GRCh37','IUPAC'))
       matched[['GRCh38']]<-merge(cSumstats, ref, by.x=c('CHR','BP','IUPAC'), by.y=c('CHR','BP_GRCh38','IUPAC'))
 
-      cat('GRCh37 match: ',round(nrow(matched[['GRCh37']])/sum(cSumstats$CHR == i)*100, 2),'%\n',sep='')
-      cat('GRCh38 match: ',round(nrow(matched[['GRCh38']])/sum(cSumstats$CHR == i)*100, 2),'%\n',sep='')
+      cat('\nGRCh37 match: ',round(nrow(matched[['GRCh37']])/sum(cSumstats$CHR == i)*100, 2),'%\n',sep='')
+      cat('\nGRCh38 match: ',round(nrow(matched[['GRCh38']])/sum(cSumstats$CHR == i)*100, 2),'%\n',sep='')
 
       target_build<-NA
       if((nrow(matched[['GRCh37']])/sum(cSumstats$CHR == i)) > 0.7 & (nrow(matched[['GRCh37']])/sum(cSumstats$CHR == i)) > (nrow(matched[['GRCh38']])/sum(cSumstats$CHR == i))){

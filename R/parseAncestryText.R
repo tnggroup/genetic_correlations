@@ -4,7 +4,7 @@ parseAncestryText <- function(ancestryText){
   ancestryText.orig<-ancestryText
   ancestryText<-toupper(ancestryText)
   if(any(ancestryText == c("MIX","TRANSETHNIC","WORLDWIDE","WORLD"))) ancestryText<-"MIX"
-  if(any(ancestryText == c("EUR","EUROPEAN","EUROPE"))) ancestryText<-"EUR"
+  if(any(ancestryText == c("EUR","EUROPEAN","EUROPE","MOSTLY EUROPEAN"))) ancestryText<-"EUR"
   if(any(ancestryText == c("AFR","AFRICAN","AFRICA"))) ancestryText<-"AFR"
   if(any(ancestryText == c("AMR","AD MIXED AMERICAN"))) ancestryText<-"AMR"
   if(any(ancestryText == c("EAS","EAST ASIAN","EAST ASIA"))) ancestryText<-"EAS"
