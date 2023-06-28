@@ -47,7 +47,7 @@ for(iTrait in 1:nrow(currentSheet)){
     filepath.touse <-filepath.cleaned
   }
 
-  wrapCommand<-paste0("Rscript ~/project/genetic_correlations/scripts/cleaning/runStandardCleanAndMunge.R -f '",filepath.touse,"' -c '",cTrait$code,"' -r '",filepath.varlist,"' -p '",cTrait$ancestry,"'")
+  wrapCommand<-paste0("sleep 30; Rscript ~/project/genetic_correlations/scripts/cleaning/runStandardCleanAndMunge.R -f '",filepath.touse,"' -c '",cTrait$code,"' -r '",filepath.varlist,"' -p '",cTrait$ancestry,"';")
 
   args <- c(
     paste0("--time 01:00:00"),
@@ -66,7 +66,7 @@ for(iTrait in 1:nrow(currentSheet)){
   #   stdout = T
   # )
 
-  fullTextCommand<-paste("sbatch",paste(args, collapse=" "))
+  fullTextCommand<-paste("sbatch",paste(args, collapse=" "),";")
 
   data.table::fwrite(x = list(fullTextCommand), append = T, file = filepath.commands.out, quote = F)
 
