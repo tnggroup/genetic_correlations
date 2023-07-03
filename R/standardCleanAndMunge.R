@@ -14,13 +14,20 @@
 
 #Test CREATE
 # filePaths = c(
-#  file.path("/scratch/prj/gwas_sumstats/cleaned","ACCU01.gz"),
-#  file.path("/scratch/prj/gwas_sumstats/cleaned","ALCD03.gz")
+#  file.path("/scratch/prj/gwas_sumstats/new/bmi.giant-ukbb.meta-analysis.combined.23May2018.txt.gz")
+#  #file.path("/scratch/prj/gwas_sumstats/cleaned","ALCD03.gz")
 # )
-# traitCodes = c("ACCU01","ALCD03")
-# traitNames = c("ACCU","AD")
+# traitCodes = c(
+#   "BODY14"
+#                #,"ALCD03"
+#                )
+# traitNames = c(
+#   "BMI"
+#   #,"AD"
+#   )
 # #referenceFilePath = "/scratch/prj/gwas_sumstats/variant_lists/hc1kgp3.b38.mix.l2.jz2023.gz"
-# referenceFilePath = "/scratch/prj/gwas_sumstats/variant_lists/combined.hm3_1kg.snplist.vanilla.jz2020.gz"
+# #referenceFilePath = "/scratch/prj/gwas_sumstats/variant_lists/combined.hm3_1kg.snplist.vanilla.jz2020.gz"
+# referenceFilePath = "/scratch/prj/gwas_sumstats/variant_lists/w_hm3.snplist.flaskapp2018"
 # n_threads=5
 # keep_indel=T
 # maf_filter=0.01
@@ -137,20 +144,11 @@ standardPipelineCleanAndMunge <- function(
 
 
   if(!is.null(serviceAccountTokenPath)){
-    #configure gs4 for non-browser login #https://gargle.r-lib.org/articles/non-interactive-auth.html
-    drive_auth(email = "johan.kallberg_zvrskovec@kcl.ac.uk", path = serviceAccountTokenPath)
-    #drive_auth(email = "jane_doe@example.com") # gets a suitably scoped token
-    # and stashes for googledrive use
-    gs4_auth(token = drive_token())            # registers token with googlesheets4
+    authenticateSpreadsheet(serviceAccountTokenPath=serviceAccountTokenPath)
   }
+  currentSheet <- readSpreadsheet(sheetLink=sheetLink)
   #used by supermunge - may be harmonised later so all steps use the same format of variant lists (summary level reference panel).
   varlist<-fread(file = referenceFilePath, na.strings =c(".",NA,"NA",""), encoding = "UTF-8",check.names = T, fill = T, blank.lines.skip = T, data.table = T, nThread = n_threads, showProgress = F)
-
-  currentSheet <- as.data.frame(read_sheet(ss = sheetLink, col_names = T, range="SGDP_GWASLIST_EDITTHIS"))
-  currentSheet.cols<-colnames(currentSheet)
-  if(nrow(currentSheet)>0) currentSheet$x_row<-1:nrow(currentSheet)
-  setDT(currentSheet)
-  setkeyv(currentSheet,cols = c("code"))
 
   #testTrait<-readFile(filePath = filePaths[iTrait])
 
@@ -163,11 +161,18 @@ standardPipelineCleanAndMunge <- function(
     metaFilePath <- paste0(sumstats_meta[iTrait,]$path_orig,".txt")
     #metaFilePath <- "/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/raw/bmi.giant-ukbb.meta-analysis.combined.23May2018.txt.gz.txt"
     if(file.exists(metaFilePath)){
-      nMetaList <- readMetadata(sumstats_meta_list = unlist(sumstats_meta[iTrait,]), filePath = metaFilePath)
+      nMetaList <-tngpipeline::readMetadata(sumstats_meta_list = unlist(sumstats_meta[iTrait,]), filePath = metaFilePath)
       nMetaList.names<-names(nMetaList)
       cat("\nMetadata from file read.")
-      sumstats_meta[iTrait,nMetaList.names]<-nMetaList
+      if(length(nMetaList)>0){
+        for(iCol in 1:length(nMetaList)){
+          set(x = sumstats_meta,j = nMetaList.names[iCol],value = nMetaList[nMetaList.names[iCol]])
+          #sumstats_meta[iTrait,..nMetaList.names]<-nMetaList
+        }
+      }
+      print(sumstats_meta[iTrait,])
     }
+
 
     #set new code using the spreadsheet metadata
     if(is.na(sumstats_meta[iTrait,]$code)){
@@ -181,22 +186,20 @@ standardPipelineCleanAndMunge <- function(
     #add in metadata from database
     cSheet <- currentSheet[code==eval(sumstats_meta[iTrait,]$code),]
     if(nrow(cSheet)>1) cSheet<-cSheet[1,]
+    cat("\nMetadata from Google sheet read.")
 
-    print(sumstats_meta[iTrait,])
     if(!is.na(cSheet$ancestry)) sumstats_meta[iTrait,ancestry:=eval(tngpipeline::parseAncestryText(cSheet$ancestry))]
-    print(sumstats_meta[iTrait,])
+
     # if(!is.na(cSheet$trait_detail)) sumstats_meta[iTrait,name:=eval(cSheet$trait_detail)]
     # print(sumstats_meta[iTrait,])
     if(!is.na(cSheet$n_cases)) sumstats_meta[iTrait,n_cases:=eval(readr::parse_number(cSheet$n_cases))]
-    print(sumstats_meta[iTrait,])
+
     if(!is.na(cSheet$n_controls)) sumstats_meta[iTrait,n_controls:=eval(readr::parse_number(cSheet$n_controls))]
-    print(sumstats_meta[iTrait,])
+
     #edit metadata after reading the file-based metadata and database data (if known)
     if(!is.na(sumstats_meta[iTrait,]$n_cases)) sumstats_meta[iTrait,c("N")] <- sum(as.integer(sumstats_meta[iTrait,c("n_cases")]), as.integer(sumstats_meta[iTrait,c("n_controls")]),na.rm = T)
-    print(sumstats_meta[iTrait,])
 
     sumstats_meta[iTrait,c("dependent_variable")]<-ifelse(!is.na(sumstats_meta[iTrait,]$n_cases) & !is.na(sumstats_meta[iTrait,]$n_controls), "binary", "continuous")
-    print(sumstats_meta[iTrait,])
 
     #clean using shru::supermunge - implements most of the cleaning and parsing steps in the previous implementation, plus some additions and fixes. this may be harmonised later to either increase or reduce the dependency on the shru package.
     ref_df_arg <-NULL
@@ -763,114 +766,6 @@ standardPipelineExplicitSumstatProcessing <- function(cSumstats, sumstats_meta, 
 
   return(list(cSumstats=cSumstats,sumstats_meta=sumstats_meta))
 
-}
-
-assignCodeFromSortAndSpreadsheet <- function(
-    sort,
-    sheetLink="https://docs.google.com/spreadsheets/d/1gjKI0OmYUxK66-HoXY9gG4d_OjiPJ58t7cl-OsLK8vU/edit?usp=sharing"
-    ){
-
-  #sheetLink <- "https://docs.google.com/spreadsheets/d/1gjKI0OmYUxK66-HoXY9gG4d_OjiPJ58t7cl-OsLK8vU/edit?usp=sharing"
-
-  currentSheet <- as.data.frame(read_sheet(ss = sheetLink, col_names = T, range="SGDP_GWASLIST_EDITTHIS"))
-  sorts<-currentSheet[grep(pattern = paste0("^",toupper(sort)), x = currentSheet$code),]
-  if(nrow(sorts)>0){
-    indexesLengths<-regexec(pattern = "\\d+", text=sorts$code)
-    matches<-regmatches(sorts$code,indexesLengths)
-    nums<-as.integer(unique(unlist(matches)))
-    return(paste0(sort,shru::padStringLeft(s = paste0("",(max(nums)+1)), padding = "0", targetLength = 2)))
-  } else return(paste0(sort,"01"))
-
-}
-
-
-
-updateSpreadsheet <- function(sheetLink,sumstats_meta){
-  #sheetLink <- "https://docs.google.com/spreadsheets/d/1gjKI0OmYUxK66-HoXY9gG4d_OjiPJ58t7cl-OsLK8vU/edit?usp=sharing"
-  #sumstats_meta <- cGWAS
-
-  currentSheet <- as.data.frame(read_sheet(ss = sheetLink, col_names = T, range="SGDP_GWASLIST_EDITTHIS"))
-  cols<-colnames(currentSheet)
-
-  if(nrow(currentSheet)>0) currentSheet$x_row<-1:nrow(currentSheet)
-  setDT(currentSheet)
-  setkeyv(currentSheet,cols = c("code"))
-
-  # sumstats_meta_dummy <- data.frame(
-  #   code=c("ANXI04","DEPR05","NEUR02"),
-  #   name=c("Generalised anxiety symptoms","MDD, narrow","Neuroticism"),
-  #   ancestry=c("EUR","EUR","EUR"),
-  #   n_ca=c(19012,58113,449484),
-  #   n_co=c(58113,25632,NA_integer_)
-  #   )
-  # sumstats_meta_dummy$n_tot<-sumstats_meta_dummy$n_ca + ifelse(is.na(sumstats_meta_dummy$n_co),0,sumstats_meta_dummy$n_co)
-
-  #dfToInsert<-as.data.frame(matrix(data=NA,nrow = 0, ncol = length(colnames(currentSheet))))
-  #colnames(dfToInsert)<-colnames(currentSheet)
-  dfToInsert <- currentSheet
-  dfToInsert<-dfToInsert[FALSE,]
-
-  setDT(sumstats_meta)
-  #add missing columns
-  if(!any(colnames(sumstats_meta)=="doi")) sumstats_meta[,doi:=NA_character_]
-  if(!any(colnames(sumstats_meta)=="permissions")) sumstats_meta[,permissions:=NA_character_]
-  sumstats_meta$phenotype_type<-as.character(sumstats_meta$phenotype_type)
-  sumstats_meta$assembly<-as.character(sumstats_meta$assembly)
-  sumstats_meta$ancestry<-as.character(sumstats_meta$ancestry)
-  sumstats_meta$sex<-as.character(sumstats_meta$sex)
-  sumstats_meta$permissions<-as.character(sumstats_meta$permissions)
-  sumstats_meta$dependent_variable<-as.character(sumstats_meta$dependent_variable)
-  sumstats_meta<-sumstats_meta[,.(
-    name,
-    code,
-    n_cases,
-    n_controls,
-    sample_size_discovery=n_total,
-    download_link,
-    filename,
-    platform,
-    n_details,
-    ancestry_details,
-    permissions,
-    assembly,
-    uk_biobank,
-    ancestry,
-    doi,
-    pmid,
-    trait_detail=phenotype,
-    phenotype_type,
-    ancestry,
-    sex,
-    phenotype,
-    phenotype_category=category_name,
-    notes,
-    dependent_variable,
-    year,
-    consortium
-  )]
-  setkeyv(sumstats_meta,cols = c("code"))
-
-  print(colnames(sumstats_meta))
-  dfToInsert<-rbindlist(list(
-    dfToInsert,
-    sumstats_meta
-  ), fill = T)
-
-
-  dfToInsert <- dfToInsert[,..cols]
-  for(iRec in 1:nrow(dfToInsert)){
-    #iRec<-1
-    cRec <- dfToInsert[iRec,]
-    if(!is.na(cRec$code)){
-      if(any(currentSheet$code==cRec$code)){
-        #inactivated update for now
-        # toUpdate<-currentSheet[currentSheet$code==cRec$code,]$x_row
-        # range_write(ss = sheetLink,data = cRec,cell_rows(toUpdate[[1]]:toUpdate[[1]]))
-      } else {
-        sheet_append(ss = sheetLink,data = cRec, sheet="SGDP_GWASLIST_EDITTHIS") #this does not recognise some columns
-      }
-    }
-  }
 }
 
 
