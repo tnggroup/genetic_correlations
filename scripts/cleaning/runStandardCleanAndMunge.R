@@ -61,6 +61,20 @@ column_parser <- add_option(
   help = "Path to where you want tp place the output files."
 )
 
+column_parser <- add_option(
+  object = column_parser,
+  opt_str = c("--filter.maf"),
+  type = "numeric",
+  help = "MAF filter lower bound to include."
+)
+
+column_parser <- add_option(
+  object = column_parser,
+  opt_str = c("--filter.info"),
+  type = "numeric",
+  help = "INFO filter lower bound to include."
+)
+
 column_options <- parse_args(column_parser)
 
 cat("\n***Run standard clean and munge***\n")
@@ -102,13 +116,16 @@ N<-NULL
 if(!is.null(column_options$`sample-size`)) N <- unlist(strsplit(column_options$`sample-size`,split = ",",fixed = T))
 pathDirOutput<-NULL
 if(!is.null(column_options$output)) pathDirOutput <- column_options$output
-
+maf_filter<-NULL
+if(!is.null(column_options$`filter.maf`)) maf_filter <- column_options$`filter.maf`
+info_filter<-NULL
+if(!is.null(column_options$`filter.info`)) info_filter <- column_options$`filter.info`
 
 #hard coded options
 n_threads <- 5
 keep_indel <- TRUE
-maf_filter <- 0.01
-info_filter <- 0.6
+#maf_filter <- 0.01
+#info_filter <- 0.6
 
 #groupFolderPath <- normalizePath("/scratch/prj/gwas_sumstats",mustWork = T)
 #groupFolderPath <- normalizePath("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/gwas_sumstats_test",mustWork = T) #for test

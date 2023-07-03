@@ -148,8 +148,6 @@ standardPipelineCleanAndMunge <- function(
   }
   currentSheet <- readSpreadsheet(sheetLink=sheetLink)
   #used by supermunge - may be harmonised later so all steps use the same format of variant lists (summary level reference panel).
-  varlist<-fread(file = referenceFilePath, na.strings =c(".",NA,"NA",""), encoding = "UTF-8",check.names = T, fill = T, blank.lines.skip = T, data.table = T, nThread = n_threads, showProgress = F)
-
   #testTrait<-readFile(filePath = filePaths[iTrait])
 
   for(iTrait in 1:nrow(sumstats_meta)){
@@ -201,7 +199,15 @@ standardPipelineCleanAndMunge <- function(
 
     sumstats_meta[iTrait,c("dependent_variable")]<-ifelse(!is.na(sumstats_meta[iTrait,]$n_cases) & !is.na(sumstats_meta[iTrait,]$n_controls), "binary", "continuous")
 
+    #reference variants
+    varlist<-NULL
+    if(!is.null(referenceFilePath)) {
+      varlist<-fread(file = referenceFilePath, na.strings =c(".",NA,"NA",""), encoding = "UTF-8",check.names = T, fill = T, blank.lines.skip = T, data.table = T, nThread = n_threads, showProgress = F)
+      cat("\nRead reference variant list.")
+    }
+
     #clean using shru::supermunge - implements most of the cleaning and parsing steps in the previous implementation, plus some additions and fixes. this may be harmonised later to either increase or reduce the dependency on the shru package.
+
     ref_df_arg <-NULL
     if(munge=="supermunge") ref_df_arg<-varlist
 
