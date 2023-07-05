@@ -47,7 +47,7 @@ for(iTrait in 1:nrow(currentSheet)){
     filepath.touse <-filepath.cleaned
   }
 
-  wrapCommand<-paste0("sleep 30; Rscript ~/project/genetic_correlations/scripts/cleaning/runStandardCleanAndMunge.R -f '",filepath.touse,"' -c '",cTrait$code,"' -r '",filepath.varlist,"' -p '",cTrait$ancestry,"';")
+  wrapCommand<-paste0("sleep 30; Rscript ~/project/genetic_correlations/scripts/cleaning/runStandardCleanAndMunge.R -f '",filepath.touse,"' -c '",cTrait$code,"' -r '",filepath.varlist,"' -p '",cTrait$ancestry,"' --filter.maf 0.01 --filter.info 0.6;")
 
   args <- c(
     paste0("--time 01:00:00"),

@@ -14,7 +14,7 @@
 
 #Test CREATE
 # filePaths = c(
-#  file.path("/scratch/prj/gwas_sumstats/new/bmi.giant-ukbb.meta-analysis.combined.23May2018.txt.gz")
+#  file.path("/scratch/prj/gwas_sumstats/original/bmi.giant-ukbb.meta-analysis.combined.23May2018.txt.gz")
 #  #file.path("/scratch/prj/gwas_sumstats/cleaned","ALCD03.gz")
 # )
 # traitCodes = c(
@@ -246,6 +246,7 @@ standardPipelineCleanAndMunge <- function(
 
     cSumstats <- procResults$cSumstats
     sumstats_meta <-procResults$sumstats_meta
+    setDT(sumstats_meta)
 
     #silence final supermunge messages as we just want to print the result to file with standardised column filtering
     cat("\n**** Writing output using selected standardised columns names ****")
@@ -291,6 +292,9 @@ standardPipelineExplicitSumstatProcessing <- function(cSumstats, sumstats_meta, 
   # cSumstats <- smungeResults$last
   # cCode <- traitCodes[iTrait]
   # super_pop <- "EUR"
+
+  sumstats_meta<-as.data.frame(sumstats_meta)
+  rownames(sumstats_meta)<-sumstats_meta$code
 
   # Meta data about sufficient columns for analyses
   sumstats_meta[cCode, c("enough_columns_PRS")] <-
