@@ -80,8 +80,8 @@ column_options <- parse_args(column_parser)
 cat("\n***Run standard clean and munge***\n")
 
 # # # test
-column_options<-c()
-#projectFolderpath <- normalizePath("/Users/jakz/project/JZ_GED_PHD_C1",mustWork = T)
+# column_options<-c()
+# #projectFolderpath <- normalizePath("/Users/jakz/project/JZ_GED_PHD_C1",mustWork = T)
 # projectFolderpath <- normalizePath("/scratch/prj/gwas_sumstats",mustWork = T)
 # # column_options$file <-paste0(
 # #   file.path(projectFolderpath,"cleaned","ACCU01.gz"),
@@ -89,13 +89,14 @@ column_options<-c()
 # #   file.path(projectFolderpath,"cleaned","ALCD03.gz")
 # # )
 # #column_options$label <- "Binge Eating (Narrow),BMI 2018"
-# column_options$code <- "ACCU01,ALCD03"
+# column_options$code <- "SMOK10"
+# #column_options$code <- "ACCU01,ALCD03"
 # #column_options$`sample-size`<-"830917,681275"
 # #column_options$population<-"EUR"
 # column_options$`reference-file-path`<- file.path(projectFolderpath,"variant_lists","hc1kgp3.b38.mix.l2.jz2023.gz")
 # column_options$output<-'/scratch/groups/gwas_sumstats/munged_hc1kg'
-#
-#
+
+
 
 #settings
 filePaths <- NULL

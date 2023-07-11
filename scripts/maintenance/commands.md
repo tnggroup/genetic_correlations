@@ -20,6 +20,6 @@ sbatch --time 01:00:00 --partition cpu --job-name="munge" --ntasks 1 --cpus-per-
 
 Re-munge from previous file and existing info in spreadsheet
 ```bash
-sbatch --time 01:00:00 --partition cpu --job-name="munge" --ntasks 1 --cpus-per-task 5 --mem 64G --wrap "Rscript ~/project/genetic_correlations/scripts/cleaning/runStandardCleanAndMunge.R -c 'BODY14' -r '/scratch/prj/gwas_sumstats/variant_lists/w_hm3.snplist.flaskapp2018' -o '/scratch/prj/gwas_sumstats/munged' --filter.maf 0.01 --filter.info 0.6" --output "BODY14.$(date +%Y%m%d).out.txt"
+sbatch --time 01:00:00 --partition cpu --job-name="munge" --ntasks 1 --cpus-per-task 5 --mem 64G --wrap "Rscript ~/project/genetic_correlations/scripts/cleaning/runStandardCleanAndMunge.R -c 'SMOK10' -r '/scratch/prj/gwas_sumstats/variant_lists/w_hm3.snplist.flaskapp2018' -o '/scratch/prj/gwas_sumstats/munged' --filter.maf 0.01 --filter.info 0.6" --output "SMOK10.$(date +%Y%m%d).out.txt"
 
 ```

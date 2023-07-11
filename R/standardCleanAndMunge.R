@@ -84,7 +84,9 @@
 
 
 #defaults
+# filePaths=NA_character_
 # traitCodes=NA_character_ #set explicit code(s) here
+# sortCodes=NA_character_
 # traitNames=NA_character_
 # n_threads=5
 # keep_indel=T
@@ -100,8 +102,9 @@
 # ancestrySetting=NA_character_
 
 standardPipelineCleanAndMunge <- function(
-    filePaths,
+    filePaths=NA_character_,
     traitCodes=NA_character_, #set explicit code(s) here
+    sortCodes=NA_character_,
     traitNames=NA_character_,
     referenceFilePath,
     n_threads=5,
@@ -118,11 +121,19 @@ standardPipelineCleanAndMunge <- function(
     ancestrySetting=NA_character_
     ){
 
+
+  #fix arguments
+  if(is.null(filePaths)) filePaths<-NA_character_
+  if(is.null(traitCodes)) traitCodes<-NA_character_
+  if(is.null(sortCodes)) sortCodes<-NA_character_
+  if(is.null(traitNames)) traitNames<-NA_character_
+
   cat("\n***Standard clean and munge***\n")
 
 #set up metadata df
   sumstats_meta <- data.frame(
     code = traitCodes,
+    sort = sortCodes,
     name = traitNames,
     path_orig = filePaths,
     N = N,
