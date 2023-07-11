@@ -95,6 +95,7 @@
 # or_filter=NULL
 # serviceAccountTokenPath=normalizePath("/scratch/prj/gwas_sumstats/tngpipeline/tngpipeline-8130dbd7d58a.json",mustWork = T)
 # sheetLink = "https://docs.google.com/spreadsheets/d/1gjKI0OmYUxK66-HoXY9gG4d_OjiPJ58t7cl-OsLK8vU/edit?usp=sharing"
+#altInputFolderPaths = c("/scratch/prj/gwas_sumstats/original","/scratch/prj/gwas_sumstats/cleaned")
 # pathDirOutput = normalizePath("./",mustWork = T)
 # munge="supermunge" #alt opmunge
 # mhc_filter=NULL #can be either 37 or 38 for filtering the MHC region according to either grch37 or grch38
@@ -114,6 +115,7 @@ standardPipelineCleanAndMunge <- function(
     or_filter=NULL,
     serviceAccountTokenPath=normalizePath("/scratch/prj/gwas_sumstats/tngpipeline/tngpipeline-8130dbd7d58a.json",mustWork = T),
     sheetLink = "https://docs.google.com/spreadsheets/d/1gjKI0OmYUxK66-HoXY9gG4d_OjiPJ58t7cl-OsLK8vU/edit?usp=sharing",
+    altInputFolderPaths = c("/scratch/prj/gwas_sumstats/original","/scratch/prj/gwas_sumstats/cleaned"), #these are entered in priority order with the higher priority first
     pathDirOutput = normalizePath("./",mustWork = T),
     munge="supermunge", #alt opmunge
     mhc_filter=NULL, #can be either 37 or 38 for filtering the MHC region according to either grch37 or grch38
@@ -209,6 +211,26 @@ standardPipelineCleanAndMunge <- function(
     if(!is.na(sumstats_meta[iTrait,]$n_cases)) sumstats_meta[iTrait,c("N")] <- sum(as.integer(sumstats_meta[iTrait,c("n_cases")]), as.integer(sumstats_meta[iTrait,c("n_controls")]),na.rm = T)
 
     sumstats_meta[iTrait,c("dependent_variable")]<-ifelse(!is.na(sumstats_meta[iTrait,]$n_cases) & !is.na(sumstats_meta[iTrait,]$n_controls), "binary", "continuous")
+
+    sumstats_meta[iTrait,file_name:=ifelse(is.na(eval(cSheet$file_name)),paste0(code,".gz"),eval(cSheet$file_name))]
+
+    if(length(altInputFolderPaths)>0 & is.na(sumstats_meta[iTrait,]$path_orig)){
+      for(iAltPath in 1:length(altInputFolderPaths)){
+        cFilepath <- file.path(altInputFolderPaths,sumstats_meta[iTrait,]$file_name)
+        if( length(sumstats_meta[iTrait,]$file_name>1) & file.exists(cFilepath)){
+          sumstats_meta[iTrait,path_orig:=eval(cFilepath)]
+          break
+        }
+
+        #alt using the code.gz format
+        cFilepath <- file.path(altInputFolderPaths,paste0(sumstats_meta[iTrait,]$code,".gz"))
+        if(length(sumstats_meta[iTrait,]$file_name>1) & file.exists(cFilepath)){
+          sumstats_meta[iTrait,path_orig:=eval(cFilepath)]
+          break
+        }
+      }
+    }
+
 
     #reference variants
     varlist<-NULL
