@@ -80,14 +80,14 @@ column_options <- parse_args(column_parser)
 cat("\n***Run standard clean and munge***\n")
 
 # # # test
-# column_options<-c()
-# #projectFolderpath <- normalizePath("/Users/jakz/project/JZ_GED_PHD_C1",mustWork = T)
+column_options<-c()
+#projectFolderpath <- normalizePath("/Users/jakz/project/JZ_GED_PHD_C1",mustWork = T)
 # projectFolderpath <- normalizePath("/scratch/prj/gwas_sumstats",mustWork = T)
-# column_options$file <-paste0(
-#   file.path(projectFolderpath,"cleaned","ACCU01.gz"),
-#   ",",
-#   file.path(projectFolderpath,"cleaned","ALCD03.gz")
-# )
+# # column_options$file <-paste0(
+# #   file.path(projectFolderpath,"cleaned","ACCU01.gz"),
+# #   ",",
+# #   file.path(projectFolderpath,"cleaned","ALCD03.gz")
+# # )
 # #column_options$label <- "Binge Eating (Narrow),BMI 2018"
 # column_options$code <- "ACCU01,ALCD03"
 # #column_options$`sample-size`<-"830917,681275"
@@ -98,15 +98,18 @@ cat("\n***Run standard clean and munge***\n")
 #
 
 #settings
-filePaths <-  unlist(strsplit(column_options$file,split = ",",fixed = T))
-traitCodes <- unlist(strsplit(column_options$code,split = ",",fixed = T))
+filePaths <- NULL
+if(!is.null(column_options$file)) filePaths <-  unlist(strsplit(column_options$file,split = ",",fixed = T))
+traitCodes <- NULL
+if(!is.null(column_options$code)) traitCodes <- unlist(strsplit(column_options$code,split = ",",fixed = T))
 #traitCodes <- c("BEN","BMI")
 traitNames<-NULL
 if(!is.null(column_options$label)) {
   traitNames <- unlist(strsplit(column_options$label,split = ",",fixed = T))
-} else {
+} else if (length(traitCodes)>0){
   traitNames <- traitCodes
-  }
+}
+
 #traitNames <- c("Binge Eating (Narrow)","BMI 2018")
 ancestrySetting<-NULL
 if(!is.null(column_options$population)) ancestrySetting <- unlist(strsplit(column_options$population,split = ",",fixed = T))
