@@ -217,14 +217,14 @@ standardPipelineCleanAndMunge <- function(
     if(length(altInputFolderPaths)>0 & is.na(sumstats_meta[iTrait,]$path_orig)){
       for(iAltPath in 1:length(altInputFolderPaths)){
         cFilepath <- file.path(altInputFolderPaths,sumstats_meta[iTrait,]$file_name)
-        if( length(sumstats_meta[iTrait,]$file_name>1) & file.exists(cFilepath)){
+        if( length(sumstats_meta[iTrait,]$file_name) >1 & file.exists(cFilepath)){
           sumstats_meta[iTrait,path_orig:=eval(cFilepath)]
           break
         }
 
         #alt using the code.gz format
         cFilepath <- file.path(altInputFolderPaths,paste0(sumstats_meta[iTrait,]$code,".gz"))
-        if(length(sumstats_meta[iTrait,]$file_name>1) & file.exists(cFilepath)){
+        if(length(sumstats_meta[iTrait,]$file_name) >1 & file.exists(cFilepath)){
           sumstats_meta[iTrait,path_orig:=eval(cFilepath)]
           break
         }
