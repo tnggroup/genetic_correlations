@@ -13,16 +13,17 @@
 
 
 #Test CREATE
+# filePaths<-NULL
 # # filePaths = c(
 # #  file.path("/scratch/prj/gwas_sumstats/original/bmi.giant-ukbb.meta-analysis.combined.23May2018.txt.gz")
 # #  #file.path("/scratch/prj/gwas_sumstats/cleaned","ALCD03.gz")
 # # )
 # traitCodes = c(
-#   "SMOK10"
+#   "BIPO04"
 #                #,"ALCD03"
 #                )
 # traitNames = c(
-#   "Smoking"
+#   "BD"
 #   #,"AD"
 #   )
 # #referenceFilePath = "/scratch/prj/gwas_sumstats/variant_lists/hc1kgp3.b38.mix.l2.jz2023.gz"
@@ -210,7 +211,7 @@ standardPipelineCleanAndMunge <- function(
     #edit metadata after reading the file-based metadata and database data (if known)
     if(!is.na(sumstats_meta[iTrait,]$n_cases)) sumstats_meta[iTrait,c("N")] <- sum(as.integer(sumstats_meta[iTrait,c("n_cases")]), as.integer(sumstats_meta[iTrait,c("n_controls")]),na.rm = T)
 
-    sumstats_meta[iTrait,c("dependent_variable")]<-ifelse(!is.na(sumstats_meta[iTrait,]$n_cases) & !is.na(sumstats_meta[iTrait,]$n_controls), "binary", "continuous")
+    sumstats_meta[iTrait,dependent_variable:=ifelse(!is.na(n_cases) & !is.na(n_controls), "binary", "continuous")]
 
     sumstats_meta[iTrait,file_name:=ifelse(is.na(eval(cSheet$file_name)),paste0(code,".gz"),eval(cSheet$file_name))]
 
@@ -254,6 +255,8 @@ standardPipelineCleanAndMunge <- function(
     # print(sumstats_meta[iTrait,]$N)
 
     if(is.na(sumstats_meta[iTrait,]$path_orig)) stop("There is no file to process. Please reconfigure the file paths for this job.")
+
+    sumstats_meta<-as.data.frame(sumstats_meta)
 
     smungeResults <- shru::supermunge(
       filePaths = sumstats_meta[iTrait,]$path_orig,
