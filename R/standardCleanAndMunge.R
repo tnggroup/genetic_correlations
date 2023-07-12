@@ -13,16 +13,16 @@
 
 
 #Test CREATE
-# filePaths = c(
-#  file.path("/scratch/prj/gwas_sumstats/original/bmi.giant-ukbb.meta-analysis.combined.23May2018.txt.gz")
-#  #file.path("/scratch/prj/gwas_sumstats/cleaned","ALCD03.gz")
-# )
+# # filePaths = c(
+# #  file.path("/scratch/prj/gwas_sumstats/original/bmi.giant-ukbb.meta-analysis.combined.23May2018.txt.gz")
+# #  #file.path("/scratch/prj/gwas_sumstats/cleaned","ALCD03.gz")
+# # )
 # traitCodes = c(
-#   "BODY14"
+#   "SMOK10"
 #                #,"ALCD03"
 #                )
 # traitNames = c(
-#   "BMI"
+#   "Smoking"
 #   #,"AD"
 #   )
 # #referenceFilePath = "/scratch/prj/gwas_sumstats/variant_lists/hc1kgp3.b38.mix.l2.jz2023.gz"
@@ -95,7 +95,7 @@
 # or_filter=NULL
 # serviceAccountTokenPath=normalizePath("/scratch/prj/gwas_sumstats/tngpipeline/tngpipeline-8130dbd7d58a.json",mustWork = T)
 # sheetLink = "https://docs.google.com/spreadsheets/d/1gjKI0OmYUxK66-HoXY9gG4d_OjiPJ58t7cl-OsLK8vU/edit?usp=sharing"
-#altInputFolderPaths = c("/scratch/prj/gwas_sumstats/original","/scratch/prj/gwas_sumstats/cleaned")
+# altInputFolderPaths = c("/scratch/prj/gwas_sumstats/original","/scratch/prj/gwas_sumstats/cleaned")
 # pathDirOutput = normalizePath("./",mustWork = T)
 # munge="supermunge" #alt opmunge
 # mhc_filter=NULL #can be either 37 or 38 for filtering the MHC region according to either grch37 or grch38
@@ -157,9 +157,9 @@ standardPipelineCleanAndMunge <- function(
 
 
   if(!is.null(serviceAccountTokenPath)){
-    authenticateSpreadsheet(serviceAccountTokenPath=serviceAccountTokenPath)
+    tngpipeline::authenticateSpreadsheet(serviceAccountTokenPath=serviceAccountTokenPath)
   }
-  currentSheet <- readSpreadsheet(sheetLink=sheetLink)
+  currentSheet <- tngpipeline::readSpreadsheet(sheetLink=sheetLink)
   #used by supermunge - may be harmonised later so all steps use the same format of variant lists (summary level reference panel).
   #testTrait<-readFile(filePath = filePaths[iTrait])
 
@@ -216,15 +216,16 @@ standardPipelineCleanAndMunge <- function(
 
     if(length(altInputFolderPaths)>0 & is.na(sumstats_meta[iTrait,]$path_orig)){
       for(iAltPath in 1:length(altInputFolderPaths)){
-        cFilepath <- file.path(altInputFolderPaths,sumstats_meta[iTrait,]$file_name)
-        if( length(sumstats_meta[iTrait,]$file_name) >1 & file.exists(cFilepath)){
+        #iAltPath<-1
+        cFilepath <- file.path(altInputFolderPaths[iAltPath],sumstats_meta[iTrait,]$file_name)
+        if( !is.na(sumstats_meta[iTrait,]$file_name) & file.exists(cFilepath)){
           sumstats_meta[iTrait,path_orig:=eval(cFilepath)]
           break
         }
 
         #alt using the code.gz format
-        cFilepath <- file.path(altInputFolderPaths,paste0(sumstats_meta[iTrait,]$code,".gz"))
-        if(length(sumstats_meta[iTrait,]$file_name) >1 & file.exists(cFilepath)){
+        cFilepath <- file.path(altInputFolderPaths[iAltPath],paste0(sumstats_meta[iTrait,]$code,".gz"))
+        if(!is.na(sumstats_meta[iTrait,]$file_name) & file.exists(cFilepath)){
           sumstats_meta[iTrait,path_orig:=eval(cFilepath)]
           break
         }
@@ -251,6 +252,8 @@ standardPipelineCleanAndMunge <- function(
     # print(sumstats_meta[iTrait,]$code)
     # print(sumstats_meta[iTrait,]$ancestry)
     # print(sumstats_meta[iTrait,]$N)
+
+    if(is.na(sumstats_meta[iTrait,]$path_orig)) stop("There is no file to process. Please reconfigure the file paths for this job.")
 
     smungeResults <- shru::supermunge(
       filePaths = sumstats_meta[iTrait,]$path_orig,
