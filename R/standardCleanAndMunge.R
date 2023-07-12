@@ -39,7 +39,7 @@
 # munge="supermunge"
 # N=NA_integer_
 # #N = c(830917,681275)
-# ancestrySetting =c("EUR")
+# #ancestrySetting =c("EUR")
 
 
 #Test
@@ -199,6 +199,8 @@ standardPipelineCleanAndMunge <- function(
     cSheet <- currentSheet[code==eval(sumstats_meta[iTrait,]$code),]
     if(nrow(cSheet)>1) cSheet<-cSheet[1,]
     cat("\nMetadata from Google sheet read.")
+
+    cSheet <- as.list(cSheet) #to avoid errors when indexing fields
 
     if(!is.na(cSheet$ancestry)) sumstats_meta[iTrait,ancestry:=eval(tngpipeline::parseAncestryText(cSheet$ancestry))]
 
