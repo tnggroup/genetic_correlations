@@ -145,6 +145,8 @@ standardPipelineCleanAndMunge <- function(
     n_controls = NA_character_
   )
 
+  print(colnames(sumstats_meta))
+
   # sumstats_meta$code<-traitCodes
   # sumstats_meta$path_orig<-filePaths
   # sumstats_meta$N<-N
@@ -224,6 +226,10 @@ standardPipelineCleanAndMunge <- function(
     cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
     cat("\nis.na(sumstats_meta[iTrait,c(\"path_orig\")]):",as.character(is.na(sumstats_meta[iTrait,c("path_orig")])))
 
+    print(colnames(sumstats_meta))
+    sumstats_meta<-as.data.frame(sumstats_meta)
+    print(colnames(sumstats_meta))
+
     if(length(altInputFolderPaths)>0 & is.na(sumstats_meta[iTrait,c("path_orig")])){
       cat("\nUpdating path from hypothesised input folders...")
       for(iAltPath in 1:length(altInputFolderPaths)){
@@ -233,7 +239,8 @@ standardPipelineCleanAndMunge <- function(
         cat("\ncFilepath:\n",cFilepath)
         if( !is.na(sumstats_meta[iTrait,c("file_name")]) & file.exists(cFilepath)){
 
-          sumstats_meta[iTrait,path_orig:=eval(cFilepath)]
+          sumstats_meta[iTrait,c("path_orig")]<-cFilepath
+          #sumstats_meta[iTrait,path_orig:=eval(cFilepath)]
           cat("\nsumstats_meta path_orig for iTrait:\n",sumstats_meta[iTrait,c("path_orig")])
           break
         }
@@ -242,7 +249,8 @@ standardPipelineCleanAndMunge <- function(
         cFilepath <- as.character(file.path(altInputFolderPaths[iAltPath],paste0(sumstats_meta[iTrait,c("code")],".gz")))
         cat("\ncFilepath:\n",cFilepath)
         if(!is.na(sumstats_meta[iTrait,c("file_name")]) & file.exists(cFilepath)){
-          sumstats_meta[iTrait,path_orig:=eval(cFilepath)]
+          sumstats_meta[iTrait,c("path_orig")]<-cFilepath
+          #sumstats_meta[iTrait,path_orig:=eval(cFilepath)]
           cat("\nsumstats_meta path_orig for iTrait:\n",sumstats_meta[iTrait,c("path_orig")])
           break
         }
