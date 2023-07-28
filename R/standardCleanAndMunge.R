@@ -211,13 +211,16 @@ standardPipelineCleanAndMunge <- function(
 
     cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
 
+    #error from here!!!
     # if(!is.na(cSheet$trait_detail)) sumstats_meta[iTrait,name:=eval(cSheet$trait_detail)]
     # print(sumstats_meta[iTrait,])
-    if(!is.na(cSheet$n_cases)) sumstats_meta[iTrait,n_cases:=eval(readr::parse_number(cSheet$n_cases))]
+    #if(!is.na(cSheet$n_cases)) sumstats_meta[iTrait,n_cases:=eval(readr::parse_number(cSheet$n_cases))]
+    if(!is.na(cSheet$n_cases)) sumstats_meta[iTrait,c("n_cases")] <- readr::parse_number(cSheet$n_cases)
 
     cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
 
-    if(!is.na(cSheet$n_controls)) sumstats_meta[iTrait,n_controls:=eval(readr::parse_number(cSheet$n_controls))]
+    #if(!is.na(cSheet$n_controls)) sumstats_meta[iTrait,n_controls:=eval(readr::parse_number(cSheet$n_controls))]
+    if(!is.na(cSheet$n_controls)) sumstats_meta[iTrait,c("n_controls")] <- readr::parse_number(cSheet$n_controls)
 
     cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
 
