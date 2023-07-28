@@ -217,6 +217,9 @@ standardPipelineCleanAndMunge <- function(
 
     sumstats_meta[iTrait,file_name:=ifelse(is.na(eval(cSheet$file_name)),paste0(code,".gz"),eval(cSheet$file_name))]
 
+    cat("\nUsing the input folder paths in priority order as:")
+    print(altInputFolderPaths)
+
     if(length(altInputFolderPaths)>0 & is.na(sumstats_meta[iTrait,]$path_orig)){
       for(iAltPath in 1:length(altInputFolderPaths)){
         #iAltPath<-1
