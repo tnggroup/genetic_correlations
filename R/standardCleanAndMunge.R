@@ -220,24 +220,24 @@ standardPipelineCleanAndMunge <- function(
     cat("\nUsing the input folder paths in priority order as:")
     print(altInputFolderPaths)
 
-    if(length(altInputFolderPaths)>0 & is.na(sumstats_meta[iTrait,]$path_orig)){
+    if(length(altInputFolderPaths)>0 & is.na(sumstats_meta[iTrait,c("path_orig")])){
       for(iAltPath in 1:length(altInputFolderPaths)){
         #iAltPath<-1
         cFilepath <- as.character(file.path(altInputFolderPaths[iAltPath],sumstats_meta[iTrait,c("file_name")]))
-        print(cFilepath)
-        if( !is.na(sumstats_meta[iTrait,]$file_name) & file.exists(cFilepath)){
+        cat("\ncFilepath:\n",cFilepath)
+        if( !is.na(sumstats_meta[iTrait,c("file_name")]) & file.exists(cFilepath)){
 
           sumstats_meta[iTrait,path_orig:=eval(cFilepath)]
-          print(sumstats_meta[iTrait,c("path_orig")])
+          cat("\nsumstats_meta path_orig for iTrait:\n",sumstats_meta[iTrait,c("path_orig")])
           break
         }
 
         #alt using the code.gz format
         cFilepath <- as.character(file.path(altInputFolderPaths[iAltPath],paste0(sumstats_meta[iTrait,c("code")],".gz")))
-        print(cFilepath)
-        if(!is.na(sumstats_meta[iTrait,]$file_name) & file.exists(cFilepath)){
+        cat("\ncFilepath:\n",cFilepath)
+        if(!is.na(sumstats_meta[iTrait,c("file_name")]) & file.exists(cFilepath)){
           sumstats_meta[iTrait,path_orig:=eval(cFilepath)]
-          print(sumstats_meta[iTrait,c("path_orig")])
+          cat("\nsumstats_meta path_orig for iTrait:\n",sumstats_meta[iTrait,c("path_orig")])
           break
         }
       }
@@ -264,16 +264,16 @@ standardPipelineCleanAndMunge <- function(
     # print(sumstats_meta[iTrait,]$ancestry)
     # print(sumstats_meta[iTrait,]$N)
 
-    if(is.na(sumstats_meta[iTrait,]$path_orig)) stop("There is no file to process. Please reconfigure the file paths for this job.")
+    if(is.na(sumstats_meta[iTrait,c("path_orig")])) stop("There is no file to process. Please reconfigure the file paths for this job.")
 
     sumstats_meta<-as.data.frame(sumstats_meta)
 
     smungeResults <- shru::supermunge(
-      filePaths = sumstats_meta[iTrait,]$path_orig,
+      filePaths = sumstats_meta[iTrait,c("path_orig")],
       ref_df = ref_df_arg,
-      traitNames = sumstats_meta[iTrait,]$code,
-      ancestrySetting = sumstats_meta[iTrait,]$ancestry,
-      N = sumstats_meta[iTrait,]$N,
+      traitNames = sumstats_meta[iTrait,c("code")],
+      ancestrySetting = sumstats_meta[iTrait,c("ancestry")],
+      N = sumstats_meta[iTrait,c("N")],
       keepIndel = keep_indel,
       writeOutput = F,
       filter.maf = maf_filter,
