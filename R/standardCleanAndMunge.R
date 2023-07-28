@@ -223,7 +223,7 @@ standardPipelineCleanAndMunge <- function(
     if(length(altInputFolderPaths)>0 & is.na(sumstats_meta[iTrait,]$path_orig)){
       for(iAltPath in 1:length(altInputFolderPaths)){
         #iAltPath<-1
-        cFilepath <- file.path(altInputFolderPaths[iAltPath],sumstats_meta[iTrait,]$file_name)
+        cFilepath <- as.character(file.path(altInputFolderPaths[iAltPath],sumstats_meta[iTrait,c("file_name")]))
         if( !is.na(sumstats_meta[iTrait,]$file_name) & file.exists(cFilepath)){
           sumstats_meta[iTrait,path_orig:=eval(cFilepath)]
           break
