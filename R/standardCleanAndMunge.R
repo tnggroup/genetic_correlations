@@ -220,6 +220,10 @@ standardPipelineCleanAndMunge <- function(
     cat("\nUsing the input folder paths in priority order as:")
     print(altInputFolderPaths)
 
+    cat("\nlength(altInputFolderPaths):",as.character(length(altInputFolderPaths)))
+    cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",sumstats_meta[iTrait,c("path_orig")])
+    cat("\nis.na(sumstats_meta[iTrait,c(\"path_orig\")]):",is.na(sumstats_meta[iTrait,c("path_orig")]))
+
     if(length(altInputFolderPaths)>0 & is.na(sumstats_meta[iTrait,c("path_orig")])){
       cat("\nUpdating path from hypothesised input folders...")
       for(iAltPath in 1:length(altInputFolderPaths)){
