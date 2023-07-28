@@ -221,7 +221,9 @@ standardPipelineCleanAndMunge <- function(
     print(altInputFolderPaths)
 
     if(length(altInputFolderPaths)>0 & is.na(sumstats_meta[iTrait,c("path_orig")])){
+      cat("\nUpdating path from hypothesised input folders...")
       for(iAltPath in 1:length(altInputFolderPaths)){
+        cat("\nProcessing path: ",altInputFolderPaths[iAltPath])
         #iAltPath<-1
         cFilepath <- as.character(file.path(altInputFolderPaths[iAltPath],sumstats_meta[iTrait,c("file_name")]))
         cat("\ncFilepath:\n",cFilepath)
