@@ -197,27 +197,40 @@ standardPipelineCleanAndMunge <- function(
       sumstats_meta[iTrait,c("code")]<-nCode
     }
 
+    cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
     #add in metadata from database
     cSheet <- currentSheet[code==eval(sumstats_meta[iTrait,]$code),]
     if(nrow(cSheet)>1) cSheet<-cSheet[1,]
     cat("\nMetadata from Google sheet read.")
 
+    cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
+
     cSheet <- as.list(cSheet) #to avoid errors when indexing fields
 
     if(!is.na(cSheet$ancestry)) sumstats_meta[iTrait,ancestry:=eval(tngpipeline::parseAncestryText(cSheet$ancestry))]
+
+    cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
 
     # if(!is.na(cSheet$trait_detail)) sumstats_meta[iTrait,name:=eval(cSheet$trait_detail)]
     # print(sumstats_meta[iTrait,])
     if(!is.na(cSheet$n_cases)) sumstats_meta[iTrait,n_cases:=eval(readr::parse_number(cSheet$n_cases))]
 
+    cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
+
     if(!is.na(cSheet$n_controls)) sumstats_meta[iTrait,n_controls:=eval(readr::parse_number(cSheet$n_controls))]
+
+    cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
 
     #edit metadata after reading the file-based metadata and database data (if known)
     if(!is.na(sumstats_meta[iTrait,]$n_cases)) sumstats_meta[iTrait,c("N")] <- sum(as.integer(sumstats_meta[iTrait,c("n_cases")]), as.integer(sumstats_meta[iTrait,c("n_controls")]),na.rm = T)
 
+    cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
+
     sumstats_meta[iTrait,dependent_variable:=ifelse(!is.na(n_cases) & !is.na(n_controls), "binary", "continuous")]
 
     sumstats_meta[iTrait,file_name:=ifelse(is.na(eval(cSheet$file_name)),paste0(code,".gz"),eval(cSheet$file_name))]
+
+    cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
 
     cat("\nUsing the input folder paths in priority order as:")
     print(altInputFolderPaths)
@@ -226,9 +239,7 @@ standardPipelineCleanAndMunge <- function(
     cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
     cat("\nis.na(sumstats_meta[iTrait,c(\"path_orig\")]):",as.character(is.na(sumstats_meta[iTrait,c("path_orig")])))
 
-    print(colnames(sumstats_meta))
     sumstats_meta<-as.data.frame(sumstats_meta)
-    print(colnames(sumstats_meta))
 
     if(length(altInputFolderPaths)>0 & is.na(sumstats_meta[iTrait,c("path_orig")])){
       cat("\nUpdating path from hypothesised input folders...")
