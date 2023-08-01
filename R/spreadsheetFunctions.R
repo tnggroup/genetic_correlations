@@ -14,6 +14,10 @@ readSpreadsheet <- function(
   currentSheet <- as.data.frame(read_sheet(ss = sheetLink, col_names = T, range="SGDP_GWASLIST_EDITTHIS"))
   currentSheet.cols<-colnames(currentSheet)
   if(nrow(currentSheet)>0) currentSheet$x_row<-1:nrow(currentSheet)
+
+  currentSheet.char <- sapply(currentSheet,as.character)
+  currentSheet[currentSheet.char=="NULL"]<-NA #get rid of those pesky NULL text strings
+
   setDT(currentSheet)
   setkeyv(currentSheet,cols = c("code"))
   return(currentSheet)
