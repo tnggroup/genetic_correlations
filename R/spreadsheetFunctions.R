@@ -15,6 +15,9 @@ readSpreadsheet <- function(
   currentSheet.cols<-colnames(currentSheet)
   if(nrow(currentSheet)>0) currentSheet$x_row<-1:nrow(currentSheet)
 
+  #standardised ancestry values
+  currentSheet$ancestry.std.tngpipeline<-parseAncestryText(currentSheet$ancestry)
+
   currentSheet.char <- sapply(currentSheet,as.character)
   currentSheet[currentSheet.char=="NULL"]<-NA #get rid of those pesky NULL text strings
 
