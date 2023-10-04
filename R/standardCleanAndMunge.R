@@ -102,6 +102,7 @@
 # mhc_filter=NULL #can be either 37 or 38 for filtering the MHC region according to either grch37 or grch38
 # N=NA_integer_
 # ancestrySetting=NA_character_
+# setNtoNEFF = NULL
 
 standardPipelineCleanAndMunge <- function(
     filePaths=NA_character_,
@@ -121,7 +122,8 @@ standardPipelineCleanAndMunge <- function(
     munge="supermunge", #alt opmunge
     mhc_filter=NULL, #can be either 37 or 38 for filtering the MHC region according to either grch37 or grch38
     N=NA_integer_,
-    ancestrySetting=NA_character_
+    ancestrySetting=NA_character_,
+    setNtoNEFF = NULL #list, set N to NEFF before writing output (per dataset), remove NEFF (as Genomic SEM munge)
     ){
 
 
@@ -308,7 +310,8 @@ standardPipelineCleanAndMunge <- function(
       filter.info = info_filter,
       filter.or = or_filter,
       filter.mhc = mhc_filter,
-      lossless = T
+      lossless = T,
+      setNtoNEFF = setNtoNEFF
       )
 
     cat("\n**** Now continuing with pipeline specific standard cleaning and munging routines ****")
