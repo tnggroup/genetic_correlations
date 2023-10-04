@@ -94,6 +94,7 @@
 # maf_filter=NULL
 # info_filter=NULL
 # or_filter=NULL
+# process=TRUE
 # serviceAccountTokenPath=normalizePath("/scratch/prj/gwas_sumstats/tngpipeline/tngpipeline-8130dbd7d58a.json",mustWork = T)
 # sheetLink = "https://docs.google.com/spreadsheets/d/1gjKI0OmYUxK66-HoXY9gG4d_OjiPJ58t7cl-OsLK8vU/edit?usp=sharing"
 # altInputFolderPaths = c("/scratch/prj/gwas_sumstats/original","/scratch/prj/gwas_sumstats/cleaned")
@@ -115,6 +116,7 @@ standardPipelineCleanAndMunge <- function(
     maf_filter=NULL,
     info_filter=NULL,
     or_filter=NULL,
+    process=TRUE, #do more procesing. required for munge-type operations and reference processing.
     serviceAccountTokenPath=normalizePath("/scratch/prj/gwas_sumstats/tngpipeline/tngpipeline-8130dbd7d58a.json",mustWork = T),
     sheetLink = "https://docs.google.com/spreadsheets/d/1gjKI0OmYUxK66-HoXY9gG4d_OjiPJ58t7cl-OsLK8vU/edit?usp=sharing",
     altInputFolderPaths = c("/scratch/prj/gwas_sumstats/original","/scratch/prj/gwas_sumstats/cleaned"), #these are entered in priority order with the higher priority first
@@ -305,13 +307,13 @@ standardPipelineCleanAndMunge <- function(
       ancestrySetting = sumstats_meta[iTrait,c("ancestry")],
       N = sumstats_meta[iTrait,c("N")],
       keepIndel = keep_indel,
+      process = process,
       writeOutput = F,
       filter.maf = maf_filter,
       filter.info = info_filter,
       filter.or = or_filter,
       filter.mhc = mhc_filter,
-      lossless = T,
-      setNtoNEFF = setNtoNEFF
+      lossless = T
       )
 
     cat("\n**** Now continuing with pipeline specific standard cleaning and munging routines ****")
@@ -335,7 +337,8 @@ standardPipelineCleanAndMunge <- function(
       shru::supermunge(
         list_df = list(cSumstats),
         traitNames = sumstats_meta[iTrait,]$code,
-        process = F,
+        setNtoNEFF = setNtoNEFF,
+        process=F,
         pathDirOutput = pathDirOutput
         )
       )
