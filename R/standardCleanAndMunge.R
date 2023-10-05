@@ -14,16 +14,16 @@
 
 #Test CREATE
 # filePaths<-NULL
-# # filePaths = c(
-# #  file.path("/scratch/prj/gwas_sumstats/original/bmi.giant-ukbb.meta-analysis.combined.23May2018.txt.gz")
-# #  #file.path("/scratch/prj/gwas_sumstats/cleaned","ALCD03.gz")
-# # )
+# filePaths = c(
+#  file.path("/scratch/prj/gwas_sumstats/original/PGC2_MDD_Wray/daner_ukb_170227_aligned.assoc.gz")
+#  #file.path("/scratch/prj/gwas_sumstats/cleaned","ALCD03.gz")
+# )
 # traitCodes = c(
-#   "BIPO04"
+#   "DEPR12"
 #                #,"ALCD03"
 #                )
 # traitNames = c(
-#   "BD"
+#   "MDD"
 #   #,"AD"
 #   )
 # #referenceFilePath = "/scratch/prj/gwas_sumstats/variant_lists/hc1kgp3.b38.mix.l2.jz2023.gz"
@@ -38,6 +38,7 @@
 # pathDirOutput = normalizePath("./",mustWork = T)
 # munge="supermunge"
 # N=NA_integer_
+# process=FALSE
 # #N = c(830917,681275)
 # #ancestrySetting =c("EUR")
 
@@ -457,9 +458,11 @@ standardPipelineExplicitSumstatProcessing <- function(cSumstats, sumstats_meta, 
       cSumstats$NEFF_est<-4/(1/cSumstats$N_CAS+1/cSumstats$N_CON)
 
       N_sd <- sd(cSumstats$NEFF_est)
-      N_median <- median(cSumstats$NEF_est)
+      N_median <- median(cSumstats$NEFF_est)
 
-      cSumstats$N_outlier<-cSumstats$NEFF_est > N_median+(3*N_sd) | cSumstats$NEFF < N_median-(3*N_sd)
+
+      cSumstats$N_outlier<-F
+      cSumstats$N_outlier<-cSumstats$NEFF_est > N_median+(3*N_sd) | cSumstats$NEFF_est < N_median-(3*N_sd)
 
       cat("\n",sum(cSumstats$N_outlier, na.rm=T), "SNPs have estimated NEFF outside median(N) ± 3SD(N).\n", sep='')
       sumstats_meta[cCode,c("n_outlier_n")] <- sum(cSumstats$N_outlier, na.rm=T)
