@@ -14,46 +14,51 @@
 
 #Test CREATE
 # filePaths<-NULL
-# filePaths = c(
-#  file.path("/scratch/prj/gwas_sumstats/original/PGC2_MDD_Wray/daner_ukb_170227_aligned.assoc.gz")
-#  #file.path("/scratch/prj/gwas_sumstats/cleaned","ALCD03.gz")
-# )
-# traitCodes = c(
-#   "DEPR12"
-#                #,"ALCD03"
-#                )
-# traitNames = c(
-#   "MDD"
-#   #,"AD"
-#   )
-# #referenceFilePath = "/scratch/prj/gwas_sumstats/variant_lists/hc1kgp3.b38.mix.l2.jz2023.gz"
+# # filePaths = c(
+# #  file.path("/scratch/prj/gwas_sumstats/original/PGC2_MDD_Wray/daner_ukb_170227_aligned.assoc.gz")
+# #  #file.path("/scratch/prj/gwas_sumstats/cleaned","ALCD03.gz")
+# # )
+# # traitCodes = c(
+# #   "DEPR12"
+# #                #,"ALCD03"
+# #                )
+# # traitNames = c(
+# #   "MDD"
+# #   #,"AD"
+# #   )
+# traitCodes = c("ANXI03")
+# referenceFilePath = "/scratch/prj/gwas_sumstats/variant_lists/hc1kgp3.b38.eur.l2.jz2023.gz"
 # #referenceFilePath = "/scratch/prj/gwas_sumstats/variant_lists/combined.hm3_1kg.snplist.vanilla.jz2020.gz"
-# referenceFilePath = "/scratch/prj/gwas_sumstats/variant_lists/w_hm3.snplist.flaskapp2018"
+# #referenceFilePath = "/scratch/prj/gwas_sumstats/variant_lists/w_hm3.snplist.flaskapp2018"
 # n_threads=5
 # keep_indel=T
-# maf_filter=0.01
+# maf_filter=0.001
 # info_filter=0.6
 # or_filter=10000
 # mhc_filter=NULL
 # pathDirOutput = normalizePath("./",mustWork = T)
 # munge="supermunge"
 # N=NA_integer_
-# process=FALSE
+# process=TRUE
 # #N = c(830917,681275)
 # #ancestrySetting =c("EUR")
+# setNtoNEFF = c(TRUE)
+# doPipelineSpecific= FALSE
 
 
 #Test
-# filePaths = c(
-#  file.path("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/cleaned/","ADHD05.gz"),
-#  file.path("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/cleaned/","ALCD03.gz")
-# )
-# traitCodes = c("ADHD05","ALCD03")
-# traitNames = c("ADHD","AD")
-# referenceFilePath = "/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/variant_lists/combined.hm3_1kg.snplist.vanilla.jz2020.gz"
+# # filePaths = c(
+# #  file.path("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/cleaned/","ADHD05.gz"),
+# #  file.path("/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/gwas_sumstats/cleaned/","ALCD03.gz")
+# # )
+# traitCodes = c("ANXI03")
+# traitNames = c("ANXI")
+#
+# referenceFilePath = "/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/variant_lists/hc1kgp3.b38.eur.l2.jz2023.gz"
+# #referenceFilePath = "/Users/jakz/Documents/local_db/JZ_GED_PHD_ADMIN_GENERAL/data/variant_lists/combined.hm3_1kg.snplist.vanilla.jz2020.gz"
 # n_threads=5
 # keep_indel=T
-# maf_filter=0.01
+# maf_filter=0.001
 # info_filter=0.6
 # or_filter=10000
 # mhc_filter=NULL
@@ -65,6 +70,8 @@
 # N=NA_integer_
 # #N = c(830917,681275)
 # ancestrySetting =c("EUR")
+# setNtoNEFF = c(TRUE)
+# doPipelineSpecific= FALSE
 
 #
 # filePaths = c(
@@ -93,6 +100,7 @@
 # n_threads=5
 # keep_indel=T
 # doPipelineSpecific=T
+# ldscCompatibility=T
 # maf_filter=NULL
 # info_filter=NULL
 # or_filter=NULL
@@ -116,6 +124,7 @@ standardPipelineCleanAndMunge <- function(
     n_threads=5,
     keep_indel=T,
     doPipelineSpecific=T,
+    ldscCompatibility=T,
     maf_filter=NULL,
     info_filter=NULL,
     or_filter=NULL,
@@ -303,7 +312,7 @@ standardPipelineCleanAndMunge <- function(
 
     sumstats_meta<-as.data.frame(sumstats_meta)
 
-    cat("\n****Supermunging ", sumstats_meta[iTrait,c("code")]," ****")
+    cat("\n****Supermunging", sumstats_meta[iTrait,c("code")],"****")
     if(doPipelineSpecific){
       smungeResults <- shru::supermunge(
         filePaths = sumstats_meta[iTrait,c("path_orig")],
@@ -344,7 +353,8 @@ standardPipelineCleanAndMunge <- function(
           traitNames = sumstats_meta[iTrait,]$code,
           setNtoNEFF = setNtoNEFF,
           process=F,
-          pathDirOutput = pathDirOutput
+          pathDirOutput = pathDirOutput,
+          ldscCompatibility=ldscCompatibility
           )
         )
     } else {
@@ -362,7 +372,8 @@ standardPipelineCleanAndMunge <- function(
         filter.mhc = mhc_filter,
         lossless = T,
         pathDirOutput = pathDirOutput,
-        setNtoNEFF = setNtoNEFF
+        setNtoNEFF = setNtoNEFF,
+        ldscCompatibility=ldscCompatibility
       )
     }
   }
