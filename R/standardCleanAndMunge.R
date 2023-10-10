@@ -92,6 +92,7 @@
 # traitNames=NA_character_
 # n_threads=5
 # keep_indel=T
+# doPipelineSpecific=T
 # maf_filter=NULL
 # info_filter=NULL
 # or_filter=NULL
@@ -114,6 +115,7 @@ standardPipelineCleanAndMunge <- function(
     referenceFilePath,
     n_threads=5,
     keep_indel=T,
+    doPipelineSpecific=T,
     maf_filter=NULL,
     info_filter=NULL,
     or_filter=NULL,
@@ -301,50 +303,69 @@ standardPipelineCleanAndMunge <- function(
 
     sumstats_meta<-as.data.frame(sumstats_meta)
 
-    smungeResults <- shru::supermunge(
-      filePaths = sumstats_meta[iTrait,c("path_orig")],
-      ref_df = ref_df_arg,
-      traitNames = sumstats_meta[iTrait,c("code")],
-      ancestrySetting = sumstats_meta[iTrait,c("ancestry")],
-      N = sumstats_meta[iTrait,c("N")],
-      keepIndel = keep_indel,
-      process = process,
-      writeOutput = F,
-      filter.maf = maf_filter,
-      filter.info = info_filter,
-      filter.or = or_filter,
-      filter.mhc = mhc_filter,
-      lossless = T
-      )
 
-    cat("\n**** Now continuing with pipeline specific standard cleaning and munging routines ****")
-
-    procResults <- tngpipeline::standardPipelineExplicitSumstatProcessing(
-      cSumstats = smungeResults$last,
-      sumstats_meta = sumstats_meta,
-      cCode = traitCodes[iTrait],
-      super_pop = ancestrySetting[iTrait],
-      munge = (munge=="opmunge")
-      )
-
-    cSumstats <- procResults$cSumstats
-    sumstats_meta <-procResults$sumstats_meta
-    setDT(sumstats_meta)
-
-    #silence final supermunge messages as we just want to print the result to file with standardised column filtering
-    cat("\n**** Writing output using selected standardised columns names ****")
-    if(is.null(pathDirOutput)) pathDirOutput<-normalizePath("./",mustWork = T)
-    capture.output(
-      shru::supermunge(
-        list_df = list(cSumstats),
-        traitNames = sumstats_meta[iTrait,]$code,
-        setNtoNEFF = setNtoNEFF,
-        process=F,
-        pathDirOutput = pathDirOutput
+    if(doPipelineSpecific){
+      smungeResults <- shru::supermunge(
+        filePaths = sumstats_meta[iTrait,c("path_orig")],
+        ref_df = ref_df_arg,
+        traitNames = sumstats_meta[iTrait,c("code")],
+        ancestrySetting = sumstats_meta[iTrait,c("ancestry")],
+        N = sumstats_meta[iTrait,c("N")],
+        keepIndel = keep_indel,
+        process = process,
+        writeOutput = F,
+        filter.maf = maf_filter,
+        filter.info = info_filter,
+        filter.or = or_filter,
+        filter.mhc = mhc_filter,
+        lossless = T
         )
-      )
-  }
 
+      cat("\n**** Now continuing with pipeline specific standard cleaning and munging routines ****")
+
+      procResults <- tngpipeline::standardPipelineExplicitSumstatProcessing(
+        cSumstats = smungeResults$last,
+        sumstats_meta = sumstats_meta,
+        cCode = traitCodes[iTrait],
+        super_pop = ancestrySetting[iTrait],
+        munge = (munge=="opmunge")
+        )
+
+      cSumstats <- procResults$cSumstats
+      sumstats_meta <-procResults$sumstats_meta
+      setDT(sumstats_meta)
+
+      #silence final supermunge messages as we just want to print the result to file with standardised column filtering
+      cat("\n**** Writing output using selected standardised columns names ****")
+      if(is.null(pathDirOutput)) pathDirOutput<-normalizePath("./",mustWork = T)
+      capture.output(
+        shru::supermunge(
+          list_df = list(cSumstats),
+          traitNames = sumstats_meta[iTrait,]$code,
+          setNtoNEFF = setNtoNEFF,
+          process=F,
+          pathDirOutput = pathDirOutput
+          )
+        )
+    } else {
+      smungeResults <- shru::supermunge(
+        filePaths = sumstats_meta[iTrait,c("path_orig")],
+        ref_df = ref_df_arg,
+        traitNames = sumstats_meta[iTrait,c("code")],
+        ancestrySetting = sumstats_meta[iTrait,c("ancestry")],
+        N = sumstats_meta[iTrait,c("N")],
+        keepIndel = keep_indel,
+        process = process,
+        filter.maf = maf_filter,
+        filter.info = info_filter,
+        filter.or = or_filter,
+        filter.mhc = mhc_filter,
+        lossless = T,
+        pathDirOutput = pathDirOutput,
+        setNtoNEFF = setNtoNEFF
+      )
+    }
+  }
 }
 
 readMetadata <- function(sumstats_meta_list,filePath){

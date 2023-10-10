@@ -79,7 +79,14 @@ column_parser <- add_option(
   object = column_parser,
   opt_str = c("--process"),
   type = "character",
-  help = "True or false (as parseable by R). Default TRUE."
+  help = "Standardised edits of file content when possible. True or false (as parseable by R). Default TRUE."
+)
+
+column_parser <- add_option(
+  object = column_parser,
+  opt_str = c("--doPipelineSpecific"),
+  type = "character",
+  help = "Run pipeline specific parts (besides supermunge). True or false (as parseable by R). Default TRUE."
 )
 
 column_parser <- add_option(
@@ -144,6 +151,9 @@ if(!is.null(column_options$`filter.info`)) info_filter <- column_options$`filter
 arg.process <- TRUE
 if(!is.null(column_options$process)) arg.process <-  as.logical(column_options$process)
 
+arg.doPipelineSpecific <- TRUE
+if(!is.null(column_options$doPipelineSpecific)) arg.doPipelineSpecific <-  as.logical(column_options$doPipelineSpecific)
+
 arg.setNToNEFF <- NULL
 if(!is.null(column_options$setntoneff)) arg.setNToNEFF <-  as.logical(unlist(strsplit(column_options$setntoneff,split = ",",fixed = T)))
 
@@ -169,4 +179,4 @@ print(traitCodes)
 cat("\nOutput path:")
 print(pathDirOutput)
 
-tngpipeline::standardPipelineCleanAndMunge(filePaths = filePaths, traitCodes = traitCodes, traitNames = traitNames,referenceFilePath = referenceFilePath, n_threads = n_threads, keep_indel = keep_indel, maf_filter = maf_filter,info_filter = info_filter, process=arg.process,  pathDirOutput = pathDirOutput, setNtoNEFF=arg.setNToNEFF)
+tngpipeline::standardPipelineCleanAndMunge(filePaths = filePaths, traitCodes = traitCodes, traitNames = traitNames,referenceFilePath = referenceFilePath, n_threads = n_threads, keep_indel = keep_indel, maf_filter = maf_filter,info_filter = info_filter, process=arg.process, doPipelineSpecific=arg.doPipelineSpecific, pathDirOutput = pathDirOutput, setNtoNEFF=arg.setNToNEFF)
