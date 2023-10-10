@@ -342,7 +342,6 @@ standardPipelineCleanAndMunge <- function(
 
       cSumstats <- procResults$cSumstats
       sumstats_meta <-procResults$sumstats_meta
-      setDT(sumstats_meta)
 
       #silence final supermunge messages as we just want to print the result to file with standardised column filtering
       cat("\n**** Writing output using selected standardised columns names ****")
@@ -350,7 +349,7 @@ standardPipelineCleanAndMunge <- function(
       capture.output(
         shru::supermunge(
           list_df = list(cSumstats),
-          traitNames = sumstats_meta[iTrait,]$code,
+          traitNames = sumstats_meta[iTrait,c("code")],
           setNtoNEFF = setNtoNEFF,
           process=F,
           pathDirOutput = pathDirOutput,
