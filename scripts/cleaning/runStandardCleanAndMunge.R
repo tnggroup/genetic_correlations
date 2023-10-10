@@ -91,6 +91,13 @@ column_parser <- add_option(
 
 column_parser <- add_option(
   object = column_parser,
+  opt_str = c("--forLDSC"),
+  type = "character",
+  help = "Toggle LDSC compatible output format. True or false (as parseable by R). Default FALSE."
+)
+
+column_parser <- add_option(
+  object = column_parser,
   opt_str = c("--setntoneff"),
   type = "character",
   help = "True or false (as parseable by R), per dataset. Set N=NEFF in the output. This will be capped in case of backed out NEFF (formula version, rather than previously provided)."
@@ -154,6 +161,9 @@ if(!is.null(column_options$process)) arg.process <-  as.logical(column_options$p
 arg.doPipelineSpecific <- TRUE
 if(!is.null(column_options$doPipelineSpecific)) arg.doPipelineSpecific <-  as.logical(column_options$doPipelineSpecific)
 
+arg.forLDSC <- FALSE
+if(!is.null(column_options$forLDSC)) arg.forLDSC <-  as.logical(column_options$forLDSC)
+
 arg.setNToNEFF <- NULL
 if(!is.null(column_options$setntoneff)) arg.setNToNEFF <-  as.logical(unlist(strsplit(column_options$setntoneff,split = ",",fixed = T)))
 
@@ -179,4 +189,4 @@ print(traitCodes)
 cat("\nOutput path:")
 print(pathDirOutput)
 
-tngpipeline::standardPipelineCleanAndMunge(filePaths = filePaths, traitCodes = traitCodes, traitNames = traitNames,referenceFilePath = referenceFilePath, n_threads = n_threads, keep_indel = keep_indel, maf_filter = maf_filter,info_filter = info_filter, process=arg.process, doPipelineSpecific=arg.doPipelineSpecific, pathDirOutput = pathDirOutput, setNtoNEFF=arg.setNToNEFF)
+tngpipeline::standardPipelineCleanAndMunge(filePaths = filePaths, traitCodes = traitCodes, traitNames = traitNames,referenceFilePath = referenceFilePath, n_threads = n_threads, keep_indel = keep_indel, maf_filter = maf_filter,info_filter = info_filter, process=arg.process, doPipelineSpecific=arg.doPipelineSpecific, pathDirOutput = pathDirOutput, setNtoNEFF=arg.setNToNEFF, ldscCompatibility = arg.forLDSC)
