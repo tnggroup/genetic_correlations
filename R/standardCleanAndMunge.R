@@ -303,7 +303,7 @@ standardPipelineCleanAndMunge <- function(
 
     sumstats_meta<-as.data.frame(sumstats_meta)
 
-
+    cat("\n****Supermunging ", sumstats_meta[iTrait,c("code")]," ****")
     if(doPipelineSpecific){
       smungeResults <- shru::supermunge(
         filePaths = sumstats_meta[iTrait,c("path_orig")],
