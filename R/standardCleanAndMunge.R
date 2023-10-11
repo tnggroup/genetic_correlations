@@ -319,7 +319,7 @@ standardPipelineCleanAndMunge <- function(
     if(doPipelineSpecific){
       smungeResults <- shru::supermunge(
         filePaths = sumstats_meta[iTrait,c("path_orig")],
-        #ref_df = ref_df_arg,
+        ref_df = ref_df_arg,
         traitNames = sumstats_meta[iTrait,c("code")],
         ancestrySetting = sumstats_meta[iTrait,c("ancestry")],
         N = sumstats_meta[iTrait,c("N")],
