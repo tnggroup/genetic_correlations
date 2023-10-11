@@ -132,13 +132,16 @@ standardPipelineCleanAndMunge <- function(
     serviceAccountTokenPath=normalizePath("/scratch/prj/gwas_sumstats/tngpipeline/tngpipeline-8130dbd7d58a.json",mustWork = T),
     sheetLink = "https://docs.google.com/spreadsheets/d/1gjKI0OmYUxK66-HoXY9gG4d_OjiPJ58t7cl-OsLK8vU/edit?usp=sharing",
     altInputFolderPaths = c("/scratch/prj/gwas_sumstats/original","/scratch/prj/gwas_sumstats/cleaned"), #these are entered in priority order with the higher priority first
-    pathDirOutput = normalizePath("./",mustWork = T),
+    pathDirOutput = NULL,
     munge="supermunge", #alt opmunge
     mhc_filter=NULL, #can be either 37 or 38 for filtering the MHC region according to either grch37 or grch38
     N=NA_integer_,
     ancestrySetting=NA_character_,
     setNtoNEFF = NULL #list, set N to NEFF before writing output (per dataset), remove NEFF (as Genomic SEM munge)
     ){
+
+
+  if(is.null(pathDirOutput)) normalizePath("./",mustWork = T)
 
 
   #fix arguments
@@ -316,7 +319,7 @@ standardPipelineCleanAndMunge <- function(
     if(doPipelineSpecific){
       smungeResults <- shru::supermunge(
         filePaths = sumstats_meta[iTrait,c("path_orig")],
-        ref_df = ref_df_arg,
+        #ref_df = ref_df_arg,
         traitNames = sumstats_meta[iTrait,c("code")],
         ancestrySetting = sumstats_meta[iTrait,c("ancestry")],
         N = sumstats_meta[iTrait,c("N")],
@@ -345,7 +348,6 @@ standardPipelineCleanAndMunge <- function(
 
       #silence final supermunge messages as we just want to print the result to file with standardised column filtering
       cat("\n**** Writing output using selected standardised columns names ****")
-      if(is.null(pathDirOutput)) pathDirOutput<-normalizePath("./",mustWork = T)
       capture.output(
         shru::supermunge(
           list_df = list(cSumstats),
