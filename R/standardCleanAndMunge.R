@@ -97,6 +97,7 @@
 # traitCodes=NA_character_ #set explicit code(s) here
 # sortCodes=NA_character_
 # traitNames=NA_character_
+# rsSynonymsFilePath=NA_character_
 # n_threads=5
 # keep_indel=T
 # doPipelineSpecific=T
@@ -121,6 +122,7 @@ standardPipelineCleanAndMunge <- function(
     sortCodes=NA_character_,
     traitNames=NA_character_,
     referenceFilePath,
+    rsSynonymsFilePath=NA_character_,
     n_threads=5,
     keep_indel=T,
     doPipelineSpecific=T,
@@ -149,6 +151,7 @@ standardPipelineCleanAndMunge <- function(
   if(is.null(traitCodes)) traitCodes<-NA_character_
   if(is.null(sortCodes)) sortCodes<-NA_character_
   if(is.null(traitNames)) traitNames<-NA_character_
+  if(is.null(rsSynonymsFilePath)) rsSynonymsFilePath<-NA_character_
 
   cat("\n***Standard clean and munge***\n")
 
@@ -320,6 +323,7 @@ standardPipelineCleanAndMunge <- function(
       smungeResults <- shru::supermunge(
         filePaths = sumstats_meta[iTrait,c("path_orig")],
         ref_df = ref_df_arg,
+        rsSynonymsFilePath = ifelse(is.na(rsSynonymsFilePath),NULL,rsSynonymsFilePath),
         traitNames = sumstats_meta[iTrait,c("code")],
         ancestrySetting = sumstats_meta[iTrait,c("ancestry")],
         N = sumstats_meta[iTrait,c("N")],
@@ -362,6 +366,7 @@ standardPipelineCleanAndMunge <- function(
       smungeResults <- shru::supermunge(
         filePaths = sumstats_meta[iTrait,c("path_orig")],
         ref_df = ref_df_arg,
+        rsSynonymsFilePath = ifelse(is.na(rsSynonymsFilePath),NULL,rsSynonymsFilePath),
         traitNames = sumstats_meta[iTrait,c("code")],
         ancestrySetting = sumstats_meta[iTrait,c("ancestry")],
         N = sumstats_meta[iTrait,c("N")],

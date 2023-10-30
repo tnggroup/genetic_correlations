@@ -56,6 +56,13 @@ column_parser <- add_option(
 
 column_parser <- add_option(
   object = column_parser,
+  opt_str = c("-s", "--rs-synonyms-file-path"),
+  type = "character",
+  help = "Path to the RS synonyms file."
+)
+
+column_parser <- add_option(
+  object = column_parser,
   opt_str = c("-o", "--output"),
   type = "character",
   help = "Path to where you want tp place the output files."
@@ -146,6 +153,8 @@ ancestrySetting<-NULL
 if(!is.null(column_options$population)) ancestrySetting <- unlist(strsplit(column_options$population,split = ",",fixed = T))
 referenceFilePath<-NULL
 if(!is.null(column_options$`reference-file-path`)) referenceFilePath <- column_options$`reference-file-path`
+arg.rsSynonymsFilePath<-NULL
+if(!is.null(column_options$`rs-synonyms-file-path`)) arg.rsSynonymsFilePath <- column_options$`rs-synonyms-file-path`
 N<-NULL
 if(!is.null(column_options$`sample-size`)) N <- unlist(strsplit(column_options$`sample-size`,split = ",",fixed = T))
 pathDirOutput<-NULL
@@ -189,4 +198,4 @@ print(traitCodes)
 cat("\nOutput path:")
 print(pathDirOutput)
 
-tngpipeline::standardPipelineCleanAndMunge(filePaths = filePaths, traitCodes = traitCodes, traitNames = traitNames,referenceFilePath = referenceFilePath, n_threads = n_threads, keep_indel = keep_indel, maf_filter = maf_filter,info_filter = info_filter, process=arg.process, doPipelineSpecific=arg.doPipelineSpecific, pathDirOutput = pathDirOutput, setNtoNEFF=arg.setNToNEFF, ldscCompatibility = arg.forLDSC)
+tngpipeline::standardPipelineCleanAndMunge(filePaths = filePaths, traitCodes = traitCodes, traitNames = traitNames,referenceFilePath = referenceFilePath, rsSynonymsFilePath=arg.rsSynonymsFilePath, n_threads = n_threads, keep_indel = keep_indel, maf_filter = maf_filter,info_filter = info_filter, process=arg.process, doPipelineSpecific=arg.doPipelineSpecific, pathDirOutput = pathDirOutput, setNtoNEFF=arg.setNToNEFF, ldscCompatibility = arg.forLDSC)
