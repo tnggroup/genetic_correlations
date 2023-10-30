@@ -318,12 +318,15 @@ standardPipelineCleanAndMunge <- function(
 
     sumstats_meta<-as.data.frame(sumstats_meta)
 
+    rsSynonymsFilePath.argument = NULL
+    if(!is.na(rsSynonymsFilePath)) rsSynonymsFilePath.argument<-rsSynonymsFilePath
+
     cat("\n****Supermunging", sumstats_meta[iTrait,c("code")],"****")
     if(doPipelineSpecific){
       smungeResults <- shru::supermunge(
         filePaths = sumstats_meta[iTrait,c("path_orig")],
         ref_df = ref_df_arg,
-        rsSynonymsFilePath = ifelse(is.na(rsSynonymsFilePath),NULL,rsSynonymsFilePath),
+        rsSynonymsFilePath = rsSynonymsFilePath.argument,
         traitNames = sumstats_meta[iTrait,c("code")],
         ancestrySetting = sumstats_meta[iTrait,c("ancestry")],
         N = sumstats_meta[iTrait,c("N")],
@@ -366,7 +369,7 @@ standardPipelineCleanAndMunge <- function(
       smungeResults <- shru::supermunge(
         filePaths = sumstats_meta[iTrait,c("path_orig")],
         ref_df = ref_df_arg,
-        rsSynonymsFilePath = ifelse(is.na(rsSynonymsFilePath),NULL,rsSynonymsFilePath),
+        rsSynonymsFilePath = rsSynonymsFilePath.argument,
         traitNames = sumstats_meta[iTrait,c("code")],
         ancestrySetting = sumstats_meta[iTrait,c("ancestry")],
         N = sumstats_meta[iTrait,c("N")],
