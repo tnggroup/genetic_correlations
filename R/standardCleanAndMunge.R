@@ -564,7 +564,7 @@ standardPipelineExplicitSumstatProcessing <- function(cSumstats, sumstats_meta, 
 
       #if there is only SE column, calculate the Zscore first and then the SE from the BETA
     } else if(
-      any(colnames(cSumstats)=="SE")
+      any(colnames(cSumstats)=="SE") & any(colnames(cSumstats)=="P")
     ){
 
       cSumstats_se_check <- cSumstats %>%
