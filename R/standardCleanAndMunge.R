@@ -101,7 +101,7 @@
 # n_threads=5
 # keep_indel=T
 # doPipelineSpecific=T
-# ldscCompatibility=T
+# outputFormat="default" #default,ldsc,cojo
 # maf_filter=NULL
 # info_filter=NULL
 # or_filter=NULL
@@ -126,7 +126,8 @@ standardPipelineCleanAndMunge <- function(
     n_threads=5,
     keep_indel=T,
     doPipelineSpecific=T,
-    ldscCompatibility=T,
+    outputFormat=NULL, #default,ldsc,cojo
+    #ldscCompatibility=T, #old
     maf_filter=NULL,
     info_filter=NULL,
     or_filter=NULL,
@@ -152,6 +153,7 @@ standardPipelineCleanAndMunge <- function(
   if(is.null(sortCodes)) sortCodes<-NA_character_
   if(is.null(traitNames)) traitNames<-NA_character_
   if(is.null(rsSynonymsFilePath)) rsSynonymsFilePath<-NA_character_
+  if(is.null(outputFormat)) outputFormat<-"default"
 
   cat("\n***Standard clean and munge***\n")
 
@@ -298,7 +300,7 @@ standardPipelineCleanAndMunge <- function(
     varlist<-NULL
     if(!is.null(referenceFilePath)) {
       varlist<-fread(file = referenceFilePath, na.strings =c(".",NA,"NA",""), encoding = "UTF-8",check.names = T, fill = T, blank.lines.skip = T, data.table = T, nThread = n_threads, showProgress = F)
-      cat("\nRead reference variant list.")
+      cat("\nRead reference variant list from ",referenceFilePath)
     }
 
     #clean using shru::supermunge - implements most of the cleaning and parsing steps in the previous implementation, plus some additions and fixes. this may be harmonised later to either increase or reduce the dependency on the shru package.
@@ -362,7 +364,7 @@ standardPipelineCleanAndMunge <- function(
           setNtoNEFF = setNtoNEFF,
           process=F,
           pathDirOutput = pathDirOutput,
-          ldscCompatibility=ldscCompatibility
+          outputFormat = outputFormat
           )
         )
     } else {
@@ -382,7 +384,7 @@ standardPipelineCleanAndMunge <- function(
         lossless = T,
         pathDirOutput = pathDirOutput,
         setNtoNEFF = setNtoNEFF,
-        ldscCompatibility=ldscCompatibility
+        outputFormat=outputFormat
       )
     }
   }

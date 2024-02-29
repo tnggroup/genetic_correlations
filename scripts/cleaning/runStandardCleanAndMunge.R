@@ -98,9 +98,9 @@ column_parser <- add_option(
 
 column_parser <- add_option(
   object = column_parser,
-  opt_str = c("--forLDSC"),
+  opt_str = c("--format"),
   type = "character",
-  help = "Toggle LDSC compatible output format. True or false (as parseable by R). Default FALSE."
+  help = "Output format. Default supermunge default format. Other options are ldsc: ldsc compartible sumstat format, cojo: GCTA COJO sumstat format."
 )
 
 column_parser <- add_option(
@@ -170,8 +170,8 @@ if(!is.null(column_options$process)) arg.process <-  as.logical(column_options$p
 arg.doPipelineSpecific <- TRUE
 if(!is.null(column_options$doPipelineSpecific)) arg.doPipelineSpecific <-  as.logical(column_options$doPipelineSpecific)
 
-arg.forLDSC <- FALSE
-if(!is.null(column_options$forLDSC)) arg.forLDSC <-  as.logical(column_options$forLDSC)
+arg.outputFormat <- NULL
+if(!is.null(column_options$format)) arg.outputFormat <-  column_options$format
 
 arg.setNToNEFF <- NULL
 if(!is.null(column_options$setntoneff)) arg.setNToNEFF <-  as.logical(unlist(strsplit(column_options$setntoneff,split = ",",fixed = T)))
