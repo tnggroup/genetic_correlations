@@ -91,6 +91,39 @@
 # N = c(806834,NA)
 # ancestrySetting =c("EUR")
 
+# # Xinyue's test
+# filePaths<-NULL
+# # filePaths = c(
+# #  file.path("/scratch/prj/gwas_sumstats/original/PGC2_MDD_Wray/daner_ukb_170227_aligned.assoc.gz")
+# #  #file.path("/scratch/prj/gwas_sumstats/cleaned","ALCD03.gz")
+# # )
+# # traitCodes = c(
+# #   "DEPR12"
+# #                #,"ALCD03"
+# #                )
+# # traitNames = c(
+# #   "MDD"
+# #   #,"AD"
+# #   )
+# traitCodes = c("AMIN10")
+# referenceFilePath = "/scratch/prj/gwas_sumstats/variant_lists/reference.1000G.maf.0.005.txt.gz"
+# #referenceFilePath = "/scratch/prj/gwas_sumstats/variant_lists/combined.hm3_1kg.snplist.vanilla.jz2020.gz"
+# #referenceFilePath = "/scratch/prj/gwas_sumstats/variant_lists/w_hm3.snplist.flaskapp2018"
+# n_threads=5
+# #keep_indel=T
+# #maf_filter=0.001
+# #info_filter=0.6
+# #or_filter=10000
+# #mhc_filter=NULL
+# #pathDirOutput = normalizePath("./",mustWork = T)
+# munge="supermunge"
+# #N=NA_integer_
+# #process=TRUE
+# #N = c(830917,681275)
+# #ancestrySetting =c("EUR")
+# #setNtoNEFF = c(TRUE)
+# doPipelineSpecific= FALSE
+
 
 #defaults
 # filePaths=NA_character_
@@ -166,8 +199,10 @@ standardPipelineCleanAndMunge <- function(
     N = N,
     ancestry = ancestrySetting,
     n_cases = NA_character_,
-    n_controls = NA_character_
+    n_controls = NA_character_,
+    sample_size_discovery = NA_character_
   )
+  ###Add [sample_size_discovery = NA_character_]
 
   print(colnames(sumstats_meta))
 
@@ -177,6 +212,7 @@ standardPipelineCleanAndMunge <- function(
   # sumstats_meta$ancestry<-ancestrySetting
   # sumstats_meta$n_cases<-NA_character_
   # sumstats_meta$n_controls<-NA_character_
+  # sumstats_meta$sample_size_discovery<-NA_character_
   setDT(sumstats_meta)
   setkeyv(sumstats_meta,cols = c("code"))
 
@@ -186,9 +222,30 @@ standardPipelineCleanAndMunge <- function(
   if(!is.null(serviceAccountTokenPath)){
     tngpipeline::authenticateSpreadsheet(serviceAccountTokenPath=serviceAccountTokenPath)
   }
-  currentSheet <- tngpipeline::readSpreadsheet(sheetLink=sheetLink)
+  #currentSheet <- tngpipeline::readSpreadsheet(sheetLink=sheetLink)
   #used by supermunge - may be harmonised later so all steps use the same format of variant lists (summary level reference panel).
   #testTrait<-readFile(filePath = filePaths[iTrait])
+  #Xy: Sometimes erro occurs because of the rate limit problem in Google table reading process,so I edited the reading code to a loop
+  max_retries <- 3  # max try times
+  delay <- 60      # delay time-2mins
+
+  for (i in 1:max_retries) {
+    tryCatch({
+      currentSheet <- tngpipeline::readSpreadsheet(sheetLink = sheetLink)
+      break
+    }, error = function(e) {
+      cat("Error in reading Google Sheet. Attempt", i, "of", max_retries, "failed.\n")
+      cat("Error message:", e$message, "\n")
+      if (i < max_retries) {
+        cat("Waiting for", delay/60, "minutes before retrying...\n")
+        Sys.sleep(delay)
+      } else {
+        stop("Failed to read Google Sheet after", max_retries, "attempts.")
+      }
+    })
+  }
+  cat("Successfully read the Google Spreadsheet.\n")
+
 
   for(iTrait in 1:nrow(sumstats_meta)){
     #iTrait <-1 #test
@@ -249,8 +306,23 @@ standardPipelineCleanAndMunge <- function(
     cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
 
     #edit metadata after reading the file-based metadata and database data (if known)
-    if(!is.na(sumstats_meta[iTrait,]$n_cases)) sumstats_meta[iTrait,c("N")] <- sum(as.integer(sumstats_meta[iTrait,c("n_cases")]), as.integer(sumstats_meta[iTrait,c("n_controls")]),na.rm = T)
+    #Xy: if case-control are NA, sample_size_discovery is not NA, then give sample_size_discovery to "N"
 
+    if (!is.na(cSheet$n_cases) & !is.na(cSheet$n_controls)) {
+      sumstats_meta[iTrait, c("N")] <- sum(readr::parse_number(cSheet$n_cases),
+                                        readr::parse_number(cSheet$n_controls))
+    } else if (!is.na(cSheet$sample_size_discovery)) {
+      tSampleSizeDisc<-unlist(cSheet$sample_size_discovery)
+      if(is.numeric(tSampleSizeDisc)){
+        sumstats_meta[iTrait, c("N")]<-tSampleSizeDisc
+      } else {
+        sumstats_meta[iTrait, c("N")] <- readr::parse_number()
+      }
+    }
+
+    cat("\nN has been set to:", as.integer(sumstats_meta[iTrait, c("N")]))
+
+    cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:", as.character(sumstats_meta[iTrait,c("path_orig")]))
     cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
 
     sumstats_meta[iTrait,dependent_variable:=ifelse(!is.na(n_cases) & !is.na(n_controls), "binary", "continuous")]
