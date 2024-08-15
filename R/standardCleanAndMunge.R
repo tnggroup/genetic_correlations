@@ -222,9 +222,30 @@ standardPipelineCleanAndMunge <- function(
   if(!is.null(serviceAccountTokenPath)){
     tngpipeline::authenticateSpreadsheet(serviceAccountTokenPath=serviceAccountTokenPath)
   }
-  currentSheet <- tngpipeline::readSpreadsheet(sheetLink=sheetLink)
+  #currentSheet <- tngpipeline::readSpreadsheet(sheetLink=sheetLink)
   #used by supermunge - may be harmonised later so all steps use the same format of variant lists (summary level reference panel).
   #testTrait<-readFile(filePath = filePaths[iTrait])
+  #Xy: Sometimes erro occurs because of the rate limit problem in Google table reading process,so I edited the reading code to a loop
+  max_retries <- 3  # max try times
+  delay <- 60      # delay time-2mins
+
+  for (i in 1:max_retries) {
+    tryCatch({
+      currentSheet <- tngpipeline::readSpreadsheet(sheetLink = sheetLink)
+      break
+    }, error = function(e) {
+      cat("Error in reading Google Sheet. Attempt", i, "of", max_retries, "failed.\n")
+      cat("Error message:", e$message, "\n")
+      if (i < max_retries) {
+        cat("Waiting for", delay/60, "minutes before retrying...\n")
+        Sys.sleep(delay)
+      } else {
+        stop("Failed to read Google Sheet after", max_retries, "attempts.")
+      }
+    })
+  }
+  cat("Successfully read the Google Spreadsheet.\n")
+
 
   for(iTrait in 1:nrow(sumstats_meta)){
     #iTrait <-1 #test
