@@ -125,6 +125,15 @@
 # doPipelineSpecific= FALSE
 
 
+# traitCodes = c("BIPO04")
+# referenceFilePath = "/scratch/prj/gwas_sumstats/variant_lists/reference.1000G.maf.0.005.txt.gz"
+# n_threads=5
+# keep_indel=T
+# maf_filter=0.01
+# info_filter=0.6
+# outputFormat="ldsc"
+
+
 #defaults
 # filePaths=NA_character_
 # traitCodes=NA_character_ #set explicit code(s) here
@@ -296,12 +305,12 @@ standardPipelineCleanAndMunge <- function(
     # if(!is.na(cSheet$trait_detail)) sumstats_meta[iTrait,name:=eval(cSheet$trait_detail)]
     # print(sumstats_meta[iTrait,])
     #if(!is.na(cSheet$n_cases)) sumstats_meta[iTrait,n_cases:=eval(readr::parse_number(cSheet$n_cases))]
-    if(!is.na(cSheet$n_cases)) sumstats_meta[iTrait,c("n_cases")] <- readr::parse_number(cSheet$n_cases)
+    if(!is.na(cSheet$n_cases)) sumstats_meta[iTrait,c("n_cases")] <- readr::parse_number(cSheet$n_cases[[1]])
 
     cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
 
     #if(!is.na(cSheet$n_controls)) sumstats_meta[iTrait,n_controls:=eval(readr::parse_number(cSheet$n_controls))]
-    if(!is.na(cSheet$n_controls)) sumstats_meta[iTrait,c("n_controls")] <- readr::parse_number(cSheet$n_controls)
+    if(!is.na(cSheet$n_controls)) sumstats_meta[iTrait,c("n_controls")] <- readr::parse_number(cSheet$n_controls[[1]])
 
     cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
 
@@ -309,8 +318,8 @@ standardPipelineCleanAndMunge <- function(
     #Xy: if case-control are NA, sample_size_discovery is not NA, then give sample_size_discovery to "N"
 
     if (!is.na(cSheet$n_cases) & !is.na(cSheet$n_controls)) {
-      sumstats_meta[iTrait, c("N")] <- sum(readr::parse_number(cSheet$n_cases),
-                                        readr::parse_number(cSheet$n_controls))
+      sumstats_meta[iTrait, c("N")] <- sum(readr::parse_number(cSheet$n_cases[[1]]),
+                                        readr::parse_number(cSheet$n_controls[[1]]))
     } else if (!is.na(cSheet$sample_size_discovery)) {
       tSampleSizeDisc<-unlist(cSheet$sample_size_discovery)
       if(is.numeric(tSampleSizeDisc)){
