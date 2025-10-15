@@ -9,6 +9,8 @@ library(googlesheets4)
 library(data.table)
 library(optparse)
 
+cat("\n***Run standard clean and munge***\nAs of tngpipeline 0.1.1\n")
+
 #command line options
 column_parser <- OptionParser()
 
@@ -114,7 +116,6 @@ column_parser <- add_option(
 
 column_options <- parse_args(column_parser)
 
-cat("\n***Run standard clean and munge***\n")
 
 # # # test
 # column_options<-c()

@@ -13,6 +13,16 @@
 
 
 #Test CREATE
+
+# traitCodes = c("BORD02")
+# referenceFilePath = "/users/k19049801/project/JZ_GED_PHD_C1/data/variant_lists/1kgp3.bX.eur.l2.jz2023.gz"
+# filePaths = c("/users/k19049801/project/JZ_GED_PHD_C1/data/gwas_sumstats/raw/2025_borderline_pd_full_meta_both_sexes_embargo/daner_bor15_autosomes_x_EMBARGO.gz")
+# n_threads=5
+# keep_indel=T
+# maf_filter=0.01
+# info_filter=0.6
+
+
 # filePaths<-NULL
 # # filePaths = c(
 # #  file.path("/scratch/prj/gwas_sumstats/original/PGC2_MDD_Wray/daner_ukb_170227_aligned.assoc.gz")
@@ -213,7 +223,7 @@ standardPipelineCleanAndMunge <- function(
   )
   ###Add [sample_size_discovery = NA_character_]
 
-  print(colnames(sumstats_meta))
+  #print(colnames(sumstats_meta))
 
   # sumstats_meta$code<-traitCodes
   # sumstats_meta$path_orig<-filePaths
@@ -225,7 +235,7 @@ standardPipelineCleanAndMunge <- function(
   setDT(sumstats_meta)
   setkeyv(sumstats_meta,cols = c("code"))
 
-  print(sumstats_meta)
+  #print(sumstats_meta)
 
 
   if(!is.null(serviceAccountTokenPath)){
@@ -258,8 +268,8 @@ standardPipelineCleanAndMunge <- function(
 
   for(iTrait in 1:nrow(sumstats_meta)){
     #iTrait <-1 #test
-    cat("\nClean & munge #",iTrait)
-    print(sumstats_meta[iTrait,])
+    cat("\nClean & munge #",iTrait," code: ",sumstats_meta[iTrait,]$code)
+
 
     #read trait metadata if exists
     metaFilePath <- paste0(sumstats_meta[iTrait,]$path_orig,".txt")
@@ -274,9 +284,8 @@ standardPipelineCleanAndMunge <- function(
           #sumstats_meta[iTrait,..nMetaList.names]<-nMetaList
         }
       }
-      print(sumstats_meta[iTrait,])
+      #print(sumstats_meta[iTrait,])
     }
-
 
     #set new code using the spreadsheet metadata
     if(is.na(sumstats_meta[iTrait,]$code)){
@@ -293,52 +302,43 @@ standardPipelineCleanAndMunge <- function(
     if(nrow(cSheet)>1) cSheet<-cSheet[1,]
     cat("\nMetadata from Google sheet read.")
 
-    cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
-
     cSheet <- as.list(cSheet) #to avoid errors when indexing fields
 
     if(!is.na(cSheet$ancestry)) sumstats_meta[iTrait,ancestry:=eval(tngpipeline::parseAncestryText(cSheet$ancestry))]
-
-    cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
+    cat("\nsumstats_meta[iTrait,c(\"ancestry\")]:",as.character(sumstats_meta[iTrait,c("ancestry")]))
 
     #error from here!!!
     # if(!is.na(cSheet$trait_detail)) sumstats_meta[iTrait,name:=eval(cSheet$trait_detail)]
     # print(sumstats_meta[iTrait,])
     #if(!is.na(cSheet$n_cases)) sumstats_meta[iTrait,n_cases:=eval(readr::parse_number(cSheet$n_cases))]
-    if(!is.na(cSheet$n_cases)) sumstats_meta[iTrait,c("n_cases")] <- readr::parse_number(cSheet$n_cases[[1]])
+    if(!is.na(cSheet$n_cases)) sumstats_meta[iTrait,c("n_cases")] <- readr::parse_number(paste0("",unlist(cSheet$n_cases)[[1]]))
 
-    cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
+    cat("\nsumstats_meta[iTrait,c(\"n_cases\")]:",as.character(sumstats_meta[iTrait,c("n_cases")]))
 
     #if(!is.na(cSheet$n_controls)) sumstats_meta[iTrait,n_controls:=eval(readr::parse_number(cSheet$n_controls))]
-    if(!is.na(cSheet$n_controls)) sumstats_meta[iTrait,c("n_controls")] <- readr::parse_number(cSheet$n_controls[[1]])
+    if(!is.na(cSheet$n_controls)) sumstats_meta[iTrait,c("n_controls")] <- readr::parse_number(paste0("",unlist(cSheet$n_controls)[[1]]))
 
-    cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
+    cat("\nsumstats_meta[iTrait,c(\"n_controls\")]:",as.character(sumstats_meta[iTrait,c("n_controls")]))
 
     #edit metadata after reading the file-based metadata and database data (if known)
     #Xy: if case-control are NA, sample_size_discovery is not NA, then give sample_size_discovery to "N"
 
     if (!is.na(cSheet$n_cases) & !is.na(cSheet$n_controls)) {
-      sumstats_meta[iTrait, c("N")] <- sum(readr::parse_number(cSheet$n_cases[[1]]),
-                                        readr::parse_number(cSheet$n_controls[[1]]))
+      sumstats_meta[iTrait, c("N")] <- sum(
+        readr::parse_number(paste0("",unlist(cSheet$n_cases)[[1]])),
+        readr::parse_number(paste0("",unlist(cSheet$n_controls)[[1]]))
+      )
     } else if (!is.na(cSheet$sample_size_discovery)) {
-      tSampleSizeDisc<-unlist(cSheet$sample_size_discovery)
-      if(is.numeric(tSampleSizeDisc)){
-        sumstats_meta[iTrait, c("N")]<-tSampleSizeDisc
-      } else {
-        sumstats_meta[iTrait, c("N")] <- readr::parse_number()
-      }
+        sumstats_meta[iTrait, c("N")] <- readr::parse_number(paste0("",unlist(cSheet$sample_size_discovery)[[1]]))
     }
 
     cat("\nN has been set to:", as.integer(sumstats_meta[iTrait, c("N")]))
 
-    cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:", as.character(sumstats_meta[iTrait,c("path_orig")]))
-    cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
-
     sumstats_meta[iTrait,dependent_variable:=ifelse(!is.na(n_cases) & !is.na(n_controls), "binary", "continuous")]
+    cat("\nsumstats_meta[iTrait,c(\"dependent_variable\")]:", as.character(sumstats_meta[iTrait,c("dependent_variable")]))
 
     sumstats_meta[iTrait,file_name:=ifelse(is.na(eval(cSheet$file_name)),paste0(code,".gz"),eval(cSheet$file_name))]
-
-    cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
+    cat("\nsumstats_meta[iTrait,c(\"file_name\")]:",as.character(sumstats_meta[iTrait,c("file_name")]))
 
     cat("\nUsing the input folder paths in priority order as:")
     print(altInputFolderPaths)
