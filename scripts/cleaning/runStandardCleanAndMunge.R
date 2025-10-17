@@ -10,7 +10,7 @@ library(googlesheets4)
 library(data.table)
 library(optparse)
 
-cat("\n***Run standard clean and munge***\nAs of tngpipeline 0.1.1\n")
+cat("\n***Run standard clean and munge***")
 
 #command line options
 column_parser <- OptionParser()
@@ -113,6 +113,13 @@ column_parser <- add_option(
   help = "True or false (as parseable by R), per dataset. Set N=NEFF in the output. This will be capped in case of backed out NEFF (formula version, rather than previously provided)."
 )
 
+column_parser <- add_option(
+  object = column_parser,
+  opt_str = c("--ncores"),
+  type = "numeric",
+  help = "Number of cores to specify for different routines to use."
+)
+
 
 
 column_options <- parse_args(column_parser)
@@ -178,8 +185,10 @@ if(!is.null(column_options$format)) arg.outputFormat <-  column_options$format
 arg.setNToNEFF <- NULL
 if(!is.null(column_options$setntoneff)) arg.setNToNEFF <-  as.logical(unlist(strsplit(column_options$setntoneff,split = ",",fixed = T)))
 
+arg.ncores <- 5
+if(!is.null(column_options$ncores)) arg.ncores<-as.numeric(column_options$ncores)
+
 #hard coded options
-n_threads <- 5
 keep_indel <- TRUE
 #maf_filter <- 0.01
 #info_filter <- 0.6
@@ -200,4 +209,4 @@ print(traitCodes)
 cat("\nOutput path:")
 print(pathDirOutput)
 
-tngpipeline::standardPipelineCleanAndMunge(filePaths = filePaths, traitCodes = traitCodes, traitNames = traitNames,referenceFilePath = referenceFilePath, rsSynonymsFilePath=arg.rsSynonymsFilePath, n_threads = n_threads, keep_indel = keep_indel, maf_filter = maf_filter,info_filter = info_filter, process=arg.process, doPipelineSpecific=arg.doPipelineSpecific, pathDirOutput = pathDirOutput, setNtoNEFF=arg.setNToNEFF, outputFormat = arg.outputFormat)
+tngpipeline::standardPipelineCleanAndMunge(filePaths = filePaths, traitCodes = traitCodes, traitNames = traitNames,referenceFilePath = referenceFilePath, rsSynonymsFilePath=arg.rsSynonymsFilePath, n_threads = arg.ncores, keep_indel = keep_indel, maf_filter = maf_filter,info_filter = info_filter, process=arg.process, doPipelineSpecific=arg.doPipelineSpecific, pathDirOutput = pathDirOutput, setNtoNEFF=arg.setNToNEFF, outputFormat = arg.outputFormat)

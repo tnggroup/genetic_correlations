@@ -207,7 +207,7 @@ standardPipelineCleanAndMunge <- function(
   if(is.null(rsSynonymsFilePath)) rsSynonymsFilePath<-NA_character_
   if(is.null(outputFormat)) outputFormat<-"default"
 
-  cat("\n***Standard clean and munge***\n")
+  cat("\n***Standard clean and munge***\nAs of tngpipeline 0.1.2\n")
 
 #set up metadata df
   sumstats_meta <- data.frame(
@@ -420,7 +420,8 @@ standardPipelineCleanAndMunge <- function(
         filter.info = info_filter,
         filter.or = or_filter,
         filter.mhc = mhc_filter,
-        lossless = T
+        lossless = T,
+        nThreads = n_threads
         )
 
       cat("\n**** Now continuing with pipeline specific standard cleaning and munging routines ****")
@@ -445,7 +446,8 @@ standardPipelineCleanAndMunge <- function(
           setNtoNEFF = setNtoNEFF,
           process=F,
           pathDirOutput = pathDirOutput,
-          outputFormat = outputFormat
+          outputFormat = outputFormat,
+          nThreads = n_threads
           )
         )
     } else {
@@ -465,7 +467,8 @@ standardPipelineCleanAndMunge <- function(
         lossless = T,
         pathDirOutput = pathDirOutput,
         setNtoNEFF = setNtoNEFF,
-        outputFormat=outputFormat
+        outputFormat=outputFormat,
+        nThreads = n_threads
       )
     }
   }
