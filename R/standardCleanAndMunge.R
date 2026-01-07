@@ -207,7 +207,7 @@ standardPipelineCleanAndMunge <- function(
   if(is.null(rsSynonymsFilePath)) rsSynonymsFilePath<-NA_character_
   if(is.null(outputFormat)) outputFormat<-"default"
 
-  cat("\n***Standard clean and munge***\nAs of tngpipeline 0.1.2\n")
+  cat("\n***Standard clean and munge***\nAs of tngpipeline 0.2.0\n")
 
 #set up metadata df
   sumstats_meta <- data.frame(
@@ -216,6 +216,7 @@ standardPipelineCleanAndMunge <- function(
     name = traitNames,
     path_orig = filePaths,
     N = N,
+    Neff=NA_real_,
     ancestry = ancestrySetting,
     n_cases = NA_character_,
     n_controls = NA_character_,
@@ -322,17 +323,21 @@ standardPipelineCleanAndMunge <- function(
 
     #edit metadata after reading the file-based metadata and database data (if known)
     #Xy: if case-control are NA, sample_size_discovery is not NA, then give sample_size_discovery to "N"
-
-    if (!is.na(cSheet$n_cases) & !is.na(cSheet$n_controls)) {
+    #JZ: Rearranged the priority of these, prioritising discovery sample size over case/control N (as some meta-analyses mix ca/co and continuous outcom variables).
+    if (!is.na(cSheet$sample_size_discovery)) {
+      sumstats_meta[iTrait, c("N")] <- readr::parse_number(paste0("",unlist(cSheet$sample_size_discovery)[[1]]))
+    } else if (!is.na(cSheet$n_cases) || !is.na(cSheet$n_controls)) {
       sumstats_meta[iTrait, c("N")] <- sum(
         readr::parse_number(paste0("",unlist(cSheet$n_cases)[[1]])),
         readr::parse_number(paste0("",unlist(cSheet$n_controls)[[1]]))
       )
-    } else if (!is.na(cSheet$sample_size_discovery)) {
-        sumstats_meta[iTrait, c("N")] <- readr::parse_number(paste0("",unlist(cSheet$sample_size_discovery)[[1]]))
     }
+    cat("\nN has been set to:\t\t", as.integer(sumstats_meta[iTrait, c("N")]))
 
-    cat("\nN has been set to:", as.integer(sumstats_meta[iTrait, c("N")]))
+    if (!is.na(cSheet$sample_size_effective)) {
+      sumstats_meta[iTrait, c("Neff")] <- readr::parse_number(paste0("",unlist(cSheet$sample_size_effective)[[1]]))
+    }
+    cat("\nNeff has been set to:\t\t", as.integer(sumstats_meta[iTrait, c("Neff")]))
 
     sumstats_meta[iTrait,dependent_variable:=ifelse(!is.na(n_cases) & !is.na(n_controls), "binary", "continuous")]
     cat("\nsumstats_meta[iTrait,c(\"dependent_variable\")]:", as.character(sumstats_meta[iTrait,c("dependent_variable")]))
@@ -413,6 +418,7 @@ standardPipelineCleanAndMunge <- function(
         traitNames = sumstats_meta[iTrait,c("code")],
         ancestrySetting = sumstats_meta[iTrait,c("ancestry")],
         N = sumstats_meta[iTrait,c("N")],
+        Neff = sumstats_meta[iTrait,c("Neff")],
         keepIndel = keep_indel,
         process = process,
         writeOutput = F,
@@ -458,6 +464,7 @@ standardPipelineCleanAndMunge <- function(
         traitNames = sumstats_meta[iTrait,c("code")],
         ancestrySetting = sumstats_meta[iTrait,c("ancestry")],
         N = sumstats_meta[iTrait,c("N")],
+        Neff = sumstats_meta[iTrait,c("Neff")],
         keepIndel = keep_indel,
         process = process,
         filter.maf = maf_filter,
@@ -472,6 +479,8 @@ standardPipelineCleanAndMunge <- function(
       )
     }
   }
+
+  return(sumstats_meta)
 }
 
 readMetadata <- function(sumstats_meta_list,filePath){
