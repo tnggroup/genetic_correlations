@@ -186,7 +186,7 @@ standardPipelineCleanAndMunge <- function(
     process=TRUE, #do more procesing. required for munge-type operations and reference processing.
     serviceAccountTokenPath=normalizePath("/scratch/prj/gwas_sumstats/tngpipeline/tngpipeline-8130dbd7d58a.json",mustWork = T),
     sheetLink = "https://docs.google.com/spreadsheets/d/1gjKI0OmYUxK66-HoXY9gG4d_OjiPJ58t7cl-OsLK8vU/edit?usp=sharing",
-    altInputFolderPaths = c("/scratch/prj/gwas_sumstats/original","/scratch/prj/gwas_sumstats/cleaned"), #these are entered in priority order with the higher priority first
+    altInputFolderPaths = c("/scratch/prj/gwas_sumstats/original_release","/scratch/prj/gwas_sumstats/original","/scratch/prj/gwas_sumstats/cleaned"), #these are entered in priority order with the higher priority first
     pathDirOutput = NULL,
     munge="supermunge", #alt opmunge
     mhc_filter=NULL, #can be either 37 or 38 for filtering the MHC region according to either grch37 or grch38
@@ -207,7 +207,7 @@ standardPipelineCleanAndMunge <- function(
   if(is.null(rsSynonymsFilePath)) rsSynonymsFilePath<-NA_character_
   if(is.null(outputFormat)) outputFormat<-"default"
 
-  cat("\n***Standard clean and munge***\nAs of tngpipeline 0.2.0\n")
+  cat("\n***Standard clean and munge***\nAs of tngpipeline 0.3.0\n")
 
 #set up metadata df
   sumstats_meta <- data.frame(
@@ -359,12 +359,22 @@ standardPipelineCleanAndMunge <- function(
       for(iAltPath in 1:length(altInputFolderPaths)){
         cat("\nProcessing path: ",altInputFolderPaths[iAltPath])
         #iAltPath<-1
+
+        #new - subfolders for releases
+        if(!is.na(cSheet$sub)){
+          cFilepath <- as.character(file.path(altInputFolderPaths[iAltPath],cSheet$sub,sumstats_meta[iTrait,c("file_name")]))
+          cat("\ncFilepath:\n",cFilepath)
+          if( !is.na(sumstats_meta[iTrait,c("file_name")]) & file.exists(cFilepath)){
+            sumstats_meta[iTrait,c("path_orig")]<-cFilepath
+            cat("\nsumstats_meta path_orig for iTrait:\n",sumstats_meta[iTrait,c("path_orig")])
+            break
+          }
+        }
+
         cFilepath <- as.character(file.path(altInputFolderPaths[iAltPath],sumstats_meta[iTrait,c("file_name")]))
         cat("\ncFilepath:\n",cFilepath)
         if( !is.na(sumstats_meta[iTrait,c("file_name")]) & file.exists(cFilepath)){
-
           sumstats_meta[iTrait,c("path_orig")]<-cFilepath
-          #sumstats_meta[iTrait,path_orig:=eval(cFilepath)]
           cat("\nsumstats_meta path_orig for iTrait:\n",sumstats_meta[iTrait,c("path_orig")])
           break
         }
@@ -374,7 +384,6 @@ standardPipelineCleanAndMunge <- function(
         cat("\ncFilepath:\n",cFilepath)
         if(!is.na(sumstats_meta[iTrait,c("file_name")]) & file.exists(cFilepath)){
           sumstats_meta[iTrait,c("path_orig")]<-cFilepath
-          #sumstats_meta[iTrait,path_orig:=eval(cFilepath)]
           cat("\nsumstats_meta path_orig for iTrait:\n",sumstats_meta[iTrait,c("path_orig")])
           break
         }
