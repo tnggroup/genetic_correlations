@@ -186,7 +186,7 @@ standardPipelineCleanAndMunge <- function(
     process=TRUE, #do more procesing. required for munge-type operations and reference processing.
     serviceAccountTokenPath=normalizePath("/scratch/prj/gwas_sumstats/tngpipeline/tngpipeline-8130dbd7d58a.json",mustWork = T),
     sheetLink = "https://docs.google.com/spreadsheets/d/1gjKI0OmYUxK66-HoXY9gG4d_OjiPJ58t7cl-OsLK8vU/edit?usp=sharing",
-    altInputFolderPaths = c("/scratch/prj/gwas_sumstats/original_release","/scratch/prj/gwas_sumstats/original","/scratch/prj/gwas_sumstats/cleaned"), #these are entered in priority order with the higher priority first
+    altInputFolderPaths = c("/scratch/prj/gwas_sumstats/original_releases","/scratch/prj/gwas_sumstats/original","/scratch/prj/gwas_sumstats/cleaned"), #these are entered in priority order with the higher priority first
     pathDirOutput = NULL,
     munge="supermunge", #alt opmunge
     mhc_filter=NULL, #can be either 37 or 38 for filtering the MHC region according to either grch37 or grch38
