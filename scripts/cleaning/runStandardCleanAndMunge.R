@@ -163,7 +163,7 @@ referenceFilePath<-NULL
 if(!is.null(column_options$`reference-file-path`)) referenceFilePath <- column_options$`reference-file-path`
 arg.rsSynonymsFilePath<-NULL
 if(!is.null(column_options$`rs-synonyms-file-path`)) arg.rsSynonymsFilePath <- column_options$`rs-synonyms-file-path`
-N<-NULL
+N<-NA_integer_
 if(!is.null(column_options$`sample-size`)) N <- unlist(strsplit(column_options$`sample-size`,split = ",",fixed = T))
 pathDirOutput<-NULL
 if(!is.null(column_options$output)) pathDirOutput <- column_options$output
@@ -208,4 +208,4 @@ print(traitCodes)
 cat("\nOutput path:")
 print(pathDirOutput)
 
-tngpipeline::standardPipelineCleanAndMunge(filePaths = filePaths, traitCodes = traitCodes, traitNames = traitNames,referenceFilePath = referenceFilePath, rsSynonymsFilePath=arg.rsSynonymsFilePath, n_threads = arg.ncores, keep_indel = keep_indel, maf_filter = maf_filter,info_filter = info_filter, process=arg.process, doPipelineSpecific=arg.doPipelineSpecific, pathDirOutput = pathDirOutput, setNtoNEFF=arg.setNToNEFF, outputFormat = arg.outputFormat)
+tngpipeline::standardPipelineCleanAndMunge(filePaths = filePaths, traitCodes = traitCodes, traitNames = traitNames,referenceFilePath = referenceFilePath, rsSynonymsFilePath=arg.rsSynonymsFilePath, n_threads = arg.ncores, keep_indel = keep_indel, maf_filter = maf_filter,info_filter = info_filter, process=arg.process, doPipelineSpecific=arg.doPipelineSpecific, pathDirOutput = pathDirOutput, setNtoNEFF=arg.setNToNEFF, outputFormat = arg.outputFormat, N = N)
