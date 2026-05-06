@@ -194,7 +194,7 @@ if(!is.null(column_options$setntoneff)) arg.setNToNEFF <-  as.logical(unlist(str
 arg.ncores <- 5
 if(!is.null(column_options$ncores)) arg.ncores<-as.numeric(column_options$ncores)
 
-arg.nospreadsheet <- NULL
+arg.nospreadsheet <- FALSE
 if(!is.null(column_options$setntoneff)) arg.nospreadsheet <-  as.logical(column_options$nospreadsheet)
 
 #hard coded options
@@ -218,4 +218,4 @@ print(traitCodes)
 cat("\nOutput path:")
 print(pathDirOutput)
 
-tngpipeline::standardPipelineCleanAndMunge(filePaths = filePaths, traitCodes = traitCodes, traitNames = traitNames,referenceFilePath = referenceFilePath, rsSynonymsFilePath=arg.rsSynonymsFilePath, n_threads = arg.ncores, keep_indel = keep_indel, maf_filter = maf_filter,info_filter = info_filter, process=arg.process, doPipelineSpecific=arg.doPipelineSpecific, pathDirOutput = pathDirOutput, setNtoNEFF=arg.setNToNEFF, outputFormat = arg.outputFormat, N = N)
+tngpipeline::standardPipelineCleanAndMunge(filePaths = filePaths, traitCodes = traitCodes, traitNames = traitNames,referenceFilePath = referenceFilePath, rsSynonymsFilePath=arg.rsSynonymsFilePath, n_threads = arg.ncores, keep_indel = keep_indel, maf_filter = maf_filter,info_filter = info_filter, process=arg.process, doPipelineSpecific=arg.doPipelineSpecific, pathDirOutput = pathDirOutput, setNtoNEFF=arg.setNToNEFF, outputFormat = arg.outputFormat, N = N, useSpreadsheetDatabase = !arg.nospreadsheet)
