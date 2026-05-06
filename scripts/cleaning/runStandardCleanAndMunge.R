@@ -119,6 +119,13 @@ column_parser <- add_option(
   help = "Number of cores to specify for different routines to use."
 )
 
+column_parser <- add_option(
+  object = column_parser,
+  opt_str = c("--nospreadsheet"),
+  type = "character",
+  help = "True or false (as parseable by R). Set to true to ignore interacting with the spreadsheet database. Deafult FALSE."
+)
+
 
 
 column_options <- parse_args(column_parser)
@@ -186,6 +193,9 @@ if(!is.null(column_options$setntoneff)) arg.setNToNEFF <-  as.logical(unlist(str
 
 arg.ncores <- 5
 if(!is.null(column_options$ncores)) arg.ncores<-as.numeric(column_options$ncores)
+
+arg.nospreadsheet <- NULL
+if(!is.null(column_options$setntoneff)) arg.nospreadsheet <-  as.logical(column_options$nospreadsheet)
 
 #hard coded options
 keep_indel <- TRUE

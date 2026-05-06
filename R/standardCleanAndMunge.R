@@ -178,6 +178,7 @@ standardPipelineCleanAndMunge <- function(
     n_threads=5,
     keep_indel=T,
     doPipelineSpecific=T,
+    useSpreadsheetDatabase=T,
     outputFormat=NULL, #default,ldsc,cojo
     #ldscCompatibility=T, #old
     maf_filter=NULL,
@@ -207,7 +208,7 @@ standardPipelineCleanAndMunge <- function(
   if(is.null(rsSynonymsFilePath)) rsSynonymsFilePath<-NA_character_
   if(is.null(outputFormat)) outputFormat<-"default"
 
-  cat("\n***Standard clean and munge***\nAs of tngpipeline 0.3.0\n")
+  cat("\n***Standard clean and munge***\nAs of tngpipeline 0.4.0\n")
 
 #set up metadata df
   sumstats_meta <- data.frame(
@@ -239,7 +240,7 @@ standardPipelineCleanAndMunge <- function(
   #print(sumstats_meta)
 
 
-  if(!is.null(serviceAccountTokenPath)){
+  if(!is.null(serviceAccountTokenPath) && useSpreadsheetDatabase==TRUE){
     tngpipeline::authenticateSpreadsheet(serviceAccountTokenPath=serviceAccountTokenPath)
   }
   #currentSheet <- tngpipeline::readSpreadsheet(sheetLink=sheetLink)
@@ -249,23 +250,24 @@ standardPipelineCleanAndMunge <- function(
   max_retries <- 3  # max try times
   delay <- 60      # delay time-2mins
 
-  for (i in 1:max_retries) {
-    tryCatch({
-      currentSheet <- tngpipeline::readSpreadsheet(sheetLink = sheetLink)
-      break
-    }, error = function(e) {
-      cat("Error in reading Google Sheet. Attempt", i, "of", max_retries, "failed.\n")
-      cat("Error message:", e$message, "\n")
-      if (i < max_retries) {
-        cat("Waiting for", delay/60, "minutes before retrying...\n")
-        Sys.sleep(delay)
-      } else {
-        stop("Failed to read Google Sheet after", max_retries, "attempts.")
-      }
-    })
-  }
-  cat("Successfully read the Google Spreadsheet.\n")
-
+  if(useSpreadsheetDatabase==TRUE){
+    for (i in 1:max_retries) {
+      tryCatch({
+        currentSheet <- tngpipeline::readSpreadsheet(sheetLink = sheetLink)
+        break
+      }, error = function(e) {
+        cat("Error in reading Google Sheet. Attempt", i, "of", max_retries, "failed.\n")
+        cat("Error message:", e$message, "\n")
+        if (i < max_retries) {
+          cat("Waiting for", delay/60, "minutes before retrying...\n")
+          Sys.sleep(delay)
+        } else {
+          stop("Failed to read Google Sheet after", max_retries, "attempts.")
+        }
+      })
+    }
+    cat("Successfully read the Google Spreadsheet.\n")
+  } else cat("Ignoring the spreadsheet database.\n")
 
   for(iTrait in 1:nrow(sumstats_meta)){
     #iTrait <-1 #test
@@ -298,52 +300,56 @@ standardPipelineCleanAndMunge <- function(
     }
 
     cat("\nsumstats_meta[iTrait,c(\"path_orig\")]:",as.character(sumstats_meta[iTrait,c("path_orig")]))
-    #add in metadata from database
-    cSheet <- currentSheet[code==eval(sumstats_meta[iTrait,]$code),]
-    if(nrow(cSheet)>1) cSheet<-cSheet[1,]
-    cat("\nMetadata from Google sheet read.")
 
-    cSheet <- as.list(cSheet) #to avoid errors when indexing fields
+    if(useSpreadsheetDatabase==TRUE){
+      #add in metadata from database
+      cSheet <- currentSheet[code==eval(sumstats_meta[iTrait,]$code),]
+      if(nrow(cSheet)>1) cSheet<-cSheet[1,]
+      cat("\nMetadata from Google sheet read.")
 
-    if(!is.na(cSheet$ancestry)) sumstats_meta[iTrait,ancestry:=eval(tngpipeline::parseAncestryText(cSheet$ancestry))]
-    cat("\nsumstats_meta[iTrait,c(\"ancestry\")]:",as.character(sumstats_meta[iTrait,c("ancestry")]))
+      cSheet <- as.list(cSheet) #to avoid errors when indexing fields
 
-    #error from here!!!
-    # if(!is.na(cSheet$trait_detail)) sumstats_meta[iTrait,name:=eval(cSheet$trait_detail)]
-    # print(sumstats_meta[iTrait,])
-    #if(!is.na(cSheet$n_cases)) sumstats_meta[iTrait,n_cases:=eval(readr::parse_number(cSheet$n_cases))]
-    if(!is.na(cSheet$n_cases)) sumstats_meta[iTrait,c("n_cases")] <- readr::parse_number(paste0("",unlist(cSheet$n_cases)[[1]]))
+      if(!is.na(cSheet$ancestry)) sumstats_meta[iTrait,ancestry:=eval(tngpipeline::parseAncestryText(cSheet$ancestry))]
+      cat("\nsumstats_meta[iTrait,c(\"ancestry\")]:",as.character(sumstats_meta[iTrait,c("ancestry")]))
 
-    cat("\nsumstats_meta[iTrait,c(\"n_cases\")]:",as.character(sumstats_meta[iTrait,c("n_cases")]))
+      #error from here!!!
+      # if(!is.na(cSheet$trait_detail)) sumstats_meta[iTrait,name:=eval(cSheet$trait_detail)]
+      # print(sumstats_meta[iTrait,])
+      #if(!is.na(cSheet$n_cases)) sumstats_meta[iTrait,n_cases:=eval(readr::parse_number(cSheet$n_cases))]
+      if(!is.na(cSheet$n_cases)) sumstats_meta[iTrait,c("n_cases")] <- readr::parse_number(paste0("",unlist(cSheet$n_cases)[[1]]))
 
-    #if(!is.na(cSheet$n_controls)) sumstats_meta[iTrait,n_controls:=eval(readr::parse_number(cSheet$n_controls))]
-    if(!is.na(cSheet$n_controls)) sumstats_meta[iTrait,c("n_controls")] <- readr::parse_number(paste0("",unlist(cSheet$n_controls)[[1]]))
+      cat("\nsumstats_meta[iTrait,c(\"n_cases\")]:",as.character(sumstats_meta[iTrait,c("n_cases")]))
 
-    cat("\nsumstats_meta[iTrait,c(\"n_controls\")]:",as.character(sumstats_meta[iTrait,c("n_controls")]))
+      #if(!is.na(cSheet$n_controls)) sumstats_meta[iTrait,n_controls:=eval(readr::parse_number(cSheet$n_controls))]
+      if(!is.na(cSheet$n_controls)) sumstats_meta[iTrait,c("n_controls")] <- readr::parse_number(paste0("",unlist(cSheet$n_controls)[[1]]))
 
-    #edit metadata after reading the file-based metadata and database data (if known)
-    #Xy: if case-control are NA, sample_size_discovery is not NA, then give sample_size_discovery to "N"
-    #JZ: Rearranged the priority of these, prioritising discovery sample size over case/control N (as some meta-analyses mix ca/co and continuous outcom variables).
-    if (!is.na(cSheet$sample_size_discovery)) {
-      sumstats_meta[iTrait, c("N")] <- readr::parse_number(paste0("",unlist(cSheet$sample_size_discovery)[[1]]))
-    } else if (!is.na(cSheet$n_cases) || !is.na(cSheet$n_controls)) {
-      sumstats_meta[iTrait, c("N")] <- sum(
-        readr::parse_number(paste0("",unlist(cSheet$n_cases)[[1]])),
-        readr::parse_number(paste0("",unlist(cSheet$n_controls)[[1]]))
-      )
+      cat("\nsumstats_meta[iTrait,c(\"n_controls\")]:",as.character(sumstats_meta[iTrait,c("n_controls")]))
+
+      #edit metadata after reading the file-based metadata and database data (if known)
+      #Xy: if case-control are NA, sample_size_discovery is not NA, then give sample_size_discovery to "N"
+      #JZ: Rearranged the priority of these, prioritising discovery sample size over case/control N (as some meta-analyses mix ca/co and continuous outcom variables).
+      if (!is.na(cSheet$sample_size_discovery)) {
+        sumstats_meta[iTrait, c("N")] <- readr::parse_number(paste0("",unlist(cSheet$sample_size_discovery)[[1]]))
+      } else if (!is.na(cSheet$n_cases) || !is.na(cSheet$n_controls)) {
+        sumstats_meta[iTrait, c("N")] <- sum(
+          readr::parse_number(paste0("",unlist(cSheet$n_cases)[[1]])),
+          readr::parse_number(paste0("",unlist(cSheet$n_controls)[[1]]))
+        )
+      }
+      cat("\nN has been set to:\t\t", as.integer(sumstats_meta[iTrait, c("N")]))
+
+      if (!is.na(cSheet$sample_size_effective)) {
+        sumstats_meta[iTrait, c("Neff")] <- readr::parse_number(paste0("",unlist(cSheet$sample_size_effective)[[1]]))
+      }
+      cat("\nNeff has been set to:\t\t", as.integer(sumstats_meta[iTrait, c("Neff")]))
+
+      sumstats_meta[iTrait,dependent_variable:=ifelse(!is.na(n_cases) & !is.na(n_controls), "binary", "continuous")]
+      cat("\nsumstats_meta[iTrait,c(\"dependent_variable\")]:", as.character(sumstats_meta[iTrait,c("dependent_variable")]))
+
+      sumstats_meta[iTrait,file_name:=ifelse(is.na(eval(cSheet$file_name)),paste0(code,".gz"),eval(cSheet$file_name))]
+      cat("\nsumstats_meta[iTrait,c(\"file_name\")]:",as.character(sumstats_meta[iTrait,c("file_name")]))
+
     }
-    cat("\nN has been set to:\t\t", as.integer(sumstats_meta[iTrait, c("N")]))
-
-    if (!is.na(cSheet$sample_size_effective)) {
-      sumstats_meta[iTrait, c("Neff")] <- readr::parse_number(paste0("",unlist(cSheet$sample_size_effective)[[1]]))
-    }
-    cat("\nNeff has been set to:\t\t", as.integer(sumstats_meta[iTrait, c("Neff")]))
-
-    sumstats_meta[iTrait,dependent_variable:=ifelse(!is.na(n_cases) & !is.na(n_controls), "binary", "continuous")]
-    cat("\nsumstats_meta[iTrait,c(\"dependent_variable\")]:", as.character(sumstats_meta[iTrait,c("dependent_variable")]))
-
-    sumstats_meta[iTrait,file_name:=ifelse(is.na(eval(cSheet$file_name)),paste0(code,".gz"),eval(cSheet$file_name))]
-    cat("\nsumstats_meta[iTrait,c(\"file_name\")]:",as.character(sumstats_meta[iTrait,c("file_name")]))
 
     cat("\nUsing the input folder paths in priority order as:")
     print(altInputFolderPaths)
@@ -361,7 +367,7 @@ standardPipelineCleanAndMunge <- function(
         #iAltPath<-1
 
         #new - subfolders for releases
-        if(!is.na(cSheet$sub)){
+        if(useSpreadsheetDatabase==TRUE && !is.na(cSheet$sub)){
           cFilepath <- as.character(file.path(altInputFolderPaths[iAltPath],cSheet$sub,sumstats_meta[iTrait,c("file_name")]))
           cat("\ncFilepath:\n",cFilepath)
           if( !is.na(sumstats_meta[iTrait,c("file_name")]) & file.exists(cFilepath)){
