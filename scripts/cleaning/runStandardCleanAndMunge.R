@@ -195,7 +195,7 @@ arg.ncores <- 5
 if(!is.null(column_options$ncores)) arg.ncores<-as.numeric(column_options$ncores)
 
 arg.nospreadsheet <- FALSE
-if(!is.null(column_options$setntoneff)) arg.nospreadsheet <-  as.logical(column_options$nospreadsheet)
+if(!is.null(column_options$nospreadsheet)) arg.nospreadsheet <-  as.logical(column_options$nospreadsheet)
 
 #hard coded options
 keep_indel <- TRUE
