@@ -135,13 +135,13 @@
 # doPipelineSpecific= FALSE
 
 
-# traitCodes = c("BIPO04")
-# referenceFilePath = "/scratch/prj/gwas_sumstats/variant_lists/reference.1000G.maf.0.005.txt.gz"
+# traitCodes = c("MIGR02")
+# #referenceFilePath = "/scratch/prj/gwas_sumstats/variant_lists/reference.1000G.maf.0.005.txt.gz"
 # n_threads=5
 # keep_indel=T
-# maf_filter=0.01
+# maf_filter=0.001
 # info_filter=0.6
-# outputFormat="ldsc"
+# #outputFormat="ldsc"
 
 
 #defaults
@@ -153,6 +153,7 @@
 # n_threads=5
 # keep_indel=T
 # doPipelineSpecific=T
+# useSpreadsheetDatabase=T
 # outputFormat="default" #default,ldsc,cojo
 # maf_filter=NULL
 # info_filter=NULL

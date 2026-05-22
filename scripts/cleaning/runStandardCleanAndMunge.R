@@ -2,8 +2,8 @@
 # Will run the standardised pipeline as a command line program
 
 #install the pipeline package
-#devtools::install_github("tnggroup/genetic_correlations",ref = 'main') #public repository
-#devtools::install_github("tnggroup/genetic_correlations",ref = 'main', auth_token = "YOUR_PAT") #private repository example
+#remotes::install_github("tnggroup/genetic_correlations",ref = 'main') #public repository
+#remotes::install_github("tnggroup/genetic_correlations",ref = 'main', auth_token = "YOUR_PAT") #private repository example
 
 library(googlesheets4)
 library(data.table)
